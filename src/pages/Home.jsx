@@ -1,6 +1,6 @@
 
 
-export default function Register() {
+export default function Home() {
   return (
     <div>
       
