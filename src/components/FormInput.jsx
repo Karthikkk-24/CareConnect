@@ -1,5 +1,4 @@
 import PropTypes from 'prop-types';
-import PhoneInput from 'react-phone-number-input';
 
 export default function FormInput({ type, name, value, onChange }) {
     const inputStyles =
