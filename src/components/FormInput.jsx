@@ -2,7 +2,7 @@ import PropTypes from 'prop-types';
 
 export default function FormInput({ type, name, value, onChange }) {
     const inputStyles =
-        'w-full h-10 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-slate-800 text-white';
+        'w-full h-10 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-slate-800 text-white pl-10';
 
     function produceInput(required, type, name) {
         switch (type) {
@@ -75,7 +75,8 @@ export default function FormInput({ type, name, value, onChange }) {
     }
 
     return (
-        <div className="w-full h-auto">
+        <div className="w-full h-auto relative">
+            <img src="/assets/icons/email.svg" className='absolute top-1/2 left-2 translate-y-[-50%]' alt="" />
             {produceInput(true, type, name, value, onChange)}
         </div>
     );

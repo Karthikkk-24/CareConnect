@@ -10,7 +10,9 @@ export default function LoginForm() {
     const [phone, setPhone] = useState("");
 
     return (
-        <div className="w-1/2 h-auto flex flex-col items-center justify-start gap-6">
+        <div className="w-1/2 h-auto flex flex-col items-start justify-start gap-6">
+            <h1 className="text-3xl font-bold text-white">Hey there...</h1>
+            <p className="text-white">Sign in to your account</p>
             <div className="w-full h-auto flex flex-col items-start justify-start gap-2">
                 <FormLabel name="email" title="Email" />
                 <FormInput type="email" name="email" title="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
