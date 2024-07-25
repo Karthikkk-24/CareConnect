@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import LoginForm from '../components/LoginForm';
+import RegisterForm from '../components/RegisterForm';
 
 export default function Register() {
     return (
@@ -8,7 +8,7 @@ export default function Register() {
                 <div className="w-full h-auto flex items-start justify-start gap-6">
                     <img src="/assets/icons/logo-full.svg" className='h-12' alt="" />
                 </div>
-                <LoginForm />
+                <RegisterForm />
                 <p className="w-full text-left flex items-center justify-between text-white">
                     <Link to="/register">
                         Don&apos;t have an account? Sign Up Now
