@@ -10,8 +10,8 @@ export default function Register() {
                 </div>
                 <RegisterForm />
                 <p className="w-full text-left flex items-center justify-between text-white">
-                    <Link to="/register">
-                        Don&apos;t have an account? Sign Up Now
+                    <Link to="/login">
+                        Already have an account? Login
                     </Link>
                     <Link className="text-primary" to="/admin/login">
                         Admin

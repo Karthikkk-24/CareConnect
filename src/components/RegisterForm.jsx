@@ -5,6 +5,7 @@ import FormLabel from "./FormLabel";
 
 export default function RegisterForm() {
 
+    const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [phone, setPhone] = useState("");
@@ -13,6 +14,10 @@ export default function RegisterForm() {
         <div className="w-1/2 h-auto flex flex-col items-start justify-start gap-6">
             <h1 className="text-3xl font-bold text-white">Hey there...</h1>
             <p className="text-white">Sign in to your account</p>
+            <div className="w-full h-auto flex flex-col items-start justify-start gap-2">
+                <FormLabel name="name" title="Name" />
+                <FormInput type="text" name="name" title="Name" value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
             <div className="w-full h-auto flex flex-col items-start justify-start gap-2">
                 <FormLabel name="email" title="Email" />
                 <FormInput type="email" name="email" title="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
