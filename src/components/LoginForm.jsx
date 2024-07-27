@@ -22,10 +22,6 @@ export default function LoginForm() {
                 <FormInput type="password" name="password" title="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
             <div className="w-full h-auto flex flex-col items-start justify-start gap-2">
-                <FormLabel name="phone" title="Phone Number" />
-                <FormInput type="tel" name="phone" title="Phone Number" value={phone} onChange={(e) => setPhone(e.target.value)} />
-            </div>
-            <div className="w-full h-auto flex flex-col items-start justify-start gap-2">
                 <button type="submit" className="w-full h-10 px-4 py-2 uppercase  rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-primary text-white">Login</button>
             </div>
         </div>
