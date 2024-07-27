@@ -20,7 +20,12 @@ export default function PatientForm() {
     const [currentMedication, setCurrentMedication] = useState('');
     const [familyMedicalHistory, setFamilyMedicalHistory] = useState('');
     const [pastMedicalHistory, setPastMedicalHistory] = useState('');
-    
+    const [identificationType, setIdentificationType] = useState('');
+    const [identificationNumber, setIdentificationNumber] = useState('');
+    const [scannedCopyDocument, setScannedCopyDocument] = useState(null);
+    const [consentToReceiveTreatments, setConsentToReceiveTreatments] = useState(null);
+    const [consentToShareData, setConsentToShareData] = useState(null);
+    const [consentAcknowledgement, setConsentAcknowledgement] = useState(null);
 
     return (
         <div className="w-1/2 h-auto flex flex-col items-start justify-start gap-6">
