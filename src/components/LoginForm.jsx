@@ -7,7 +7,6 @@ export default function LoginForm() {
 
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-    const [phone, setPhone] = useState("");
 
     return (
         <div className="w-1/2 h-auto flex flex-col items-start justify-start gap-6">
