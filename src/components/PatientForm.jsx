@@ -53,6 +53,46 @@ export default function PatientForm() {
                 />
             </div>
             <div className="w-full h-auto flex flex-col items-start justify-start gap-2">
+                <FormLabel name="phone-number" title="Phone Number" />
+                <FormInput
+                    type="tel"
+                    name="phone-number"
+                    title="Phone Number"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                />
+            </div>
+            <div className="w-full h-auto flex flex-col items-start justify-start gap-2">
+                <FormLabel name="date-of-birth" title="Date of Birth" />
+                <FormInput
+                    type="date"
+                    name="date-of-birth"
+                    title="Date of Birth"
+                    value={dob}
+                    onChange={(e) => setDob(e.target.value)}
+                />
+            </div>
+            <div className="w-full h-auto flex flex-col items-start justify-start gap-2">
+                <FormLabel name="gender" title="Gender" />
+                <FormInput
+                    type="text"
+                    name="gender"
+                    title="Gender"
+                    value={gender}
+                    onChange={(e) => setGender(e.target.value)}
+                />
+            </div>
+            <div className="w-full h-auto flex flex-col items-start justify-start gap-2">
+                <FormLabel name="address" title="Address" />
+                <FormInput
+                    type="text"
+                    name="address"
+                    title="Address"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                />
+            </div>
+            <div className="w-full h-auto flex flex-col items-start justify-start gap-2">
                 <button
                     type="submit"
                     className="w-full h-10 px-4 py-2 uppercase  rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-primary text-white"
