@@ -93,6 +93,58 @@ export default function PatientForm() {
                 />
             </div>
             <div className="w-full h-auto flex flex-col items-start justify-start gap-2">
+                <FormLabel name="occupation" title="Occupation" />
+                <FormInput
+                    type="text"
+                    name="occupation"
+                    title="Occupation"
+                    value={occupation}
+                    onChange={(e) => setOccupation(e.target.value)}
+                />
+            </div>
+            <Heading title='Medical Information' />
+            <div className="w-full h-auto flex flex-col items-start justify-start gap-2">
+                <FormLabel name="emergency-contact-name" title="Emergency Contact Name" />
+                <FormInput
+                    type="text"
+                    name="emergency-contact-name"
+                    title="Emergency Contact Name"
+                    value={emergencyContactName}
+                    onChange={(e) => setEmergencyContactName(e.target.value)}
+                />
+            </div>
+            <div className="w-full h-auto flex flex-col items-start justify-start gap-2">
+                <FormLabel name="emergency-contact-number" title="Emergency Contact Number" />
+                <FormInput
+                    type="tel"
+                    name="emergency-contact-number"
+                    title="Emergency Contact Number"
+                    value={emergencyContactNumber}
+                    onChange={(e) => setEmergencyContactNumber(e.target.value)}
+                />
+            </div>
+            <div className="w-full h-auto flex flex-col items-start justify-start gap-2">
+                <FormLabel name="family-medical-history" title="Family Medical History" />
+                <FormInput
+                    type="text"
+                    name="family-medical-history"
+                    title="Family Medical History"
+                    value={familyMedicalHistory}
+                    onChange={(e) => setFamilyMedicalHistory(e.target.value)}
+                />
+            </div>
+            <div className="w-full h-auto flex flex-col items-start justify-start gap-2">
+                <FormLabel name="allergies" title="Allergies" />
+                <FormInput
+                    type="text"
+                    name="allergies"
+                    title="Allergies"
+                    value={allergies}
+                    onChange={(e) => setAllergies(e.target.value)}
+                />
+            </div>
+
+            <div className="w-full h-auto flex flex-col items-start justify-start gap-2">
                 <button
                     type="submit"
                     className="w-full h-10 px-4 py-2 uppercase  rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-primary text-white"
