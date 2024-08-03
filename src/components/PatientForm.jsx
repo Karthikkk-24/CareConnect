@@ -124,13 +124,33 @@ export default function PatientForm() {
                 />
             </div>
             <div className="w-full h-auto flex flex-col items-start justify-start gap-2">
-                <FormLabel name="family-medical-history" title="Family Medical History" />
+                <FormLabel name='primary-care-physician' title="Primary Care Physician" />
                 <FormInput
                     type="text"
-                    name="family-medical-history"
-                    title="Family Medical History"
-                    value={familyMedicalHistory}
-                    onChange={(e) => setFamilyMedicalHistory(e.target.value)}
+                    name="primary-care-physician"
+                    title="Primary Care Physician"
+                    value={primaryCarePhysician}
+                    onChange={(e) => setPrimaryCarePhysician(e.target.value)}
+                />
+            </div>
+            <div className='w-full h-auto flex flex-col items-start justify-start gap-2'>
+                <FormLabel name="insurance-provider" title="Insurance Provider" />
+                <FormInput
+                    type="text"
+                    name="insurance-provider"
+                    title="Insurance Provider"
+                    value={insuranceProvider}
+                    onChange={(e) => setInsuranceProvider(e.target.value)}
+                />
+            </div>
+            <div className="w-full h-auto flex flex-col items-start justify-start gap-2">
+                <FormLabel name="insurance-policy-number" title="Insurance Policy Number" />
+                <FormInput
+                    type="text"
+                    name="insurance-policy-number"
+                    title="Insurance Policy Number"
+                    value={insurancePolicyNumber}
+                    onChange={(e) => setInsurancePolicyNumber(e.target.value)}
                 />
             </div>
             <div className="w-full h-auto flex flex-col items-start justify-start gap-2">
@@ -143,7 +163,96 @@ export default function PatientForm() {
                     onChange={(e) => setAllergies(e.target.value)}
                 />
             </div>
-
+            <div className="w-full h-auto flex flex-col items-start justify-start gap-2">
+                <FormLabel name='current-medication' title="Current Medication" />
+                <FormInput
+                    type="text"
+                    name="current-medication"
+                    title="Current Medication"
+                    value={currentMedication}
+                    onChange={(e) => setCurrentMedication(e.target.value)}
+                />
+            </div>
+            <div className="w-full h-auto flex flex-col items-start justify-start gap-2">
+                <FormLabel name="family-medical-history" title="Family Medical History" />
+                <FormInput
+                    type="text"
+                    name="family-medical-history"
+                    title="Family Medical History"
+                    value={familyMedicalHistory}
+                    onChange={(e) => setFamilyMedicalHistory(e.target.value)}
+                />
+            </div>
+            <div className='w-full h-auto flex flex-col items-start justify-start gap-2'>
+                <FormLabel name="past-medical-history" title="Past Medical History" />
+                <FormInput
+                    type="text"
+                    name="past-medical-history"
+                    title="Past Medical History"
+                    value={pastMedicalHistory}
+                    onChange={(e) => setPastMedicalHistory(e.target.value)}
+                />
+            </div>
+            <div className='w-full h-auto flex flex-col items-start justify-start gap-2'>
+                <FormLabel name="identification-type" title="Identification Type" />
+                <FormInput
+                    type="text"
+                    name="identification-type"
+                    title="Identification Type"
+                    value={identificationType}
+                    onChange={(e) => setIdentificationType(e.target.value)}
+                />
+            </div>
+            <div className='w-full h-auto flex flex-col items-start justify-start gap-2'>
+                <FormLabel name="identification-number" title="Identification Number" />
+                <FormInput
+                    type="text"
+                    name="identification-number"
+                    title="Identification Number"
+                    value={identificationNumber}
+                    onChange={(e) => setIdentificationNumber(e.target.value)}
+                />
+            </div>
+            <div className='w-full h-auto flex flex-col items-start justify-start gap-2'>
+                <FormLabel name='scanned-copy-document' title="Scanned Copy of Document" />
+                <FormInput
+                    type="file"
+                    name="scanned-copy-document"
+                    title="Scanned Copy of Document"
+                    value={scannedCopyDocument}
+                    onChange={(e) => setScannedCopyDocument(e.target.value)}
+                />
+            </div>
+            <div className='w-full h-auto flex flex-col items-start justify-start gap-2'>
+                <FormLabel name='consent-to-receive-treatments' title="Consent to Receive Treatments" />
+                <FormInput
+                    type="text"
+                    name="consent-to-receive-treatments"
+                    title="Consent to Receive Treatments"
+                    value={consentToReceiveTreatments}
+                    onChange={(e) => setConsentToReceiveTreatments(e.target.value)}
+                />
+            </div>
+            <div className='w-full h-auto flex flex-col items-start justify-start gap-2'>
+                <FormLabel name='consent-to-share-data' title="Consent to Share Data" />
+                <FormInput
+                    type="text"
+                    name="consent-to-share-data"
+                    title="Consent to Share Data"
+                    value={consentToShareData}
+                    onChange={(e) => setConsentToShareData(e.target.value)}
+                />
+            </div>
+            <div className='w-full h-auto flex flex-col items-start justify-start gap-2'>
+                <FormLabel name='consent-acknowledgement' title="Consent Acknowledgement" />
+                <FormInput
+                    type="text"
+                    name="consent-acknowledgement"
+                    title="Consent Acknowledgement"
+                    value={consentAcknowledgement}
+                    onChange={(e) => setConsentAcknowledgement(e.target.value)}
+                />
+            </div>
             <div className="w-full h-auto flex flex-col items-start justify-start gap-2">
                 <button
                     type="submit"
