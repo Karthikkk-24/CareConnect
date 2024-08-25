@@ -1,6 +1,6 @@
 # CareConnect
 
-CareConnect is an end-to-end hospital management site built using React. It streamlines various hospital operations, offering a seamless experience for both administrators and patients. The project is styled entirely using Tailwind CSS.
+CareConnect is an end-to-end hospital management software built using React. It streamlines various hospital operations, offering a seamless experience for both administrators and patients. The project is styled entirely using Tailwind CSS.
 
 ## Features
 
