@@ -1,0 +1,46 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+:root {
+  --clay-bg: #f0f4fa;
+  --clay-surface: #ffffff;
+  --clay-primary: #4a7fd4;
+  --clay-primary-dark: #3568b8;
+  --clay-primary-light: #e8f0fc;
+  --clay-text: #2c3e5c;
+  --clay-text-muted: #7a8ba8;
+  --clay-success: #5cb87a;
+  --clay-warning: #e8b84a;
+  --clay-error: #e85d5d;
+  --clay-shadow-dark: rgba(74, 127, 212, 0.18);
+  --clay-shadow-light: rgba(255, 255, 255, 0.9);
+}
+
+@theme inline {
+  --color-clay-bg: var(--clay-bg);
+  --color-clay-surface: var(--clay-surface);
+  --color-clay-primary: var(--clay-primary);
+  --color-clay-primary-dark: var(--clay-primary-dark);
+  --color-clay-primary-light: var(--clay-primary-light);
+  --color-clay-text: var(--clay-text);
+  --color-clay-text-muted: var(--clay-text-muted);
+  --color-clay-success: var(--clay-success);
+  --color-clay-warning: var(--clay-warning);
+  --color-clay-error: var(--clay-error);
+  --font-sans: 'Poppins', ui-sans-serif, system-ui, sans-serif;
+  --shadow-clay: 8px 8px 16px var(--clay-shadow-dark), -8px -8px 16px var(--clay-shadow-light);
+  --shadow-clay-sm: 4px 4px 12px var(--clay-shadow-dark), -4px -4px 12px var(--clay-shadow-light);
+  --shadow-clay-inset: inset 4px 4px 8px var(--clay-shadow-dark), inset -4px -4px 8px var(--clay-shadow-light);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--clay-bg);
+  color: var(--clay-text);
+  font-family: 'Poppins', sans-serif;
+  margin: 0;
+  min-height: 100vh;
+}

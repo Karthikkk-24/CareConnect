@@ -1,35 +1,22 @@
 {
   "name": "careconnect",
   "private": true,
-  "version": "0.0.0",
-  "type": "module",
+  "version": "0.1.0",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "body-parser": "^1.20.2",
-    "cors": "^2.8.5",
-    "express": "^4.19.2",
-    "mongoose": "^8.5.1",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-phone-number-input": "^3.4.3",
-    "react-router-dom": "^6.25.1"
+    "dev": "turbo dev",
+    "dev:web": "turbo dev --filter=web",
+    "dev:api": "turbo dev --filter=api",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "test": "turbo test",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,css}\""
   },
   "devDependencies": {
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.3.1",
-    "autoprefixer": "^10.4.19",
-    "eslint": "^8.57.0",
-    "eslint-plugin-react": "^7.34.3",
-    "eslint-plugin-react-hooks": "^4.6.2",
-    "eslint-plugin-react-refresh": "^0.4.7",
-    "postcss": "^8.4.39",
-    "tailwindcss": "^3.4.6",
-    "vite": "^5.3.4"
+    "prettier": "^3.4.2",
+    "turbo": "^2.5.4"
+  },
+  "packageManager": "pnpm@10.18.3",
+  "engines": {
+    "node": ">=20"
   }
 }

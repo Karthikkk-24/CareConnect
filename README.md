@@ -1,82 +1,95 @@
 # CareConnect
 
-CareConnect is an end-to-end hospital management software built using React. It streamlines various hospital operations, offering a seamless experience for both administrators and patients. The project is styled entirely using Tailwind CSS.
+Open-source hospital and healthcare management platform built with Next.js, NestJS, GraphQL, TypeORM, and Supabase PostgreSQL.
 
-## Features
+## Architecture
 
-- **Patient Management**: Track patient records, appointments, and histories.
-- **Doctor Management**: Manage doctor profiles, schedules, and specializations.
-- **Appointment Scheduling**: Efficient scheduling system for patient appointments.
-- **Billing and Invoicing**: Automated billing and invoicing for patient treatments.
-- **User Authentication**: Secure login and access management for hospital staff.
+```
+apps/web     → Next.js 16 frontend (claymorphism UI)
+apps/api     → NestJS GraphQL API with TypeORM
+packages/ui  → Shared claymorphism component library
+packages/types → Shared TypeScript types and Zod schemas
+supabase/    → Database migrations and config
+legacy/      → Original Vite + React prototype
+```
 
-## Getting Started
+## Prerequisites
 
-Follow these instructions to set up the project locally on your machine.
+- Node.js 20+
+- pnpm 10+
+- Supabase CLI (for local database)
+- PostgreSQL (via Supabase local or cloud)
 
-### Prerequisites
+## Quick Start
 
-Ensure you have the following tools installed:
+### 1. Install dependencies
 
-- [Node.js](https://nodejs.org/) (v14.0.0 or higher)
-- [npm](https://www.npmjs.com/) or [yarn](https://yarnpkg.com/)
+```bash
+pnpm install
+```
 
-### Installation
+### 2. Set up environment variables
 
-1. **Clone the repository:**
+```bash
+cp .env.example .env
+cp apps/api/.env.example apps/api/.env
+cp apps/web/.env.example apps/web/.env.local
+```
 
-    ```bash
-    git clone https://github.com/Karthikkk-24/CareConnect.git
-    cd CareConnect
-    ```
+Fill in your Supabase project URL, anon key, JWT secret, and database URL.
 
-2. **Install dependencies:**
+### 3. Run database migrations
 
-    If you're using npm:
+```bash
+# With Supabase CLI linked to your project:
+supabase db push
 
-    ```bash
-    npm install
-    ```
+# Or apply migrations manually to your Postgres instance
+```
 
-    Or, if you're using yarn:
+### 4. Start development servers
 
-    ```bash
-    yarn install
-    ```
+```bash
+# Start both frontend and API
+pnpm dev
 
-3. **Run the application:**
+# Or individually:
+pnpm dev:web   # http://localhost:3000
+pnpm dev:api   # http://localhost:4000/graphql
+```
 
-    If you're using npm:
+## Project Status
 
-    ```bash
-    npm start
-    ```
+### Phase 0 — Foundation ✅
+- Turborepo monorepo with pnpm workspaces
+- Next.js app with claymorphism design system
+- NestJS API with GraphQL + TypeORM
+- Supabase schema migrations (RBAC tables)
+- Supabase Auth ↔ NestJS JWT validation
+- GitHub Actions CI pipeline
 
-    Or, if you're using yarn:
+### Phase 1 — Core Platform ✅
+- RBAC with roles, permissions, and guards
+- Landing page (hero, features, pricing, CTA)
+- Login, register, and onboarding flows
+- Hospital admin dashboard with sidebar
+- Staff CRUD (create, list, edit, deactivate)
 
-    ```bash
-    yarn start
-    ```
+### Upcoming — Phase 2
+- Patient registration (single + bulk import)
+- Patient 360° view and medical history
+- Document uploads via Supabase Storage
 
-    Open [http://localhost:3000](http://localhost:3000) in your browser to view the application.
+## Tech Stack
 
-### How It Works
+| Layer | Technology |
+|-------|-----------|
+| Frontend | Next.js 16, Tailwind CSS 4, Apollo Client |
+| Backend | NestJS 11, GraphQL (code-first), TypeORM |
+| Database | Supabase PostgreSQL |
+| Auth | Supabase Auth + JWT guards |
+| Monorepo | Turborepo + pnpm |
 
-1. **Login/Signup**: Users can log in or sign up to access the platform.
-2. **Dashboard**: After logging in, users can access different management modules like patients, doctors, appointments, and billing.
-3. **Manage Operations**: Admins can add, edit, and remove records, manage schedules, and generate invoices.
+## License
 
-## Built With
-
-- **React**: A JavaScript library for building user interfaces.
-- **Tailwind CSS**: A utility-first CSS framework for rapidly building custom designs.
-
-## Contact
-
-If you have any questions or feedback, feel free to reach out:
-
-- GitHub: [Karthikkk-24](https://github.com/Karthikkk-24)
-- LinkedIn: [Karthik Shettigar](https://www.linkedin.com/in/kks24)
-- Twitter: [@karthikkk24](https://twitter.com/karthikkk24)
-- Instagram: [the_coding_hacker](https://www.instagram.com/the_coding_hacker/)
-- Medium: [Karthik Shettigar](https://medium.com/@karthikkk)
+MIT

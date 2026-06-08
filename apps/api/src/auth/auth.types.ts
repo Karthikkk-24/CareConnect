@@ -1,0 +1,21 @@
+import type { RoleSlug } from '@careconnect/types';
+
+export interface JwtPayload {
+  sub: string;
+  email?: string;
+  role?: string;
+  aud?: string;
+  exp?: number;
+  iat?: number;
+}
+
+export interface AuthenticatedUser {
+  id: string;
+  authId: string;
+  email: string;
+  fullName: string;
+  hospitalId?: string;
+  roles: RoleSlug[];
+  permissions: string[];
+  onboardingCompleted: boolean;
+}
