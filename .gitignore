@@ -40,5 +40,8 @@ coverage
 # Turbo
 .turbo
 
+# Built shared packages
+packages/types/dist
+
 # Legacy
 legacy/node_modules

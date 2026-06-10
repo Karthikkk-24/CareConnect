@@ -1,0 +1,97 @@
+import { UseGuards } from '@nestjs/common';
+import { Args, Int, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { PERMISSIONS } from '@careconnect/types';
+import { GqlAuthGuard } from '../auth/gql-auth.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
+import type { AuthenticatedUser } from '../auth/auth.types';
+import { Permissions } from '../rbac/permissions.decorator';
+import { RolesGuard } from '../rbac/roles.guard';
+import { PatientsService } from './patients.service';
+import {
+  BulkImportResultType,
+  BulkPatientRowInput,
+  CreatePatientInput,
+  PatientDetailType,
+  PatientDocumentInput,
+  PatientDocumentType,
+  PatientsPageType,
+  PatientType,
+} from './patients.types';
+
+@Resolver()
+@UseGuards(GqlAuthGuard, RolesGuard)
+export class PatientsResolver {
+  constructor(private readonly patientsService: PatientsService) {}
+
+  @Query(() => PatientsPageType)
+  @Permissions(PERMISSIONS.PATIENTS_READ)
+  async patients(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('page', { type: () => Int, defaultValue: 1 }) page: number,
+    @Args('limit', { type: () => Int, defaultValue: 20 }) limit: number,
+    @Args('search', { nullable: true }) search?: string,
+    @Args('hospitalId', { nullable: true }) hospitalId?: string,
+  ): Promise<PatientsPageType> {
+    const resolvedHospitalId = this.patientsService.resolveHospitalId(user, hospitalId);
+    return this.patientsService.findAll(resolvedHospitalId, page, limit, search);
+  }
+
+  @Query(() => PatientDetailType)
+  @Permissions(PERMISSIONS.PATIENTS_READ)
+  async patient(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('id') id: string,
+    @Args('hospitalId', { nullable: true }) hospitalId?: string,
+  ): Promise<PatientDetailType> {
+    const resolvedHospitalId = this.patientsService.resolveHospitalId(user, hospitalId);
+    return this.patientsService.findById(id, resolvedHospitalId);
+  }
+
+  @Mutation(() => PatientType)
+  @Permissions(PERMISSIONS.PATIENTS_WRITE)
+  async createPatient(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('input') input: CreatePatientInput,
+    @Args('hospitalId', { nullable: true }) hospitalId?: string,
+  ): Promise<PatientType> {
+    const resolvedHospitalId = this.patientsService.resolveHospitalId(user, hospitalId);
+    return this.patientsService.create(resolvedHospitalId, input);
+  }
+
+  @Mutation(() => BulkImportResultType)
+  @Permissions(PERMISSIONS.PATIENTS_WRITE)
+  async importPatients(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('rows', { type: () => [BulkPatientRowInput] }) rows: BulkPatientRowInput[],
+    @Args('dryRun', { defaultValue: true }) dryRun: boolean,
+    @Args('hospitalId', { nullable: true }) hospitalId?: string,
+  ): Promise<BulkImportResultType> {
+    const resolvedHospitalId = this.patientsService.resolveHospitalId(user, hospitalId);
+    return this.patientsService.bulkImport(resolvedHospitalId, rows, user.id, dryRun);
+  }
+
+  @Mutation(() => PatientDocumentType)
+  @Permissions(PERMISSIONS.PATIENTS_WRITE)
+  async addPatientDocument(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('patientId') patientId: string,
+    @Args('input') input: PatientDocumentInput,
+    @Args('hospitalId', { nullable: true }) hospitalId?: string,
+  ): Promise<PatientDocumentType> {
+    const resolvedHospitalId = this.patientsService.resolveHospitalId(user, hospitalId);
+    const doc = await this.patientsService.addDocument(
+      patientId,
+      resolvedHospitalId,
+      input,
+      user.id,
+    );
+    return {
+      id: doc.id,
+      name: doc.name,
+      fileUrl: doc.fileUrl,
+      fileType: doc.fileType,
+      documentType: doc.documentType,
+      createdAt: doc.createdAt,
+    };
+  }
+}

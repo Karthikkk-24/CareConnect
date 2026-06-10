@@ -4,7 +4,7 @@ import { useQuery } from '@apollo/client';
 import { Calendar, UserCog, Users, Activity } from 'lucide-react';
 import { ClayCard, ClayStatCard } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
-import { ME_QUERY, STAFF_MEMBERS_QUERY } from '@/lib/graphql/queries';
+import { ME_QUERY, PATIENTS_QUERY, STAFF_MEMBERS_QUERY } from '@/lib/graphql/queries';
 
 export default function DashboardPage() {
   const { data: meData } = useQuery(ME_QUERY);
@@ -12,8 +12,13 @@ export default function DashboardPage() {
     variables: { hospitalId: meData?.me?.hospitalId },
     skip: !meData?.me?.hospitalId,
   });
+  const { data: patientsData } = useQuery(PATIENTS_QUERY, {
+    variables: { page: 1, limit: 1, hospitalId: meData?.me?.hospitalId },
+    skip: !meData?.me?.hospitalId,
+  });
 
   const staffCount = staffData?.staffMembers?.length ?? 0;
+  const patientCount = patientsData?.patients?.total ?? 0;
 
   return (
     <div>
@@ -23,7 +28,7 @@ export default function DashboardPage() {
       />
 
       <div className="mb-8 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <ClayStatCard title="Total Patients" value="—" icon={<Users className="h-5 w-5" />} trend={{ value: 'Phase 2', positive: true }} />
+        <ClayStatCard title="Total Patients" value={patientCount} icon={<Users className="h-5 w-5" />} />
         <ClayStatCard title="Staff Members" value={staffCount} icon={<UserCog className="h-5 w-5" />} />
         <ClayStatCard title="Appointments Today" value="—" icon={<Calendar className="h-5 w-5" />} />
         <ClayStatCard title="Active Admissions" value="—" icon={<Activity className="h-5 w-5" />} />
@@ -34,9 +39,10 @@ export default function DashboardPage() {
           <h2 className="mb-4 text-lg font-semibold text-clay-text">Quick Actions</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             {[
+              { label: 'Register Patient', href: '/patients/new' },
+              { label: 'Bulk Import Patients', href: '/patients/import' },
               { label: 'Add Staff Member', href: '/staff/new' },
               { label: 'View Staff Directory', href: '/staff' },
-              { label: 'Hospital Settings', href: '/dashboard/hospital' },
             ].map((action) => (
               <a
                 key={action.label}
@@ -55,7 +61,7 @@ export default function DashboardPage() {
             {[
               { done: !!meData?.me?.onboardingCompleted, text: 'Complete onboarding' },
               { done: staffCount > 0, text: 'Add your first staff member' },
-              { done: false, text: 'Register your first patient (Phase 2)' },
+              { done: patientCount > 0, text: 'Register your first patient' },
               { done: false, text: 'Set up appointment scheduling (Phase 3)' },
             ].map((item) => (
               <li key={item.text} className="flex items-center gap-3 text-sm">

@@ -47,7 +47,17 @@ supabase db push
 # Or apply migrations manually to your Postgres instance
 ```
 
-### 4. Start development servers
+### 4. Create Supabase Storage bucket (for patient documents)
+
+In Supabase Dashboard → Storage, create a bucket named `patient-documents` (public or with RLS policies).
+
+### 5. Build shared types (required before API dev)
+
+```bash
+pnpm --filter @careconnect/types build
+```
+
+### 6. Start development servers
 
 ```bash
 # Start both frontend and API
@@ -75,10 +85,18 @@ pnpm dev:api   # http://localhost:4000/graphql
 - Hospital admin dashboard with sidebar
 - Staff CRUD (create, list, edit, deactivate)
 
-### Upcoming — Phase 2
-- Patient registration (single + bulk import)
-- Patient 360° view and medical history
-- Document uploads via Supabase Storage
+### Phase 2 — Patient Management ✅
+- Patient DB schema (demographics, insurance, allergies, medications, history, documents, consents)
+- Single patient registration (5-step wizard)
+- Patient 360° detail view
+- Medical history timeline
+- Bulk CSV import with dry-run validation
+- Document upload metadata (requires Supabase Storage bucket)
+
+### Upcoming — Phase 3
+- Appointments and scheduling
+- Admissions and bed management
+- Clinical notes and prescriptions
 
 ## Tech Stack
 

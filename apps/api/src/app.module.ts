@@ -8,12 +8,22 @@ import type { Request } from 'express';
 import { AuthModule } from './auth/auth.module';
 import {
   Hospital,
+  Patient,
+  PatientAllergy,
+  PatientConsent,
+  PatientDocument,
+  PatientEmergencyContact,
+  PatientImportJob,
+  PatientInsurance,
+  PatientMedicalHistory,
+  PatientMedication,
   Permission,
   Role,
   StaffProfile,
   User,
   UserRole,
 } from './database/entities';
+import { PatientsModule } from './patients/patients.module';
 import { HospitalsModule } from './hospitals/hospitals.module';
 import { RbacModule } from './rbac/rbac.module';
 import { StaffModule } from './staff/staff.module';
@@ -28,7 +38,23 @@ import { UsersModule } from './users/users.module';
       useFactory: (config: ConfigService) => ({
         type: 'postgres',
         url: config.get<string>('DATABASE_URL'),
-        entities: [Hospital, Role, Permission, User, UserRole, StaffProfile],
+        entities: [
+          Hospital,
+          Role,
+          Permission,
+          User,
+          UserRole,
+          StaffProfile,
+          Patient,
+          PatientEmergencyContact,
+          PatientInsurance,
+          PatientAllergy,
+          PatientMedication,
+          PatientMedicalHistory,
+          PatientDocument,
+          PatientConsent,
+          PatientImportJob,
+        ],
         synchronize: false,
         logging: config.get('NODE_ENV') === 'development',
         ssl: config.get('DATABASE_SSL') === 'true' ? { rejectUnauthorized: false } : false,
@@ -46,6 +72,7 @@ import { UsersModule } from './users/users.module';
     UsersModule,
     HospitalsModule,
     StaffModule,
+    PatientsModule,
   ],
 })
 export class AppModule {}
