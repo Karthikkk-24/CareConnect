@@ -31,12 +31,15 @@ pnpm install
 ### 2. Set up environment variables
 
 ```bash
-cp .env.example .env
-cp apps/api/.env.example apps/api/.env
-cp apps/web/.env.example apps/web/.env.local
+pnpm setup:env
 ```
 
-Fill in your Supabase project URL, anon key, JWT secret, and database URL.
+Then edit the created files with your real Supabase credentials:
+
+- **`apps/api/.env`** — `DATABASE_URL` (Postgres URI from Supabase → Settings → Database) and `SUPABASE_JWT_SECRET`
+- **`apps/web/.env.local`** — `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+The API validates env on startup and fails fast with a clear message if placeholders are still present.
 
 ### 3. Run database migrations
 

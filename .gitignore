@@ -45,3 +45,6 @@ packages/types/dist
 
 # Legacy
 legacy/node_modules
+
+# Personal progress tracker (not committed)
+PROGRESS.md
