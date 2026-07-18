@@ -26,11 +26,16 @@ import {
 @Injectable()
 export class BillingService {
   constructor(
-    @InjectRepository(Invoice) private readonly invoicesRepo: Repository<Invoice>,
-    @InjectRepository(InvoiceItem) private readonly invoiceItemsRepo: Repository<InvoiceItem>,
-    @InjectRepository(Payment) private readonly paymentsRepo: Repository<Payment>,
-    @InjectRepository(Patient) private readonly patientsRepo: Repository<Patient>,
-    @InjectRepository(Admission) private readonly admissionsRepo: Repository<Admission>,
+    @InjectRepository(Invoice)
+    private readonly invoicesRepo: Repository<Invoice>,
+    @InjectRepository(InvoiceItem)
+    private readonly invoiceItemsRepo: Repository<InvoiceItem>,
+    @InjectRepository(Payment)
+    private readonly paymentsRepo: Repository<Payment>,
+    @InjectRepository(Patient)
+    private readonly patientsRepo: Repository<Patient>,
+    @InjectRepository(Admission)
+    private readonly admissionsRepo: Repository<Admission>,
     private readonly audit: AuditService,
   ) {}
 
@@ -99,14 +104,18 @@ export class BillingService {
       totalAmount: this.toNumber(invoice.totalAmount),
       issuedAt: invoice.issuedAt,
       items: (invoice.items ?? []).map((item) => this.toInvoiceItemType(item)),
-      payments: (invoice.payments ?? []).map((payment) => this.toPaymentType(payment)),
+      payments: (invoice.payments ?? []).map((payment) =>
+        this.toPaymentType(payment),
+      ),
       createdAt: invoice.createdAt,
       updatedAt: invoice.updatedAt,
     };
   }
 
   private async assertPatient(hospitalId: string, patientId: string) {
-    const patient = await this.patientsRepo.findOne({ where: { id: patientId, hospitalId } });
+    const patient = await this.patientsRepo.findOne({
+      where: { id: patientId, hospitalId },
+    });
     if (!patient) throw new NotFoundException('Patient not found');
     return patient;
   }
@@ -144,7 +153,8 @@ export class BillingService {
         admissionId: input.admissionId,
         status,
         totalAmount: totalAmount.toFixed(2),
-        issuedAt: status === 'issued' || status === 'paid' ? new Date() : undefined,
+        issuedAt:
+          status === 'issued' || status === 'paid' ? new Date() : undefined,
       }),
     );
 
@@ -207,6 +217,18 @@ export class BillingService {
       throw new BadRequestException('Cannot record payment on a void invoice');
     }
 
+    const currentPaid = (invoice.payments ?? []).reduce(
+      (sum, p) => sum + this.toNumber(p.amount),
+      0,
+    );
+    const invoiceTotal = this.toNumber(invoice.totalAmount);
+    const remaining = Math.max(0, invoiceTotal - currentPaid);
+    if (input.amount > remaining + 0.001) {
+      throw new BadRequestException(
+        `Payment exceeds remaining balance of ${remaining.toFixed(2)}`,
+      );
+    }
+
     const payment = await this.paymentsRepo.save(
       this.paymentsRepo.create({
         invoiceId: invoice.id,
@@ -224,7 +246,6 @@ export class BillingService {
       (sum, p) => sum + this.toNumber(p.amount),
       0,
     );
-    const invoiceTotal = this.toNumber(invoice.totalAmount);
 
     if (paidTotal >= invoiceTotal) {
       invoice.status = 'paid';
@@ -244,6 +265,31 @@ export class BillingService {
       metadata: { invoiceId: invoice.id, amount: input.amount },
     });
 
+    return this.toInvoiceType(invoice);
+  }
+
+  async voidInvoice(
+    hospitalId: string,
+    id: string,
+    actor: AuthenticatedUser,
+  ): Promise<InvoiceType> {
+    const invoice = await this.invoicesRepo.findOne({
+      where: { id, hospitalId },
+      relations: ['items', 'payments', 'patient'],
+    });
+    if (!invoice) throw new NotFoundException('Invoice not found');
+    if (invoice.status === 'paid') {
+      throw new BadRequestException('Cannot void a paid invoice');
+    }
+    invoice.status = 'void';
+    await this.invoicesRepo.save(invoice);
+    await this.audit.log({
+      actorId: actor.id,
+      hospitalId,
+      action: 'void',
+      resource: 'invoice',
+      resourceId: invoice.id,
+    });
     return this.toInvoiceType(invoice);
   }
 

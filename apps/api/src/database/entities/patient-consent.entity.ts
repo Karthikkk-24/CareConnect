@@ -1,4 +1,11 @@
-import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 import { Patient } from './patient.entity';
 
 @Entity('patient_consents')
@@ -13,7 +20,11 @@ export class PatientConsent {
   @JoinColumn({ name: 'patient_id' })
   patient: Patient;
 
-  @Column({ name: 'consent_type', type: 'enum', enum: ['treatment', 'data_sharing', 'research'] })
+  @Column({
+    name: 'consent_type',
+    type: 'enum',
+    enum: ['treatment', 'data_sharing', 'research'],
+  })
   consentType: string;
 
   @Column({ default: false })

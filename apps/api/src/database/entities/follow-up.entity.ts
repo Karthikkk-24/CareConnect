@@ -12,7 +12,12 @@ import { Patient } from './patient.entity';
 import { User } from './user.entity';
 import { Discharge } from './discharge.entity';
 
-export const FOLLOW_UP_STATUSES = ['scheduled', 'completed', 'missed', 'rescheduled'] as const;
+export const FOLLOW_UP_STATUSES = [
+  'scheduled',
+  'completed',
+  'missed',
+  'rescheduled',
+] as const;
 
 @Entity('follow_ups')
 export class FollowUp {
@@ -36,7 +41,9 @@ export class FollowUp {
   @Column({ name: 'discharge_id', type: 'uuid', nullable: true })
   dischargeId?: string;
 
-  @ManyToOne(() => Discharge, (discharge) => discharge.followUps, { nullable: true })
+  @ManyToOne(() => Discharge, (discharge) => discharge.followUps, {
+    nullable: true,
+  })
   @JoinColumn({ name: 'discharge_id' })
   discharge?: Discharge;
 

@@ -1,4 +1,10 @@
-import { Column, CreateDateColumn, Entity, ManyToMany, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  ManyToMany,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 import { Role } from './role.entity';
 
 @Entity('permissions')

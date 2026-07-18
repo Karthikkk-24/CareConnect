@@ -1,12 +1,15 @@
 'use client';
 
+import { useState } from 'react';
 import { useMutation, useQuery } from '@apollo/client';
-import { CalendarClock } from 'lucide-react';
-import { ClayBadge, ClayButton, ClayCard } from '@careconnect/ui';
+import { CalendarClock, Plus } from 'lucide-react';
+import { ClayBadge, ClayButton, ClayCard, ClayInput } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
 import {
+  CREATE_FOLLOW_UP_MUTATION,
   FOLLOW_UPS_QUERY,
   ME_QUERY,
+  PATIENTS_QUERY,
   UPDATE_FOLLOW_UP_STATUS_MUTATION,
 } from '@/lib/graphql/queries';
 
@@ -36,20 +39,60 @@ const statusVariant = (status: string) => {
 export default function FollowUpsPage() {
   const { data: meData } = useQuery(ME_QUERY);
   const hospitalId = meData?.me?.hospitalId;
+  const [showForm, setShowForm] = useState(false);
+  const [patientSearch, setPatientSearch] = useState('');
+  const [patientId, setPatientId] = useState('');
+  const [scheduledAt, setScheduledAt] = useState('');
+  const [type, setType] = useState('outpatient');
+  const [error, setError] = useState('');
 
   const { data, loading, refetch } = useQuery(FOLLOW_UPS_QUERY, {
     variables: { hospitalId },
     skip: !hospitalId,
   });
 
+  const { data: patientsData } = useQuery(PATIENTS_QUERY, {
+    variables: { search: patientSearch, limit: 8, hospitalId },
+    skip: !hospitalId || patientSearch.length < 2,
+  });
+
   const [updateStatus] = useMutation(UPDATE_FOLLOW_UP_STATUS_MUTATION, {
     onCompleted: () => refetch(),
+  });
+  const [createFollowUp, { loading: creating }] = useMutation(CREATE_FOLLOW_UP_MUTATION, {
+    onCompleted: () => {
+      refetch();
+      setShowForm(false);
+      setPatientId('');
+      setScheduledAt('');
+      setPatientSearch('');
+    },
+    onError: (err) => setError(err.message),
   });
 
   const followUps = data?.followUps ?? [];
 
   const handleStatus = async (id: string, status: string) => {
     await updateStatus({ variables: { hospitalId, input: { id, status } } });
+  };
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    if (!patientId || !scheduledAt) {
+      setError('Patient and schedule are required');
+      return;
+    }
+    await createFollowUp({
+      variables: {
+        hospitalId,
+        input: {
+          patientId,
+          scheduledAt: new Date(scheduledAt).toISOString(),
+          type,
+        },
+      },
+    });
   };
 
   return (
@@ -59,6 +102,71 @@ export default function FollowUpsPage() {
         subtitle="Scheduled post-discharge and outpatient follow-up visits"
       />
 
+      <div className="mb-6 flex justify-end">
+        <ClayButton onClick={() => setShowForm((v) => !v)}>
+          <Plus className="mr-2 h-4 w-4" />
+          {showForm ? 'Hide form' : 'Schedule follow-up'}
+        </ClayButton>
+      </div>
+
+      {showForm ? (
+        <ClayCard className="mb-6 max-w-xl space-y-4">
+          <form onSubmit={handleCreate} className="space-y-4">
+            <ClayInput
+              label="Search patient"
+              value={patientSearch}
+              onChange={(e) => setPatientSearch(e.target.value)}
+              placeholder="Type at least 2 characters"
+            />
+            {(patientsData?.patients?.items ?? []).length > 0 ? (
+              <ul className="max-h-40 overflow-auto rounded-2xl bg-clay-primary-light/20 text-sm">
+                {(patientsData?.patients?.items ?? []).map(
+                  (p: { id: string; fullName: string }) => (
+                    <li key={p.id}>
+                      <button
+                        type="button"
+                        className={`block w-full px-4 py-2 text-left hover:bg-clay-primary-light/40 ${
+                          patientId === p.id ? 'bg-clay-primary-light/50 font-medium' : ''
+                        }`}
+                        onClick={() => {
+                          setPatientId(p.id);
+                          setPatientSearch(p.fullName);
+                        }}
+                      >
+                        {p.fullName}
+                      </button>
+                    </li>
+                  ),
+                )}
+              </ul>
+            ) : null}
+            <ClayInput
+              label="Scheduled at"
+              type="datetime-local"
+              value={scheduledAt}
+              onChange={(e) => setScheduledAt(e.target.value)}
+              required
+            />
+            <label className="block text-sm font-medium text-clay-text">
+              Type
+              <select
+                className="mt-1 w-full rounded-2xl border border-white/60 bg-clay-surface px-4 py-3 shadow-clay-inset"
+                value={type}
+                onChange={(e) => setType(e.target.value)}
+              >
+                <option value="outpatient">Outpatient</option>
+                <option value="post_discharge">Post-discharge</option>
+                <option value="telehealth">Telehealth</option>
+              </select>
+            </label>
+            {error ? <p className="text-sm text-clay-error">{error}</p> : null}
+            <ClayButton type="submit" isLoading={creating}>
+              Create follow-up
+            </ClayButton>
+          </form>
+        </ClayCard>
+      ) : null}
+
       <ClayCard padding="none" className="overflow-hidden">
         {loading ? (
           <p className="px-6 py-8 text-center text-clay-text-muted">Loading follow-ups...</p>
@@ -66,6 +174,9 @@ export default function FollowUpsPage() {
           <div className="px-6 py-12 text-center">
             <CalendarClock className="mx-auto mb-3 h-10 w-10 text-clay-text-muted/50" />
             <p className="text-clay-text-muted">No follow-ups scheduled.</p>
+            <ClayButton className="mt-4" size="sm" onClick={() => setShowForm(true)}>
+              Schedule one
+            </ClayButton>
           </div>
         ) : (
           <div className="divide-y divide-white/30">

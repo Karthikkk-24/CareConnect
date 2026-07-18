@@ -13,7 +13,11 @@ import { User } from './user.entity';
 import { Ward } from './ward.entity';
 import { Bed } from './bed.entity';
 
-export const ADMISSION_STATUSES = ['active', 'discharged', 'transferred'] as const;
+export const ADMISSION_STATUSES = [
+  'active',
+  'discharged',
+  'transferred',
+] as const;
 
 @Entity('admissions')
 export class Admission {

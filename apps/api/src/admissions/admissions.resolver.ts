@@ -25,7 +25,10 @@ export class AdmissionsResolver {
     @CurrentUser() user: AuthenticatedUser,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<AdmissionType[]> {
-    const resolvedHospitalId = this.admissionsService.resolveHospitalId(user, hospitalId);
+    const resolvedHospitalId = this.admissionsService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
     return this.admissionsService.activeAdmissions(resolvedHospitalId);
   }
 
@@ -35,7 +38,10 @@ export class AdmissionsResolver {
     @CurrentUser() user: AuthenticatedUser,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<WardOccupancyType[]> {
-    const resolvedHospitalId = this.admissionsService.resolveHospitalId(user, hospitalId);
+    const resolvedHospitalId = this.admissionsService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
     return this.admissionsService.wardOccupancy(resolvedHospitalId);
   }
 
@@ -46,7 +52,10 @@ export class AdmissionsResolver {
     @Args('input') input: AdmitPatientInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<AdmissionType> {
-    const resolvedHospitalId = this.admissionsService.resolveHospitalId(user, hospitalId);
+    const resolvedHospitalId = this.admissionsService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
     return this.admissionsService.admitPatient(resolvedHospitalId, input, user);
   }
 
@@ -57,7 +66,14 @@ export class AdmissionsResolver {
     @Args('input') input: DischargeAdmissionInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<AdmissionType> {
-    const resolvedHospitalId = this.admissionsService.resolveHospitalId(user, hospitalId);
-    return this.admissionsService.dischargeAdmission(resolvedHospitalId, input, user);
+    const resolvedHospitalId = this.admissionsService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.admissionsService.dischargeAdmission(
+      resolvedHospitalId,
+      input,
+      user,
+    );
   }
 }

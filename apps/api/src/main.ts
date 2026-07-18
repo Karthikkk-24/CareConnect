@@ -12,7 +12,7 @@ async function bootstrap() {
 
   const uploadDir = join(process.cwd(), 'uploads');
   if (!existsSync(uploadDir)) mkdirSync(uploadDir, { recursive: true });
-  app.useStaticAssets(uploadDir, { prefix: '/uploads/' });
+  // Files are served only via authenticated GET /uploads/:filename — not public static.
 
   app.enableCors({
     origin: config.get('CORS_ORIGIN', 'http://localhost:3000'),
@@ -30,4 +30,4 @@ async function bootstrap() {
   await app.listen(port);
   console.log(`CareConnect API running on http://localhost:${port}/graphql`);
 }
-bootstrap();
+void bootstrap();

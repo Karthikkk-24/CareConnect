@@ -1,5 +1,12 @@
 import { Field, Float, ID, InputType, ObjectType } from '@nestjs/graphql';
-import { IsNumber, IsOptional, IsString, IsUUID, Min, MinLength } from 'class-validator';
+import {
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Min,
+  MinLength,
+} from 'class-validator';
 import { PrescriptionItemType } from '../clinical/clinical.types';
 import { PatientType } from '../patients/patients.types';
 

@@ -95,6 +95,14 @@ export function DashboardSidebar() {
     return true;
   });
 
+  const brandSubtitle = isHospitalAdmin
+    ? t('brandSubtitleAdmin')
+    : isDoctor
+      ? t('brandSubtitleDoctor')
+      : isNurse
+        ? t('brandSubtitleNurse')
+        : t('brandSubtitle');
+
   const handleLogout = async () => {
     await clerk.signOut();
     router.push('/login');
@@ -115,7 +123,7 @@ export function DashboardSidebar() {
         </div>
         <div>
           <p className="font-bold text-clay-text">CareConnect</p>
-          <p className="text-xs text-clay-text-muted">{t('brandSubtitle')}</p>
+          <p className="text-xs text-clay-text-muted">{brandSubtitle}</p>
         </div>
       </div>
 
@@ -151,7 +159,7 @@ export function DashboardSidebar() {
           className="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm text-clay-text-muted hover:bg-clay-primary-light/50 hover:text-clay-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clay-primary"
         >
           <Building2 className="h-5 w-5" aria-hidden="true" />
-          Facility
+          {t('facility')}
         </Link>
         <button
           type="button"

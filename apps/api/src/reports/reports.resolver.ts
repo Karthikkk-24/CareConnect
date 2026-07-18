@@ -20,7 +20,10 @@ export class ReportsResolver {
     @CurrentUser() user: AuthenticatedUser,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<HospitalReportsType> {
-    const resolvedHospitalId = this.reportsService.resolveHospitalId(user, hospitalId);
+    const resolvedHospitalId = this.reportsService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
     return this.reportsService.getHospitalReports(resolvedHospitalId);
   }
 }

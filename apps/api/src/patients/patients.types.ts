@@ -11,8 +11,19 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
-const PATIENT_GENDERS = ['male', 'female', 'other', 'prefer_not_to_say'] as const;
-const PATIENT_STATUSES = ['registered', 'checked_in', 'admitted', 'discharged', 'inactive'] as const;
+const PATIENT_GENDERS = [
+  'male',
+  'female',
+  'other',
+  'prefer_not_to_say',
+] as const;
+const PATIENT_STATUSES = [
+  'registered',
+  'checked_in',
+  'admitted',
+  'discharged',
+  'inactive',
+] as const;
 
 @ObjectType()
 export class PatientType {

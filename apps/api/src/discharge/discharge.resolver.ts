@@ -27,7 +27,10 @@ export class DischargeResolver {
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
     @Args('status', { nullable: true }) status?: string,
   ): Promise<FollowUpType[]> {
-    const resolvedHospitalId = this.dischargeService.resolveHospitalId(user, hospitalId);
+    const resolvedHospitalId = this.dischargeService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
     return this.dischargeService.followUps(resolvedHospitalId, status);
   }
 
@@ -38,8 +41,14 @@ export class DischargeResolver {
     @Args('patientId') patientId: string,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<DischargeType[]> {
-    const resolvedHospitalId = this.dischargeService.resolveHospitalId(user, hospitalId);
-    return this.dischargeService.dischargesForPatient(resolvedHospitalId, patientId);
+    const resolvedHospitalId = this.dischargeService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.dischargeService.dischargesForPatient(
+      resolvedHospitalId,
+      patientId,
+    );
   }
 
   @Mutation(() => DischargeType)
@@ -49,8 +58,15 @@ export class DischargeResolver {
     @Args('input') input: CreateDischargeInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<DischargeType> {
-    const resolvedHospitalId = this.dischargeService.resolveHospitalId(user, hospitalId);
-    return this.dischargeService.createDischarge(resolvedHospitalId, input, user);
+    const resolvedHospitalId = this.dischargeService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.dischargeService.createDischarge(
+      resolvedHospitalId,
+      input,
+      user,
+    );
   }
 
   @Mutation(() => FollowUpType)
@@ -60,8 +76,15 @@ export class DischargeResolver {
     @Args('input') input: CreateFollowUpInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<FollowUpType> {
-    const resolvedHospitalId = this.dischargeService.resolveHospitalId(user, hospitalId);
-    return this.dischargeService.createFollowUp(resolvedHospitalId, input, user);
+    const resolvedHospitalId = this.dischargeService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.dischargeService.createFollowUp(
+      resolvedHospitalId,
+      input,
+      user,
+    );
   }
 
   @Mutation(() => FollowUpType)
@@ -71,7 +94,14 @@ export class DischargeResolver {
     @Args('input') input: UpdateFollowUpStatusInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<FollowUpType> {
-    const resolvedHospitalId = this.dischargeService.resolveHospitalId(user, hospitalId);
-    return this.dischargeService.updateFollowUpStatus(resolvedHospitalId, input, user);
+    const resolvedHospitalId = this.dischargeService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.dischargeService.updateFollowUpStatus(
+      resolvedHospitalId,
+      input,
+      user,
+    );
   }
 }

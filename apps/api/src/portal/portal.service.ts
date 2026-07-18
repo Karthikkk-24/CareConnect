@@ -20,12 +20,16 @@ import {
 @Injectable()
 export class PortalService {
   constructor(
-    @InjectRepository(Patient) private readonly patientsRepo: Repository<Patient>,
-    @InjectRepository(Appointment) private readonly appointmentsRepo: Repository<Appointment>,
+    @InjectRepository(Patient)
+    private readonly patientsRepo: Repository<Patient>,
+    @InjectRepository(Appointment)
+    private readonly appointmentsRepo: Repository<Appointment>,
     @InjectRepository(Prescription)
     private readonly prescriptionsRepo: Repository<Prescription>,
-    @InjectRepository(LabOrder) private readonly labOrdersRepo: Repository<LabOrder>,
-    @InjectRepository(LabResult) private readonly labResultsRepo: Repository<LabResult>,
+    @InjectRepository(LabOrder)
+    private readonly labOrdersRepo: Repository<LabOrder>,
+    @InjectRepository(LabResult)
+    private readonly labResultsRepo: Repository<LabResult>,
     private readonly appointmentsService: AppointmentsService,
     private readonly clinicalService: ClinicalService,
   ) {}
@@ -37,16 +41,28 @@ export class PortalService {
     }
   }
 
-  private async findLinkedPatient(user: AuthenticatedUser): Promise<Patient | null> {
+  private async findLinkedPatient(
+    user: AuthenticatedUser,
+  ): Promise<Patient | null> {
     const byUserId = await this.patientsRepo.findOne({
       where: { userId: user.id },
     });
     if (byUserId) return byUserId;
 
     if (user.email) {
-      return this.patientsRepo.findOne({
+      // Prefer hospital-scoped match when the patient user is linked to a hospital
+      if (user.hospitalId) {
+        return this.patientsRepo.findOne({
+          where: { email: user.email, hospitalId: user.hospitalId },
+        });
+      }
+      // Without hospital context, only match when exactly one patient has this email
+      const matches = await this.patientsRepo.find({
         where: { email: user.email },
+        take: 2,
       });
+      if (matches.length === 1) return matches[0];
+      return null;
     }
 
     return null;
@@ -65,12 +81,19 @@ export class PortalService {
     };
   }
 
-  async portalPatientRecords(user: AuthenticatedUser): Promise<PortalPatientRecordsType> {
+  async portalPatientRecords(
+    user: AuthenticatedUser,
+  ): Promise<PortalPatientRecordsType> {
     this.assertPatientRole(user);
 
     const patient = await this.findLinkedPatient(user);
     if (!patient) {
-      return { patient: undefined, appointments: [], prescriptions: [], labResults: [] };
+      return {
+        patient: undefined,
+        appointments: [],
+        prescriptions: [],
+        labResults: [],
+      };
     }
 
     const appointments = await this.appointmentsRepo.find({
@@ -112,8 +135,12 @@ export class PortalService {
 
     return {
       patient: this.toProfile(patient),
-      appointments: appointments.map((a) => this.appointmentsService.toAppointmentType(a)),
-      prescriptions: prescriptions.map((p) => this.clinicalService.toPrescriptionType(p)),
+      appointments: appointments.map((a) =>
+        this.appointmentsService.toAppointmentType(a),
+      ),
+      prescriptions: prescriptions.map((p) =>
+        this.clinicalService.toPrescriptionType(p),
+      ),
       labResults,
     };
   }

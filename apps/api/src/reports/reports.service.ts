@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Patient, StaffProfile } from '../database/entities';
@@ -11,8 +15,10 @@ import { HospitalReportsType } from './reports.types';
 @Injectable()
 export class ReportsService {
   constructor(
-    @InjectRepository(Patient) private readonly patientsRepo: Repository<Patient>,
-    @InjectRepository(StaffProfile) private readonly staffRepo: Repository<StaffProfile>,
+    @InjectRepository(Patient)
+    private readonly patientsRepo: Repository<Patient>,
+    @InjectRepository(StaffProfile)
+    private readonly staffRepo: Repository<StaffProfile>,
     private readonly appointmentsService: AppointmentsService,
     private readonly admissionsService: AdmissionsService,
     private readonly billingService: BillingService,
@@ -34,14 +40,19 @@ export class ReportsService {
   }
 
   async getHospitalReports(hospitalId: string): Promise<HospitalReportsType> {
-    const [patientCount, staffCount, appointmentsToday, activeAdmissions, revenueTotal] =
-      await Promise.all([
-        this.patientsRepo.count({ where: { hospitalId } }),
-        this.staffRepo.count({ where: { hospitalId, isActive: true } }),
-        this.appointmentsService.countAppointmentsToday(hospitalId),
-        this.admissionsService.countActive(hospitalId),
-        this.billingService.sumRevenue(hospitalId),
-      ]);
+    const [
+      patientCount,
+      staffCount,
+      appointmentsToday,
+      activeAdmissions,
+      revenueTotal,
+    ] = await Promise.all([
+      this.patientsRepo.count({ where: { hospitalId } }),
+      this.staffRepo.count({ where: { hospitalId, isActive: true } }),
+      this.appointmentsService.countAppointmentsToday(hospitalId),
+      this.admissionsService.countActive(hospitalId),
+      this.billingService.sumRevenue(hospitalId),
+    ]);
 
     return {
       patientCount,

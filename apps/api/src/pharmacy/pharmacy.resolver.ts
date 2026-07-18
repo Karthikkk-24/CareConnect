@@ -20,44 +20,64 @@ export class PharmacyResolver {
   constructor(private readonly pharmacyService: PharmacyService) {}
 
   @Query(() => [PharmacyStockType])
-  @Permissions(PERMISSIONS.BILLING_READ)
+  @Permissions(PERMISSIONS.PATIENTS_READ)
   async pharmacyStock(
     @CurrentUser() user: AuthenticatedUser,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<PharmacyStockType[]> {
-    const resolvedHospitalId = this.pharmacyService.resolveHospitalId(user, hospitalId);
+    const resolvedHospitalId = this.pharmacyService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
     return this.pharmacyService.listPharmacyStock(resolvedHospitalId);
   }
 
   @Query(() => [PendingPrescriptionType])
-  @Permissions(PERMISSIONS.BILLING_READ)
+  @Permissions(PERMISSIONS.PATIENTS_READ)
   async pendingPrescriptions(
     @CurrentUser() user: AuthenticatedUser,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<PendingPrescriptionType[]> {
-    const resolvedHospitalId = this.pharmacyService.resolveHospitalId(user, hospitalId);
+    const resolvedHospitalId = this.pharmacyService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
     return this.pharmacyService.listPendingPrescriptions(resolvedHospitalId);
   }
 
   @Mutation(() => PharmacyStockType)
-  @Permissions(PERMISSIONS.BILLING_WRITE)
+  @Permissions(PERMISSIONS.PATIENTS_WRITE)
   async upsertPharmacyStock(
     @CurrentUser() user: AuthenticatedUser,
     @Args('input') input: UpsertPharmacyStockInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<PharmacyStockType> {
-    const resolvedHospitalId = this.pharmacyService.resolveHospitalId(user, hospitalId);
-    return this.pharmacyService.upsertPharmacyStock(resolvedHospitalId, input, user);
+    const resolvedHospitalId = this.pharmacyService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.pharmacyService.upsertPharmacyStock(
+      resolvedHospitalId,
+      input,
+      user,
+    );
   }
 
   @Mutation(() => PendingPrescriptionType)
-  @Permissions(PERMISSIONS.BILLING_WRITE)
+  @Permissions(PERMISSIONS.PATIENTS_WRITE)
   async dispensePrescription(
     @CurrentUser() user: AuthenticatedUser,
     @Args('input') input: DispensePrescriptionInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<PendingPrescriptionType> {
-    const resolvedHospitalId = this.pharmacyService.resolveHospitalId(user, hospitalId);
-    return this.pharmacyService.dispensePrescription(resolvedHospitalId, input, user);
+    const resolvedHospitalId = this.pharmacyService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.pharmacyService.dispensePrescription(
+      resolvedHospitalId,
+      input,
+      user,
+    );
   }
 }

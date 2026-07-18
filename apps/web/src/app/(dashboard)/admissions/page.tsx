@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useMutation, useQuery } from '@apollo/client';
 import { Activity, BedDouble, Plus } from 'lucide-react';
@@ -11,13 +12,13 @@ import {
   ACTIVE_ADMISSIONS_QUERY,
   ADMIT_PATIENT_MUTATION,
   BEDS_QUERY,
-  DISCHARGE_ADMISSION_MUTATION,
   ME_QUERY,
   PATIENTS_QUERY,
   WARDS_QUERY,
 } from '@/lib/graphql/queries';
 
 export default function AdmissionsPage() {
+  const router = useRouter();
   const [showForm, setShowForm] = useState(false);
   const [patientId, setPatientId] = useState('');
   const [patientSearch, setPatientSearch] = useState('');
@@ -65,10 +66,6 @@ export default function AdmissionsPage() {
     },
   });
 
-  const [dischargeAdmission] = useMutation(DISCHARGE_ADMISSION_MUTATION, {
-    onCompleted: () => refetch(),
-  });
-
   const admissions = data?.activeAdmissions ?? [];
 
   const handleAdmit = async (e: React.FormEvent) => {
@@ -103,9 +100,8 @@ export default function AdmissionsPage() {
     }
   };
 
-  const handleDischarge = async (id: string, name: string) => {
-    if (!confirm(`Discharge ${name}?`)) return;
-    await dischargeAdmission({ variables: { id, hospitalId } });
+  const handleDischarge = (patientId: string) => {
+    router.push(`/patients/${patientId}/discharge`);
   };
 
   return (
@@ -261,7 +257,8 @@ export default function AdmissionsPage() {
               admissions.map(
                 (adm: {
                   id: string;
-                  patient?: { fullName: string };
+                  patientId?: string;
+                  patient?: { id?: string; fullName: string };
                   ward?: { name: string };
                   bed?: { label: string };
                   admittedAt: string;
@@ -286,7 +283,10 @@ export default function AdmissionsPage() {
                       <ClayButton
                         size="sm"
                         variant="secondary"
-                        onClick={() => handleDischarge(adm.id, adm.patient?.fullName ?? 'patient')}
+                        onClick={() => {
+                          const patientId = adm.patientId ?? adm.patient?.id;
+                          if (patientId) handleDischarge(patientId);
+                        }}
                       >
                         Discharge
                       </ClayButton>

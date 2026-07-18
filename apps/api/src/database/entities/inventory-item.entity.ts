@@ -33,7 +33,13 @@ export class InventoryItem {
   @Column({ type: 'varchar', length: 50, default: 'each' })
   unit: string;
 
-  @Column({ name: 'reorder_level', type: 'decimal', precision: 10, scale: 2, default: 0 })
+  @Column({
+    name: 'reorder_level',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    default: 0,
+  })
   reorderLevel: string;
 
   @CreateDateColumn({ name: 'created_at' })

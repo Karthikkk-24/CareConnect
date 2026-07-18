@@ -19,8 +19,10 @@ import {
 @Injectable()
 export class AdmissionsService {
   constructor(
-    @InjectRepository(Admission) private readonly admissionsRepo: Repository<Admission>,
-    @InjectRepository(Patient) private readonly patientsRepo: Repository<Patient>,
+    @InjectRepository(Admission)
+    private readonly admissionsRepo: Repository<Admission>,
+    @InjectRepository(Patient)
+    private readonly patientsRepo: Repository<Patient>,
     @InjectRepository(Ward) private readonly wardsRepo: Repository<Ward>,
     @InjectRepository(Bed) private readonly bedsRepo: Repository<Bed>,
     private readonly audit: AuditService,
@@ -100,7 +102,10 @@ export class AdmissionsService {
     };
   }
 
-  private async findAdmissionOrThrow(id: string, hospitalId: string): Promise<Admission> {
+  private async findAdmissionOrThrow(
+    id: string,
+    hospitalId: string,
+  ): Promise<Admission> {
     const admission = await this.admissionsRepo.findOne({
       where: { id, hospitalId },
       relations: ['patient', 'attendingDoctor', 'ward', 'bed'],
@@ -119,7 +124,9 @@ export class AdmissionsService {
     });
     if (!patient) throw new NotFoundException('Patient not found');
 
-    const ward = await this.wardsRepo.findOne({ where: { id: input.wardId, hospitalId } });
+    const ward = await this.wardsRepo.findOne({
+      where: { id: input.wardId, hospitalId },
+    });
     if (!ward) throw new NotFoundException('Ward not found');
 
     const bed = await this.bedsRepo.findOne({
@@ -235,7 +242,9 @@ export class AdmissionsService {
     const result: WardOccupancyType[] = [];
 
     for (const ward of wards) {
-      const beds = await this.bedsRepo.find({ where: { wardId: ward.id, hospitalId } });
+      const beds = await this.bedsRepo.find({
+        where: { wardId: ward.id, hospitalId },
+      });
       const occupiedBeds = beds.filter((b) => b.status === 'occupied').length;
       result.push({
         wardId: ward.id,
@@ -250,6 +259,8 @@ export class AdmissionsService {
   }
 
   async countActive(hospitalId: string): Promise<number> {
-    return this.admissionsRepo.count({ where: { hospitalId, status: 'active' } });
+    return this.admissionsRepo.count({
+      where: { hospitalId, status: 'active' },
+    });
   }
 }

@@ -11,6 +11,7 @@ import {
   PatientInsurance,
   PatientMedicalHistory,
   PatientMedication,
+  User,
 } from '../database/entities';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
@@ -34,6 +35,10 @@ describe('PatientsService', () => {
     remove: jest.fn(),
   };
 
+  const usersRepo = {
+    findOne: jest.fn(),
+  };
+
   const audit = { log: jest.fn() };
 
   const actor: AuthenticatedUser = {
@@ -54,14 +59,30 @@ describe('PatientsService', () => {
       providers: [
         PatientsService,
         { provide: getRepositoryToken(Patient), useValue: patientsRepo },
-        { provide: getRepositoryToken(PatientEmergencyContact), useValue: relatedRepo },
-        { provide: getRepositoryToken(PatientInsurance), useValue: relatedRepo },
+        {
+          provide: getRepositoryToken(PatientEmergencyContact),
+          useValue: relatedRepo,
+        },
+        {
+          provide: getRepositoryToken(PatientInsurance),
+          useValue: relatedRepo,
+        },
         { provide: getRepositoryToken(PatientAllergy), useValue: relatedRepo },
-        { provide: getRepositoryToken(PatientMedication), useValue: relatedRepo },
-        { provide: getRepositoryToken(PatientMedicalHistory), useValue: relatedRepo },
+        {
+          provide: getRepositoryToken(PatientMedication),
+          useValue: relatedRepo,
+        },
+        {
+          provide: getRepositoryToken(PatientMedicalHistory),
+          useValue: relatedRepo,
+        },
         { provide: getRepositoryToken(PatientDocument), useValue: relatedRepo },
         { provide: getRepositoryToken(PatientConsent), useValue: relatedRepo },
-        { provide: getRepositoryToken(PatientImportJob), useValue: relatedRepo },
+        {
+          provide: getRepositoryToken(PatientImportJob),
+          useValue: relatedRepo,
+        },
+        { provide: getRepositoryToken(User), useValue: usersRepo },
         { provide: AuditService, useValue: audit },
       ],
     }).compile();
@@ -73,7 +94,9 @@ describe('PatientsService', () => {
     const qb = {
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
-      getOne: jest.fn().mockResolvedValue(hasDuplicate ? { id: 'existing' } : null),
+      getOne: jest
+        .fn()
+        .mockResolvedValue(hasDuplicate ? { id: 'existing' } : null),
     };
     patientsRepo.createQueryBuilder.mockReturnValue(qb);
     return qb;
@@ -89,7 +112,11 @@ describe('PatientsService', () => {
       patientsRepo.findOne.mockResolvedValue(patient);
       patientsRepo.softRemove.mockResolvedValue(patient);
 
-      const result = await service.deletePatient('patient-1', 'hospital-1', actor);
+      const result = await service.deletePatient(
+        'patient-1',
+        'hospital-1',
+        actor,
+      );
 
       expect(result).toBe(true);
       expect(patientsRepo.softRemove).toHaveBeenCalledWith(patient);

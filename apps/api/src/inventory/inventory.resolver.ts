@@ -19,34 +19,51 @@ export class InventoryResolver {
   constructor(private readonly inventoryService: InventoryService) {}
 
   @Query(() => [InventoryItemType])
-  @Permissions(PERMISSIONS.BILLING_READ)
+  @Permissions(PERMISSIONS.HOSPITALS_READ)
   async inventoryItems(
     @CurrentUser() user: AuthenticatedUser,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<InventoryItemType[]> {
-    const resolvedHospitalId = this.inventoryService.resolveHospitalId(user, hospitalId);
+    const resolvedHospitalId = this.inventoryService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
     return this.inventoryService.listInventoryItems(resolvedHospitalId);
   }
 
   @Mutation(() => InventoryItemType)
-  @Permissions(PERMISSIONS.BILLING_WRITE)
+  @Permissions(PERMISSIONS.HOSPITALS_WRITE)
   async createInventoryItem(
     @CurrentUser() user: AuthenticatedUser,
     @Args('input') input: CreateInventoryItemInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<InventoryItemType> {
-    const resolvedHospitalId = this.inventoryService.resolveHospitalId(user, hospitalId);
-    return this.inventoryService.createInventoryItem(resolvedHospitalId, input, user);
+    const resolvedHospitalId = this.inventoryService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.inventoryService.createInventoryItem(
+      resolvedHospitalId,
+      input,
+      user,
+    );
   }
 
   @Mutation(() => InventoryItemType)
-  @Permissions(PERMISSIONS.BILLING_WRITE)
+  @Permissions(PERMISSIONS.HOSPITALS_WRITE)
   async updateInventoryQuantity(
     @CurrentUser() user: AuthenticatedUser,
     @Args('input') input: UpdateInventoryQuantityInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<InventoryItemType> {
-    const resolvedHospitalId = this.inventoryService.resolveHospitalId(user, hospitalId);
-    return this.inventoryService.updateInventoryQuantity(resolvedHospitalId, input, user);
+    const resolvedHospitalId = this.inventoryService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.inventoryService.updateInventoryQuantity(
+      resolvedHospitalId,
+      input,
+      user,
+    );
   }
 }

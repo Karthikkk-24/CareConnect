@@ -21,7 +21,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           signInUrl="/login"
           signUpUrl="/register"
           signInFallbackRedirectUrl="/dashboard"
-          signUpFallbackRedirectUrl="/onboarding"
+          signUpFallbackRedirectUrl="/dashboard"
         >
           <NextIntlClientProvider locale="en" messages={messages}>
             <Providers>{children}</Providers>

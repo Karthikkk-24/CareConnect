@@ -17,6 +17,7 @@ import {
   PatientInsurance,
   PatientMedicalHistory,
   PatientMedication,
+  User,
 } from '../database/entities';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
@@ -32,13 +33,19 @@ import {
 
 type PatientRelatedInput = Pick<
   CreatePatientInput,
-  'emergencyContacts' | 'insurance' | 'allergies' | 'medications' | 'medicalHistory' | 'consents'
+  | 'emergencyContacts'
+  | 'insurance'
+  | 'allergies'
+  | 'medications'
+  | 'medicalHistory'
+  | 'consents'
 >;
 
 @Injectable()
 export class PatientsService {
   constructor(
-    @InjectRepository(Patient) private readonly patientsRepo: Repository<Patient>,
+    @InjectRepository(Patient)
+    private readonly patientsRepo: Repository<Patient>,
     @InjectRepository(PatientEmergencyContact)
     private readonly emergencyRepo: Repository<PatientEmergencyContact>,
     @InjectRepository(PatientInsurance)
@@ -55,6 +62,8 @@ export class PatientsService {
     private readonly consentsRepo: Repository<PatientConsent>,
     @InjectRepository(PatientImportJob)
     private readonly importJobsRepo: Repository<PatientImportJob>,
+    @InjectRepository(User)
+    private readonly usersRepo: Repository<User>,
     private readonly audit: AuditService,
   ) {}
 
@@ -103,7 +112,12 @@ export class PatientsService {
     page = 1,
     limit = 20,
     search?: string,
-  ): Promise<{ items: PatientType[]; total: number; page: number; limit: number }> {
+  ): Promise<{
+    items: PatientType[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
     const where = search
       ? [
           { hospitalId, fullName: ILike(`%${search}%`) },
@@ -151,7 +165,10 @@ export class PatientsService {
       insuranceProvider: insurance?.provider,
       insurancePolicyNumber: insurance?.policyNumber,
       allergies: patient.allergies?.map((a) => a.allergen) ?? [],
-      medications: patient.medications?.map((m) => `${m.name}${m.dosage ? ` (${m.dosage})` : ''}`) ?? [],
+      medications:
+        patient.medications?.map(
+          (m) => `${m.name}${m.dosage ? ` (${m.dosage})` : ''}`,
+        ) ?? [],
       medicalHistory: (patient.medicalHistory ?? []).map((h) => ({
         id: h.id,
         type: h.type,
@@ -178,8 +195,13 @@ export class PatientsService {
     };
   }
 
-  private async findPatientOrThrow(id: string, hospitalId: string): Promise<Patient> {
-    const patient = await this.patientsRepo.findOne({ where: { id, hospitalId } });
+  private async findPatientOrThrow(
+    id: string,
+    hospitalId: string,
+  ): Promise<Patient> {
+    const patient = await this.patientsRepo.findOne({
+      where: { id, hospitalId },
+    });
     if (!patient) throw new NotFoundException('Patient not found');
     return patient;
   }
@@ -195,7 +217,9 @@ export class PatientsService {
       const qb = this.patientsRepo
         .createQueryBuilder('p')
         .where('p.hospital_id = :hospitalId', { hospitalId })
-        .andWhere('LOWER(p.email) = LOWER(:email)', { email: fields.email.trim() });
+        .andWhere('LOWER(p.email) = LOWER(:email)', {
+          email: fields.email.trim(),
+        });
       if (excludePatientId) {
         qb.andWhere('p.id != :excludePatientId', { excludePatientId });
       }
@@ -306,7 +330,8 @@ export class PatientsService {
 
     Object.assign(patient, {
       fullName: input.fullName ?? patient.fullName,
-      email: input.email !== undefined ? input.email || undefined : patient.email,
+      email:
+        input.email !== undefined ? input.email || undefined : patient.email,
       phone: input.phone ?? patient.phone,
       dateOfBirth: input.dateOfBirth ?? patient.dateOfBirth,
       gender: input.gender ?? patient.gender,
@@ -317,9 +342,12 @@ export class PatientsService {
       zipCode: input.zipCode ?? patient.zipCode,
       country: input.country ?? patient.country,
       occupation: input.occupation ?? patient.occupation,
-      identificationType: input.identificationType ?? patient.identificationType,
-      identificationNumber: input.identificationNumber ?? patient.identificationNumber,
-      primaryCarePhysician: input.primaryCarePhysician ?? patient.primaryCarePhysician,
+      identificationType:
+        input.identificationType ?? patient.identificationType,
+      identificationNumber:
+        input.identificationNumber ?? patient.identificationNumber,
+      primaryCarePhysician:
+        input.primaryCarePhysician ?? patient.primaryCarePhysician,
     });
 
     const saved = await this.patientsRepo.save(patient);
@@ -362,7 +390,9 @@ export class PatientsService {
     hospitalId: string,
     actor: AuthenticatedUser,
   ): Promise<PatientType> {
-    if (!PATIENT_STATUSES.includes(status as (typeof PATIENT_STATUSES)[number])) {
+    if (
+      !PATIENT_STATUSES.includes(status as (typeof PATIENT_STATUSES)[number])
+    ) {
       throw new BadRequestException(`Invalid patient status: ${status}`);
     }
 
@@ -390,7 +420,9 @@ export class PatientsService {
   ): Promise<boolean> {
     await this.findPatientOrThrow(patientId, hospitalId);
 
-    const document = await this.documentsRepo.findOne({ where: { id, patientId } });
+    const document = await this.documentsRepo.findOne({
+      where: { id, patientId },
+    });
     if (!document) throw new NotFoundException('Patient document not found');
 
     await this.documentsRepo.remove(document);
@@ -412,9 +444,32 @@ export class PatientsService {
     hospitalId: string,
     actor: AuthenticatedUser,
     userId?: string,
+    email?: string,
   ): Promise<PatientType> {
     const patient = await this.findPatientOrThrow(patientId, hospitalId);
-    const targetUserId = userId ?? actor.id;
+
+    let targetUserId = userId;
+    const lookupEmail =
+      email?.trim().toLowerCase() || patient.email?.toLowerCase();
+
+    if (!targetUserId && lookupEmail) {
+      const portalUser = await this.usersRepo.findOne({
+        where: { email: lookupEmail },
+      });
+      if (!portalUser) {
+        throw new NotFoundException(
+          `No CareConnect user found for email ${lookupEmail}. Ask the patient to register first.`,
+        );
+      }
+      targetUserId = portalUser.id;
+    }
+
+    if (!targetUserId) {
+      throw new BadRequestException(
+        'Provide a portal user email or userId to link (cannot default to staff account)',
+      );
+    }
+
     patient.userId = targetUserId;
     const saved = await this.patientsRepo.save(patient);
 
@@ -424,13 +479,16 @@ export class PatientsService {
       action: 'link_account',
       resource: 'patient',
       resourceId: saved.id,
-      metadata: { userId: targetUserId },
+      metadata: { userId: targetUserId, email: lookupEmail },
     });
 
     return this.toPatientType(saved);
   }
 
-  private async saveRelatedRecords(patientId: string, input: PatientRelatedInput) {
+  private async saveRelatedRecords(
+    patientId: string,
+    input: PatientRelatedInput,
+  ) {
     if (input.emergencyContacts?.length) {
       await this.emergencyRepo.save(
         input.emergencyContacts.map((c) =>
@@ -439,7 +497,10 @@ export class PatientsService {
       );
     }
 
-    if (input.insurance && (input.insurance.provider || input.insurance.policyNumber)) {
+    if (
+      input.insurance &&
+      (input.insurance.provider || input.insurance.policyNumber)
+    ) {
       await this.insuranceRepo.save(
         this.insuranceRepo.create({
           patientId,
@@ -452,19 +513,25 @@ export class PatientsService {
 
     if (input.allergies?.length) {
       await this.allergiesRepo.save(
-        input.allergies.map((a) => this.allergiesRepo.create({ patientId, ...a })),
+        input.allergies.map((a) =>
+          this.allergiesRepo.create({ patientId, ...a }),
+        ),
       );
     }
 
     if (input.medications?.length) {
       await this.medicationsRepo.save(
-        input.medications.map((m) => this.medicationsRepo.create({ patientId, ...m })),
+        input.medications.map((m) =>
+          this.medicationsRepo.create({ patientId, ...m }),
+        ),
       );
     }
 
     if (input.medicalHistory?.length) {
       await this.historyRepo.save(
-        input.medicalHistory.map((h) => this.historyRepo.create({ patientId, ...h })),
+        input.medicalHistory.map((h) =>
+          this.historyRepo.create({ patientId, ...h }),
+        ),
       );
     }
 
@@ -482,7 +549,10 @@ export class PatientsService {
     }
   }
 
-  private async replaceRelatedRecords(patientId: string, input: UpdatePatientInput) {
+  private async replaceRelatedRecords(
+    patientId: string,
+    input: UpdatePatientInput,
+  ) {
     if (input.emergencyContacts !== undefined) {
       await this.emergencyRepo.delete({ patientId });
       if (input.emergencyContacts.length) {
@@ -496,7 +566,11 @@ export class PatientsService {
 
     if (input.insurance !== undefined) {
       await this.insuranceRepo.delete({ patientId });
-      if (input.insurance.provider || input.insurance.policyNumber || input.insurance.groupNumber) {
+      if (
+        input.insurance.provider ||
+        input.insurance.policyNumber ||
+        input.insurance.groupNumber
+      ) {
         await this.insuranceRepo.save(
           this.insuranceRepo.create({
             patientId,
@@ -512,7 +586,9 @@ export class PatientsService {
       await this.allergiesRepo.delete({ patientId });
       if (input.allergies.length) {
         await this.allergiesRepo.save(
-          input.allergies.map((a) => this.allergiesRepo.create({ patientId, ...a })),
+          input.allergies.map((a) =>
+            this.allergiesRepo.create({ patientId, ...a }),
+          ),
         );
       }
     }
@@ -521,7 +597,9 @@ export class PatientsService {
       await this.medicationsRepo.delete({ patientId });
       if (input.medications.length) {
         await this.medicationsRepo.save(
-          input.medications.map((m) => this.medicationsRepo.create({ patientId, ...m })),
+          input.medications.map((m) =>
+            this.medicationsRepo.create({ patientId, ...m }),
+          ),
         );
       }
     }
@@ -530,7 +608,9 @@ export class PatientsService {
       await this.historyRepo.delete({ patientId });
       if (input.medicalHistory.length) {
         await this.historyRepo.save(
-          input.medicalHistory.map((h) => this.historyRepo.create({ patientId, ...h })),
+          input.medicalHistory.map((h) =>
+            this.historyRepo.create({ patientId, ...h }),
+          ),
         );
       }
     }
@@ -590,7 +670,12 @@ export class PatientsService {
           identificationNumber: row.identificationNumber,
           emergencyContacts:
             row.emergencyContactName && row.emergencyContactPhone
-              ? [{ name: row.emergencyContactName, phone: row.emergencyContactPhone }]
+              ? [
+                  {
+                    name: row.emergencyContactName,
+                    phone: row.emergencyContactPhone,
+                  },
+                ]
               : undefined,
           insurance:
             row.insuranceProvider || row.insurancePolicyNumber
@@ -599,9 +684,7 @@ export class PatientsService {
                   policyNumber: row.insurancePolicyNumber,
                 }
               : undefined,
-          allergies: row.allergies
-            ? [{ allergen: row.allergies }]
-            : undefined,
+          allergies: row.allergies ? [{ allergen: row.allergies }] : undefined,
         };
 
         try {
@@ -610,7 +693,8 @@ export class PatientsService {
         } catch (err) {
           errors.push({
             row: rowNum,
-            message: err instanceof Error ? err.message : 'Failed to create patient',
+            message:
+              err instanceof Error ? err.message : 'Failed to create patient',
           });
         }
       } else {
@@ -657,7 +741,9 @@ export class PatientsService {
     input: PatientDocumentInput,
     uploadedById: string,
   ) {
-    const patient = await this.patientsRepo.findOne({ where: { id: patientId, hospitalId } });
+    const patient = await this.patientsRepo.findOne({
+      where: { id: patientId, hospitalId },
+    });
     if (!patient) throw new NotFoundException('Patient not found');
 
     return this.documentsRepo.save(

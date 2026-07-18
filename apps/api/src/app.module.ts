@@ -122,7 +122,10 @@ import { UploadsModule } from './uploads/uploads.module';
         ],
         synchronize: false,
         logging: config.get('NODE_ENV') === 'development',
-        ssl: config.get('DATABASE_SSL') === 'true' ? { rejectUnauthorized: false } : false,
+        ssl:
+          config.get('DATABASE_SSL') === 'true'
+            ? { rejectUnauthorized: false }
+            : false,
       }),
     }),
     GraphQLModule.forRoot<ApolloDriverConfig>({

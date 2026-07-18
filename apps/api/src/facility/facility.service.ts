@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Bed, Department, Ward } from '../database/entities';
@@ -16,7 +20,8 @@ import {
 @Injectable()
 export class FacilityService {
   constructor(
-    @InjectRepository(Department) private readonly departmentsRepo: Repository<Department>,
+    @InjectRepository(Department)
+    private readonly departmentsRepo: Repository<Department>,
     @InjectRepository(Ward) private readonly wardsRepo: Repository<Ward>,
     @InjectRepository(Bed) private readonly bedsRepo: Repository<Bed>,
     private readonly audit: AuditService,
@@ -133,7 +138,9 @@ export class FacilityService {
     input: CreateBedInput,
     actor: AuthenticatedUser,
   ): Promise<BedType> {
-    const ward = await this.wardsRepo.findOne({ where: { id: input.wardId, hospitalId } });
+    const ward = await this.wardsRepo.findOne({
+      where: { id: input.wardId, hospitalId },
+    });
     if (!ward) throw new NotFoundException('Ward not found');
 
     const bed = await this.bedsRepo.save(
@@ -165,7 +172,10 @@ export class FacilityService {
     return departments.map((d) => this.toDepartmentType(d));
   }
 
-  async listWards(hospitalId: string, departmentId?: string): Promise<WardType[]> {
+  async listWards(
+    hospitalId: string,
+    departmentId?: string,
+  ): Promise<WardType[]> {
     const wards = await this.wardsRepo.find({
       where: departmentId ? { hospitalId, departmentId } : { hospitalId },
       order: { name: 'ASC' },
@@ -179,5 +189,76 @@ export class FacilityService {
       order: { label: 'ASC' },
     });
     return beds.map((b) => this.toBedType(b));
+  }
+
+  async deleteDepartment(
+    hospitalId: string,
+    id: string,
+    actor: AuthenticatedUser,
+  ): Promise<boolean> {
+    const department = await this.departmentsRepo.findOne({
+      where: { id, hospitalId },
+    });
+    if (!department) throw new NotFoundException('Department not found');
+    const wardCount = await this.wardsRepo.count({
+      where: { departmentId: id, hospitalId },
+    });
+    if (wardCount > 0) {
+      throw new ForbiddenException('Remove wards in this department first');
+    }
+    await this.departmentsRepo.remove(department);
+    await this.audit.log({
+      actorId: actor.id,
+      hospitalId,
+      action: 'delete',
+      resource: 'department',
+      resourceId: id,
+    });
+    return true;
+  }
+
+  async deleteWard(
+    hospitalId: string,
+    id: string,
+    actor: AuthenticatedUser,
+  ): Promise<boolean> {
+    const ward = await this.wardsRepo.findOne({ where: { id, hospitalId } });
+    if (!ward) throw new NotFoundException('Ward not found');
+    const bedCount = await this.bedsRepo.count({
+      where: { wardId: id, hospitalId },
+    });
+    if (bedCount > 0) {
+      throw new ForbiddenException('Remove beds in this ward first');
+    }
+    await this.wardsRepo.remove(ward);
+    await this.audit.log({
+      actorId: actor.id,
+      hospitalId,
+      action: 'delete',
+      resource: 'ward',
+      resourceId: id,
+    });
+    return true;
+  }
+
+  async deleteBed(
+    hospitalId: string,
+    id: string,
+    actor: AuthenticatedUser,
+  ): Promise<boolean> {
+    const bed = await this.bedsRepo.findOne({ where: { id, hospitalId } });
+    if (!bed) throw new NotFoundException('Bed not found');
+    if (bed.status === 'occupied') {
+      throw new ForbiddenException('Cannot delete an occupied bed');
+    }
+    await this.bedsRepo.remove(bed);
+    await this.audit.log({
+      actorId: actor.id,
+      hospitalId,
+      action: 'delete',
+      resource: 'bed',
+      resourceId: id,
+    });
+    return true;
   }
 }

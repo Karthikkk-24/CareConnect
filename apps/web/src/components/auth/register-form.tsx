@@ -108,8 +108,21 @@ export function RegisterForm() {
     setError('');
     try {
       const type = getValues('accountType');
+      const fullName = getValues('fullName');
+      // Persist account type before OAuth so post-login can finish patient onboarding
+      await signUp.create({
+        unsafeMetadata: {
+          fullName,
+          accountType: type,
+          hospitalName: getValues('hospitalName'),
+        },
+      });
       const dest =
-        type === 'patient' ? '/portal' : type === 'staff' ? '/login' : '/onboarding';
+        type === 'patient'
+          ? '/portal?completePatient=1'
+          : type === 'staff'
+            ? '/login'
+            : '/onboarding';
       await signUp.authenticateWithRedirect({
         strategy: 'oauth_google',
         redirectUrl: '/auth/callback',

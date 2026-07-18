@@ -50,7 +50,11 @@ export class Patient {
   @Column({ name: 'date_of_birth', type: 'date', nullable: true })
   dateOfBirth?: string;
 
-  @Column({ type: 'enum', enum: ['male', 'female', 'other', 'prefer_not_to_say'], nullable: true })
+  @Column({
+    type: 'enum',
+    enum: ['male', 'female', 'other', 'prefer_not_to_say'],
+    nullable: true,
+  })
   gender?: string;
 
   @Column({ name: 'blood_group', length: 10, nullable: true })
@@ -83,7 +87,11 @@ export class Patient {
   @Column({ name: 'primary_care_physician', length: 255, nullable: true })
   primaryCarePhysician?: string;
 
-  @Column({ type: 'enum', enum: ['registered', 'checked_in', 'admitted', 'discharged', 'inactive'], default: 'registered' })
+  @Column({
+    type: 'enum',
+    enum: ['registered', 'checked_in', 'admitted', 'discharged', 'inactive'],
+    default: 'registered',
+  })
   status: string;
 
   @OneToMany(() => PatientEmergencyContact, (c) => c.patient)

@@ -27,8 +27,16 @@ export class AppointmentsResolver {
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
     @Args('status', { nullable: true }) status?: string,
   ): Promise<AppointmentType[]> {
-    const resolvedHospitalId = this.appointmentsService.resolveHospitalId(user, hospitalId);
-    return this.appointmentsService.findAll(resolvedHospitalId, date, doctorId, status);
+    const resolvedHospitalId = this.appointmentsService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.appointmentsService.findAll(
+      resolvedHospitalId,
+      date,
+      doctorId,
+      status,
+    );
   }
 
   @Mutation(() => AppointmentType)
@@ -38,7 +46,10 @@ export class AppointmentsResolver {
     @Args('input') input: CreateAppointmentInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<AppointmentType> {
-    const resolvedHospitalId = this.appointmentsService.resolveHospitalId(user, hospitalId);
+    const resolvedHospitalId = this.appointmentsService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
     return this.appointmentsService.create(resolvedHospitalId, input, user);
   }
 
@@ -50,8 +61,16 @@ export class AppointmentsResolver {
     @Args('status') status: string,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<AppointmentType> {
-    const resolvedHospitalId = this.appointmentsService.resolveHospitalId(user, hospitalId);
-    return this.appointmentsService.updateStatus(id, status, resolvedHospitalId, user);
+    const resolvedHospitalId = this.appointmentsService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.appointmentsService.updateStatus(
+      id,
+      status,
+      resolvedHospitalId,
+      user,
+    );
   }
 
   @Mutation(() => AppointmentType)
@@ -61,7 +80,10 @@ export class AppointmentsResolver {
     @Args('input') input: CancelAppointmentInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<AppointmentType> {
-    const resolvedHospitalId = this.appointmentsService.resolveHospitalId(user, hospitalId);
+    const resolvedHospitalId = this.appointmentsService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
     return this.appointmentsService.cancel(resolvedHospitalId, input, user);
   }
 }

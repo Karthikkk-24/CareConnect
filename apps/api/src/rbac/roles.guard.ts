@@ -11,22 +11,23 @@ export class RolesGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const requiredRoles = this.reflector.getAllAndOverride<RoleSlug[]>(ROLES_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const requiredRoles = this.reflector.getAllAndOverride<RoleSlug[]>(
+      ROLES_KEY,
+      [context.getHandler(), context.getClass()],
+    );
 
-    const requiredPermissions = this.reflector.getAllAndOverride<string[]>(PERMISSIONS_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const requiredPermissions = this.reflector.getAllAndOverride<string[]>(
+      PERMISSIONS_KEY,
+      [context.getHandler(), context.getClass()],
+    );
 
     if (!requiredRoles?.length && !requiredPermissions?.length) {
       return true;
     }
 
     const ctx = GqlExecutionContext.create(context);
-    const user = ctx.getContext().req.user as AuthenticatedUser | undefined;
+    const gqlContext = ctx.getContext<{ req: { user?: AuthenticatedUser } }>();
+    const user = gqlContext.req?.user;
 
     if (!user) return false;
 
@@ -38,7 +39,9 @@ export class RolesGuard implements CanActivate {
     }
 
     if (requiredPermissions?.length) {
-      const hasPermission = requiredPermissions.every((perm) => user.permissions.includes(perm));
+      const hasPermission = requiredPermissions.every((perm) =>
+        user.permissions.includes(perm),
+      );
       if (!hasPermission) return false;
     }
 

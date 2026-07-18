@@ -14,7 +14,11 @@ import { Admission } from './admission.entity';
 import { User } from './user.entity';
 import { PrescriptionItem } from './prescription-item.entity';
 
-export const PRESCRIPTION_STATUSES = ['pending', 'dispensed', 'cancelled'] as const;
+export const PRESCRIPTION_STATUSES = [
+  'pending',
+  'dispensed',
+  'cancelled',
+] as const;
 
 @Entity('prescriptions')
 export class Prescription {

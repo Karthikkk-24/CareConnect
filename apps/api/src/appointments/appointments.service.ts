@@ -21,8 +21,10 @@ export class AppointmentsService {
   constructor(
     @InjectRepository(Appointment)
     private readonly appointmentsRepo: Repository<Appointment>,
-    @InjectRepository(Patient) private readonly patientsRepo: Repository<Patient>,
-    @InjectRepository(Department) private readonly departmentsRepo: Repository<Department>,
+    @InjectRepository(Patient)
+    private readonly patientsRepo: Repository<Patient>,
+    @InjectRepository(Department)
+    private readonly departmentsRepo: Repository<Department>,
     private readonly audit: AuditService,
   ) {}
 
@@ -80,7 +82,10 @@ export class AppointmentsService {
     };
   }
 
-  private async findAppointmentOrThrow(id: string, hospitalId: string): Promise<Appointment> {
+  private async findAppointmentOrThrow(
+    id: string,
+    hospitalId: string,
+  ): Promise<Appointment> {
     const appointment = await this.appointmentsRepo.findOne({
       where: { id, hospitalId },
       relations: ['patient', 'doctor'],
@@ -147,7 +152,11 @@ export class AppointmentsService {
     }
 
     if (status) {
-      if (!APPOINTMENT_STATUSES.includes(status as (typeof APPOINTMENT_STATUSES)[number])) {
+      if (
+        !APPOINTMENT_STATUSES.includes(
+          status as (typeof APPOINTMENT_STATUSES)[number],
+        )
+      ) {
         throw new BadRequestException(`Invalid appointment status: ${status}`);
       }
       where.status = status;
@@ -176,7 +185,11 @@ export class AppointmentsService {
     hospitalId: string,
     actor: AuthenticatedUser,
   ): Promise<AppointmentType> {
-    if (!APPOINTMENT_STATUSES.includes(status as (typeof APPOINTMENT_STATUSES)[number])) {
+    if (
+      !APPOINTMENT_STATUSES.includes(
+        status as (typeof APPOINTMENT_STATUSES)[number],
+      )
+    ) {
       throw new BadRequestException(`Invalid appointment status: ${status}`);
     }
 

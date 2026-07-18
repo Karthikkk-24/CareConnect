@@ -1,7 +1,13 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Role, StaffInvite, StaffProfile, User, UserRole } from '../database/entities';
+import {
+  Role,
+  StaffInvite,
+  StaffProfile,
+  User,
+  UserRole,
+} from '../database/entities';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
 import { ClerkAdminService } from '../clerk/clerk-admin.service';
@@ -10,11 +16,30 @@ import { StaffService } from './staff.service';
 describe('StaffService', () => {
   let service: StaffService;
 
-  const staffRepo = { find: jest.fn(), findOne: jest.fn(), save: jest.fn(), create: jest.fn() };
-  const usersRepo = { findOne: jest.fn(), save: jest.fn(), create: jest.fn(), update: jest.fn() };
+  const staffRepo = {
+    find: jest.fn(),
+    findOne: jest.fn(),
+    save: jest.fn(),
+    create: jest.fn(),
+  };
+  const usersRepo = {
+    findOne: jest.fn(),
+    save: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+  };
   const rolesRepo = { findOne: jest.fn() };
-  const userRolesRepo = { findOne: jest.fn(), save: jest.fn(), create: jest.fn(), delete: jest.fn() };
-  const invitesRepo = { save: jest.fn(), create: jest.fn(), findOne: jest.fn() };
+  const userRolesRepo = {
+    findOne: jest.fn(),
+    save: jest.fn(),
+    create: jest.fn(),
+    delete: jest.fn(),
+  };
+  const invitesRepo = {
+    save: jest.fn(),
+    create: jest.fn(),
+    findOne: jest.fn(),
+  };
   const clerkAdmin = { isConfigured: jest.fn(), inviteStaffByEmail: jest.fn() };
   const audit = { log: jest.fn() };
 
@@ -59,18 +84,23 @@ describe('StaffService', () => {
     });
 
     it('allows access when hospital matches', () => {
-      expect(() => service.assertHospitalAccess(hospitalAdmin, 'hospital-a')).not.toThrow();
+      expect(() =>
+        service.assertHospitalAccess(hospitalAdmin, 'hospital-a'),
+      ).not.toThrow();
     });
 
     it('denies access for wrong hospital', () => {
-      expect(() => service.assertHospitalAccess(hospitalAdmin, 'hospital-b')).toThrow(
-        ForbiddenException,
-      );
+      expect(() =>
+        service.assertHospitalAccess(hospitalAdmin, 'hospital-b'),
+      ).toThrow(ForbiddenException);
     });
 
     it('denies access when user has no hospital context', () => {
       expect(() =>
-        service.assertHospitalAccess({ ...hospitalAdmin, hospitalId: undefined }, 'hospital-a'),
+        service.assertHospitalAccess(
+          { ...hospitalAdmin, hospitalId: undefined },
+          'hospital-a',
+        ),
       ).toThrow(ForbiddenException);
     });
   });

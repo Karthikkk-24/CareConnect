@@ -19,12 +19,12 @@ export function Hero() {
             <span className="text-clay-primary">beautifully simple</span>
           </h1>
           <p className="max-w-xl text-lg text-clay-text-muted">
-            CareConnect streamlines patient records, appointments, billing, and clinical
-            workflows — built for hospitals that demand excellence.
+            CareConnect helps hospitals manage patients, appointments, admissions, billing, and
+            clinical workflows in one place — self-hosted on Neon with Clerk authentication.
           </p>
           <div className="flex flex-wrap gap-4">
             <Link href="/register">
-              <ClayButton size="lg">Start Free Trial</ClayButton>
+              <ClayButton size="lg">Get started</ClayButton>
             </Link>
             <Link href="/#features">
               <ClayButton variant="secondary" size="lg">
@@ -34,10 +34,10 @@ export function Hero() {
           </div>
           <div className="flex flex-wrap gap-6 pt-4 text-sm text-clay-text-muted">
             <span className="flex items-center gap-2">
-              <Shield className="h-4 w-4 text-clay-primary" /> HIPAA-ready architecture
+              <Shield className="h-4 w-4 text-clay-primary" /> Role-based access control
             </span>
             <span className="flex items-center gap-2">
-              <Activity className="h-4 w-4 text-clay-primary" /> Real-time dashboards
+              <Activity className="h-4 w-4 text-clay-primary" /> Live hospital dashboards
             </span>
           </div>
         </div>
@@ -45,24 +45,24 @@ export function Hero() {
         <ClayCard padding="lg" className="relative">
           <div className="mb-6 grid grid-cols-2 gap-4">
             <div className="rounded-2xl bg-clay-primary-light p-4 shadow-clay-inset">
-              <p className="text-2xl font-bold text-clay-primary">2,400+</p>
-              <p className="text-sm text-clay-text-muted">Patients managed</p>
+              <p className="text-2xl font-bold text-clay-primary">Patients</p>
+              <p className="text-sm text-clay-text-muted">Registration & charts</p>
             </div>
             <div className="rounded-2xl bg-clay-primary-light p-4 shadow-clay-inset">
-              <p className="text-2xl font-bold text-clay-primary">98.5%</p>
-              <p className="text-sm text-clay-text-muted">Uptime SLA</p>
+              <p className="text-2xl font-bold text-clay-primary">Clinical</p>
+              <p className="text-sm text-clay-text-muted">Notes, labs & Rx</p>
             </div>
             <div className="rounded-2xl bg-clay-primary-light p-4 shadow-clay-inset">
-              <p className="text-2xl font-bold text-clay-primary">150+</p>
-              <p className="text-sm text-clay-text-muted">Hospitals onboarded</p>
+              <p className="text-2xl font-bold text-clay-primary">Billing</p>
+              <p className="text-sm text-clay-text-muted">Invoices & payments</p>
             </div>
             <div className="rounded-2xl bg-clay-primary-light p-4 shadow-clay-inset">
-              <p className="text-2xl font-bold text-clay-primary">24/7</p>
-              <p className="text-sm text-clay-text-muted">Support available</p>
+              <p className="text-2xl font-bold text-clay-primary">Portal</p>
+              <p className="text-sm text-clay-text-muted">Patient self-serve</p>
             </div>
           </div>
           <p className="text-center text-sm text-clay-text-muted">
-            Trusted by healthcare teams worldwide
+            Built for clinics and hospitals that want full control of their data
           </p>
         </ClayCard>
       </div>

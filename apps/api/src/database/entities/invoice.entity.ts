@@ -50,7 +50,13 @@ export class Invoice {
   })
   status: string;
 
-  @Column({ name: 'total_amount', type: 'decimal', precision: 12, scale: 2, default: 0 })
+  @Column({
+    name: 'total_amount',
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+  })
   totalAmount: string;
 
   @Column({ name: 'issued_at', type: 'timestamptz', nullable: true })

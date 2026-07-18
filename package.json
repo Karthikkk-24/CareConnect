@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
-    "setup:env": "test -f apps/api/.env || cp apps/api/.env.example apps/api/.env; test -f apps/web/.env.local || cp apps/web/.env.example apps/web/.env.local; echo 'Created .env files — edit them with your Supabase credentials before running pnpm dev'",
+    "setup:env": "test -f apps/api/.env || cp apps/api/.env.example apps/api/.env; test -f apps/web/.env.local || cp apps/web/.env.example apps/web/.env.local; echo 'Created .env files — edit them with your Neon and Clerk credentials before running pnpm dev'",
     "dev": "turbo dev",
     "predev": "pnpm --filter @careconnect/types build",
     "dev:web": "turbo dev --filter=web",

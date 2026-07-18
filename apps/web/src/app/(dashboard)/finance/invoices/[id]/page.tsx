@@ -6,7 +6,7 @@ import { useMutation, useQuery } from '@apollo/client';
 import { useState } from 'react';
 import { ClayBadge, ClayButton, ClayCard, ClayInput } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
-import { INVOICE_QUERY, ME_QUERY, RECORD_PAYMENT_MUTATION } from '@/lib/graphql/queries';
+import { INVOICE_QUERY, ME_QUERY, RECORD_PAYMENT_MUTATION, VOID_INVOICE_MUTATION } from '@/lib/graphql/queries';
 
 export default function InvoiceDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -24,6 +24,10 @@ export default function InvoiceDetailPage() {
       setAmount('');
       refetch();
     },
+    onError: (err) => setError(err.message),
+  });
+  const [voidInvoice, { loading: voiding }] = useMutation(VOID_INVOICE_MUTATION, {
+    onCompleted: () => refetch(),
     onError: (err) => setError(err.message),
   });
 
@@ -54,9 +58,25 @@ export default function InvoiceDetailPage() {
         <ClayCard className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between">
             <ClayBadge>{invoice.status}</ClayBadge>
-            <p className="text-lg font-semibold text-clay-text">
-              ${Number(invoice.totalAmount).toFixed(2)}
-            </p>
+            <div className="flex items-center gap-3">
+              {invoice.status !== 'void' && invoice.status !== 'paid' ? (
+                <ClayButton
+                  size="sm"
+                  variant="ghost"
+                  isLoading={voiding}
+                  onClick={() => {
+                    if (confirm('Void this invoice?')) {
+                      voidInvoice({ variables: { id, hospitalId } });
+                    }
+                  }}
+                >
+                  Void
+                </ClayButton>
+              ) : null}
+              <p className="text-lg font-semibold text-clay-text">
+                ${Number(invoice.totalAmount).toFixed(2)}
+              </p>
+            </div>
           </div>
           <div className="divide-y divide-white/30">
             {(invoice.items ?? []).map(

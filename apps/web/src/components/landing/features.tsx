@@ -12,32 +12,32 @@ const features = [
   {
     icon: Stethoscope,
     title: 'Patient 360°',
-    description: 'Complete patient records with medical history, vitals, documents, and consent tracking.',
+    description: 'Patient records with medical history, documents, consents, and clinical actions.',
   },
   {
     icon: Calendar,
-    title: 'Smart Scheduling',
-    description: 'Appointment booking, walk-ins, doctor calendars, and automated reminders.',
+    title: 'Scheduling',
+    description: 'Book appointments by date, check patients in, and track status through completion.',
   },
   {
     icon: ClipboardList,
     title: 'Clinical Workflows',
-    description: 'Admissions, diagnoses, prescriptions, nursing notes, and discharge summaries.',
+    description: 'Admissions, vitals, notes, prescriptions, nursing tasks, and discharge summaries.',
   },
   {
     icon: FlaskConical,
-    title: 'Lab Integration',
-    description: 'Order tests, track samples, and deliver results directly to patient charts.',
+    title: 'Lab Orders',
+    description: 'Order tests and record results against the patient chart.',
   },
   {
     icon: Pill,
-    title: 'Pharmacy Module',
-    description: 'Prescription queue, drug interaction checks, and inventory management.',
+    title: 'Pharmacy & Inventory',
+    description: 'Prescription dispense queue and basic medical supply stock tracking.',
   },
   {
     icon: BarChart3,
-    title: 'Analytics & Reports',
-    description: 'Revenue, occupancy, patient statistics, and customizable dashboards.',
+    title: 'Reports',
+    description: 'Hospital KPIs for patients, appointments, occupancy, and revenue.',
   },
 ];
 

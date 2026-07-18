@@ -24,7 +24,10 @@ export class BillingResolver {
     @CurrentUser() user: AuthenticatedUser,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<InvoiceType[]> {
-    const resolvedHospitalId = this.billingService.resolveHospitalId(user, hospitalId);
+    const resolvedHospitalId = this.billingService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
     return this.billingService.listInvoices(resolvedHospitalId);
   }
 
@@ -35,7 +38,10 @@ export class BillingResolver {
     @Args('id') id: string,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<InvoiceType> {
-    const resolvedHospitalId = this.billingService.resolveHospitalId(user, hospitalId);
+    const resolvedHospitalId = this.billingService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
     return this.billingService.getInvoice(resolvedHospitalId, id);
   }
 
@@ -46,7 +52,10 @@ export class BillingResolver {
     @Args('input') input: CreateInvoiceInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<InvoiceType> {
-    const resolvedHospitalId = this.billingService.resolveHospitalId(user, hospitalId);
+    const resolvedHospitalId = this.billingService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
     return this.billingService.createInvoice(resolvedHospitalId, input, user);
   }
 
@@ -57,7 +66,24 @@ export class BillingResolver {
     @Args('input') input: RecordPaymentInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<InvoiceType> {
-    const resolvedHospitalId = this.billingService.resolveHospitalId(user, hospitalId);
+    const resolvedHospitalId = this.billingService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
     return this.billingService.recordPayment(resolvedHospitalId, input, user);
+  }
+
+  @Mutation(() => InvoiceType)
+  @Permissions(PERMISSIONS.BILLING_WRITE)
+  async voidInvoice(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('id') id: string,
+    @Args('hospitalId', { nullable: true }) hospitalId?: string,
+  ): Promise<InvoiceType> {
+    const resolvedHospitalId = this.billingService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.billingService.voidInvoice(resolvedHospitalId, id, user);
   }
 }

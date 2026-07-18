@@ -63,7 +63,7 @@ export default function SettingsPage() {
   if (!hospitalId) {
     return (
       <div>
-        <DashboardHeader title="Settings" subtitle="Hospital profile and preferences" />
+        <DashboardHeader title="Settings" subtitle="Hospital profile and facility setup" />
         <p className="text-clay-text-muted">No hospital linked to your account yet.</p>
       </div>
     );
@@ -77,7 +77,7 @@ export default function SettingsPage() {
     <div>
       <DashboardHeader
         title="Settings"
-        subtitle="Manage your hospital profile and preferences"
+        subtitle="Hospital profile and facility setup"
       />
 
       <ClayCard className="mb-6 flex flex-wrap items-center justify-between gap-3">

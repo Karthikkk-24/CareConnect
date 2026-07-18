@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { FileText, History, Upload } from 'lucide-react';
 import { ClayBadge, ClayButton, ClayCard } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
-import { ADD_PATIENT_DOCUMENT_MUTATION, DELETE_PATIENT_MUTATION, LINK_PATIENT_ACCOUNT, ME_QUERY, PATIENT_QUERY, UPDATE_PATIENT_STATUS } from '@/lib/graphql/queries';
+import { ADD_PATIENT_DOCUMENT_MUTATION, DELETE_PATIENT_DOCUMENT, DELETE_PATIENT_MUTATION, DISCHARGES_QUERY, LINK_PATIENT_ACCOUNT, ME_QUERY, PATIENT_DIAGNOSES_QUERY, PATIENT_NOTES_QUERY, PATIENT_PRESCRIPTIONS_QUERY, PATIENT_QUERY, PATIENT_VITALS_QUERY, UPDATE_PATIENT_STATUS } from '@/lib/graphql/queries';
 import { PatientClinicalActions } from '@/components/clinical/patient-clinical-actions';
 import { useAuth } from '@clerk/nextjs';
 
@@ -31,9 +31,31 @@ export default function PatientDetailPage() {
     skip: !id,
   });
   const [addDocument] = useMutation(ADD_PATIENT_DOCUMENT_MUTATION);
+  const [deleteDocument] = useMutation(DELETE_PATIENT_DOCUMENT, { onCompleted: () => refetch() });
   const [updateStatus] = useMutation(UPDATE_PATIENT_STATUS, { onCompleted: () => refetch() });
   const [deletePatient] = useMutation(DELETE_PATIENT_MUTATION);
   const [linkAccount] = useMutation(LINK_PATIENT_ACCOUNT, { onCompleted: () => refetch() });
+
+  const vitalsQuery = useQuery(PATIENT_VITALS_QUERY, {
+    variables: { patientId: id, hospitalId: meData?.me?.hospitalId },
+    skip: !id || !meData?.me?.hospitalId,
+  });
+  const notesQuery = useQuery(PATIENT_NOTES_QUERY, {
+    variables: { patientId: id, hospitalId: meData?.me?.hospitalId },
+    skip: !id || !meData?.me?.hospitalId,
+  });
+  const diagnosesQuery = useQuery(PATIENT_DIAGNOSES_QUERY, {
+    variables: { patientId: id, hospitalId: meData?.me?.hospitalId },
+    skip: !id || !meData?.me?.hospitalId,
+  });
+  const rxQuery = useQuery(PATIENT_PRESCRIPTIONS_QUERY, {
+    variables: { patientId: id, hospitalId: meData?.me?.hospitalId },
+    skip: !id || !meData?.me?.hospitalId,
+  });
+  const dischargesQuery = useQuery(DISCHARGES_QUERY, {
+    variables: { patientId: id, hospitalId: meData?.me?.hospitalId },
+    skip: !id || !meData?.me?.hospitalId,
+  });
 
   const patient = data?.patient;
 
@@ -128,13 +150,22 @@ export default function PatientDetailPage() {
         <ClayButton
           size="sm"
           variant="ghost"
-          onClick={() =>
+          onClick={() => {
+            const email =
+              window.prompt(
+                'Portal user email to link (defaults to patient email)',
+                patient.email ?? '',
+              ) ?? '';
             linkAccount({
-              variables: { patientId: id, hospitalId: meData?.me?.hospitalId },
-            })
-          }
+              variables: {
+                patientId: id,
+                hospitalId: meData?.me?.hospitalId,
+                email: email || undefined,
+              },
+            });
+          }}
         >
-          Link my portal account
+          Link portal account
         </ClayButton>
         <ClayButton
           size="sm"
@@ -251,20 +282,148 @@ export default function PatientDetailPage() {
           {patient.documents?.length ? (
             <div className="grid gap-3 sm:grid-cols-2">
               {patient.documents.map((d: { id: string; name: string; fileUrl: string }) => (
-                <a
+                <div
                   key={d.id}
-                  href={d.fileUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 rounded-2xl bg-clay-primary-light/30 p-3 hover:bg-clay-primary-light/50"
+                  className="flex items-center gap-3 rounded-2xl bg-clay-primary-light/30 p-3"
                 >
-                  <FileText className="h-5 w-5 text-clay-primary" />
-                  <span className="text-sm text-clay-text">{d.name}</span>
-                </a>
+                  <a
+                    href={d.fileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex min-w-0 flex-1 items-center gap-3 hover:opacity-80"
+                  >
+                    <FileText className="h-5 w-5 shrink-0 text-clay-primary" />
+                    <span className="truncate text-sm text-clay-text">{d.name}</span>
+                  </a>
+                  <ClayButton
+                    size="sm"
+                    variant="ghost"
+                    onClick={() =>
+                      deleteDocument({
+                        variables: {
+                          id: d.id,
+                          patientId: id,
+                          hospitalId: meData?.me?.hospitalId,
+                        },
+                      })
+                    }
+                  >
+                    Delete
+                  </ClayButton>
+                </div>
               ))}
             </div>
           ) : (
             <p className="text-sm text-clay-text-muted">No documents uploaded</p>
+          )}
+        </ClayCard>
+
+        <ClayCard className="lg:col-span-3">
+          <h2 className="mb-4 text-lg font-semibold text-clay-text">Clinical chart</h2>
+          <div className="grid gap-6 md:grid-cols-2">
+            <div>
+              <h3 className="mb-2 text-sm font-medium text-clay-text">Vitals</h3>
+              {(vitalsQuery.data?.vitalSigns ?? []).length === 0 ? (
+                <p className="text-sm text-clay-text-muted">None yet</p>
+              ) : (
+                <ul className="space-y-2 text-sm">
+                  {(vitalsQuery.data?.vitalSigns ?? []).slice(0, 5).map(
+                    (v: {
+                      id: string;
+                      bloodPressure?: string;
+                      heartRate?: number;
+                      recordedAt: string;
+                    }) => (
+                      <li key={v.id} className="text-clay-text-muted">
+                        {new Date(v.recordedAt).toLocaleString()} — BP {v.bloodPressure ?? '—'} · HR{' '}
+                        {v.heartRate ?? '—'}
+                      </li>
+                    ),
+                  )}
+                </ul>
+              )}
+            </div>
+            <div>
+              <h3 className="mb-2 text-sm font-medium text-clay-text">Diagnoses</h3>
+              {(diagnosesQuery.data?.diagnoses ?? []).length === 0 ? (
+                <p className="text-sm text-clay-text-muted">None yet</p>
+              ) : (
+                <ul className="space-y-2 text-sm">
+                  {(diagnosesQuery.data?.diagnoses ?? []).map(
+                    (d: { id: string; description: string; icdCode?: string }) => (
+                      <li key={d.id} className="text-clay-text">
+                        {d.icdCode ? `${d.icdCode}: ` : ''}
+                        {d.description}
+                      </li>
+                    ),
+                  )}
+                </ul>
+              )}
+            </div>
+            <div>
+              <h3 className="mb-2 text-sm font-medium text-clay-text">Notes</h3>
+              {(notesQuery.data?.clinicalNotes ?? []).length === 0 ? (
+                <p className="text-sm text-clay-text-muted">None yet</p>
+              ) : (
+                <ul className="space-y-2 text-sm">
+                  {(notesQuery.data?.clinicalNotes ?? []).slice(0, 3).map(
+                    (n: { id: string; assessment?: string; createdAt: string }) => (
+                      <li key={n.id} className="text-clay-text-muted">
+                        {new Date(n.createdAt).toLocaleDateString()}: {n.assessment || 'SOAP note'}
+                      </li>
+                    ),
+                  )}
+                </ul>
+              )}
+            </div>
+            <div>
+              <h3 className="mb-2 text-sm font-medium text-clay-text">Prescriptions</h3>
+              {(rxQuery.data?.prescriptions ?? []).length === 0 ? (
+                <p className="text-sm text-clay-text-muted">None yet</p>
+              ) : (
+                <ul className="space-y-2 text-sm">
+                  {(rxQuery.data?.prescriptions ?? []).map(
+                    (p: {
+                      id: string;
+                      status: string;
+                      items?: Array<{ drugName: string }>;
+                    }) => (
+                      <li key={p.id} className="text-clay-text">
+                        {p.items?.map((i) => i.drugName).join(', ') || 'Rx'} ({p.status})
+                      </li>
+                    ),
+                  )}
+                </ul>
+              )}
+            </div>
+          </div>
+        </ClayCard>
+
+        <ClayCard className="lg:col-span-3">
+          <h2 className="mb-4 text-lg font-semibold text-clay-text">Discharge summaries</h2>
+          {(dischargesQuery.data?.discharges ?? []).length === 0 ? (
+            <p className="text-sm text-clay-text-muted">No discharges recorded</p>
+          ) : (
+            <ul className="space-y-3 text-sm">
+              {(dischargesQuery.data?.discharges ?? []).map(
+                (d: {
+                  id: string;
+                  summary?: string;
+                  dischargedAt: string;
+                  instructions?: string;
+                }) => (
+                  <li key={d.id} className="rounded-2xl bg-clay-primary-light/20 px-3 py-2">
+                    <p className="font-medium text-clay-text">
+                      {new Date(d.dischargedAt).toLocaleString()}
+                    </p>
+                    <p className="text-clay-text-muted">{d.summary || 'No summary'}</p>
+                    {d.instructions ? (
+                      <p className="mt-1 text-xs text-clay-text-muted">{d.instructions}</p>
+                    ) : null}
+                  </li>
+                ),
+              )}
+            </ul>
           )}
         </ClayCard>
 

@@ -26,7 +26,13 @@ export class InvoiceItem {
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 1 })
   quantity: string;
 
-  @Column({ name: 'unit_price', type: 'decimal', precision: 12, scale: 2, default: 0 })
+  @Column({
+    name: 'unit_price',
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+  })
   unitPrice: string;
 
   @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })

@@ -7,7 +7,16 @@
     "forgotPassword": "Forgot password?",
     "signIn": "Sign In",
     "noAccount": "Don't have an account?",
-    "createOne": "Create one"
+    "createOne": "Create one",
+    "createAccount": "Create your account",
+    "signUpSubtitle": "Register a hospital workspace or patient portal account",
+    "fullName": "Full name",
+    "hospitalName": "Hospital name",
+    "accountType": "Account type",
+    "signUp": "Sign up",
+    "hasAccount": "Already have an account?",
+    "signInLink": "Sign in",
+    "continueWithGoogle": "Continue with Google"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -24,10 +33,37 @@
     "pharmacy": "Pharmacy",
     "inventory": "Inventory",
     "reports": "Reports",
+    "facility": "Facility",
     "hospitalProfile": "Hospital Profile",
     "signOut": "Sign Out",
-    "brandSubtitle": "Hospital Admin",
+    "brandSubtitle": "Care workspace",
+    "brandSubtitleAdmin": "Hospital Admin",
+    "brandSubtitleDoctor": "Doctor",
+    "brandSubtitleNurse": "Nurse",
+    "brandSubtitlePatient": "Patient Portal",
     "mainNav": "Main navigation",
+    "skipToContent": "Skip to main content"
+  },
+  "common": {
+    "loading": "Loading...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "error": "Something went wrong",
+    "noResults": "No results found"
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Hospital profile and facility setup"
+  },
+  "marketing": {
+    "features": "Features",
+    "howItWorks": "How it Works",
+    "pricing": "Pricing",
+    "logIn": "Log in",
+    "getStarted": "Get Started",
+    "menu": "Open menu",
     "skipToContent": "Skip to main content"
   }
 }

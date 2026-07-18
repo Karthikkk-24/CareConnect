@@ -27,7 +27,10 @@ export class FacilityResolver {
     @CurrentUser() user: AuthenticatedUser,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<DepartmentType[]> {
-    const resolvedHospitalId = this.facilityService.resolveHospitalId(user, hospitalId);
+    const resolvedHospitalId = this.facilityService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
     return this.facilityService.listDepartments(resolvedHospitalId);
   }
 
@@ -38,7 +41,10 @@ export class FacilityResolver {
     @Args('departmentId', { nullable: true }) departmentId?: string,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<WardType[]> {
-    const resolvedHospitalId = this.facilityService.resolveHospitalId(user, hospitalId);
+    const resolvedHospitalId = this.facilityService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
     return this.facilityService.listWards(resolvedHospitalId, departmentId);
   }
 
@@ -49,7 +55,10 @@ export class FacilityResolver {
     @Args('wardId', { nullable: true }) wardId?: string,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<BedType[]> {
-    const resolvedHospitalId = this.facilityService.resolveHospitalId(user, hospitalId);
+    const resolvedHospitalId = this.facilityService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
     return this.facilityService.listBeds(resolvedHospitalId, wardId);
   }
 
@@ -60,8 +69,15 @@ export class FacilityResolver {
     @Args('input') input: CreateDepartmentInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<DepartmentType> {
-    const resolvedHospitalId = this.facilityService.resolveHospitalId(user, hospitalId);
-    return this.facilityService.createDepartment(resolvedHospitalId, input, user);
+    const resolvedHospitalId = this.facilityService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.facilityService.createDepartment(
+      resolvedHospitalId,
+      input,
+      user,
+    );
   }
 
   @Mutation(() => WardType)
@@ -71,7 +87,10 @@ export class FacilityResolver {
     @Args('input') input: CreateWardInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<WardType> {
-    const resolvedHospitalId = this.facilityService.resolveHospitalId(user, hospitalId);
+    const resolvedHospitalId = this.facilityService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
     return this.facilityService.createWard(resolvedHospitalId, input, user);
   }
 
@@ -82,7 +101,52 @@ export class FacilityResolver {
     @Args('input') input: CreateBedInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<BedType> {
-    const resolvedHospitalId = this.facilityService.resolveHospitalId(user, hospitalId);
+    const resolvedHospitalId = this.facilityService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
     return this.facilityService.createBed(resolvedHospitalId, input, user);
+  }
+
+  @Mutation(() => Boolean)
+  @Permissions(PERMISSIONS.HOSPITALS_WRITE)
+  async deleteDepartment(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('id') id: string,
+    @Args('hospitalId', { nullable: true }) hospitalId?: string,
+  ): Promise<boolean> {
+    const resolvedHospitalId = this.facilityService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.facilityService.deleteDepartment(resolvedHospitalId, id, user);
+  }
+
+  @Mutation(() => Boolean)
+  @Permissions(PERMISSIONS.HOSPITALS_WRITE)
+  async deleteWard(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('id') id: string,
+    @Args('hospitalId', { nullable: true }) hospitalId?: string,
+  ): Promise<boolean> {
+    const resolvedHospitalId = this.facilityService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.facilityService.deleteWard(resolvedHospitalId, id, user);
+  }
+
+  @Mutation(() => Boolean)
+  @Permissions(PERMISSIONS.HOSPITALS_WRITE)
+  async deleteBed(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('id') id: string,
+    @Args('hospitalId', { nullable: true }) hospitalId?: string,
+  ): Promise<boolean> {
+    const resolvedHospitalId = this.facilityService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.facilityService.deleteBed(resolvedHospitalId, id, user);
   }
 }

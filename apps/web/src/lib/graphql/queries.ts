@@ -57,12 +57,103 @@ export const COMPLETE_PATIENT_ONBOARDING = gql`
 `;
 
 export const LINK_PATIENT_ACCOUNT = gql`
-  mutation LinkPatientAccount($patientId: String!, $userId: String, $hospitalId: String) {
-    linkPatientAccount(patientId: $patientId, userId: $userId, hospitalId: $hospitalId) {
+  mutation LinkPatientAccount(
+    $patientId: String!
+    $userId: String
+    $email: String
+    $hospitalId: String
+  ) {
+    linkPatientAccount(
+      patientId: $patientId
+      userId: $userId
+      email: $email
+      hospitalId: $hospitalId
+    ) {
       id
       fullName
       status
     }
+  }
+`;
+
+export const VOID_INVOICE_MUTATION = gql`
+  mutation VoidInvoice($id: String!, $hospitalId: String) {
+    voidInvoice(id: $id, hospitalId: $hospitalId) {
+      id
+      status
+    }
+  }
+`;
+
+export const PATIENT_VITALS_QUERY = gql`
+  query PatientVitals($patientId: String!, $hospitalId: String) {
+    vitalSigns(patientId: $patientId, hospitalId: $hospitalId) {
+      id
+      bloodPressure
+      heartRate
+      temperature
+      spo2
+      recordedAt
+    }
+  }
+`;
+
+export const PATIENT_NOTES_QUERY = gql`
+  query PatientNotes($patientId: String!, $hospitalId: String) {
+    clinicalNotes(patientId: $patientId, hospitalId: $hospitalId) {
+      id
+      subjective
+      objective
+      assessment
+      plan
+      createdAt
+    }
+  }
+`;
+
+export const PATIENT_DIAGNOSES_QUERY = gql`
+  query PatientDiagnoses($patientId: String!, $hospitalId: String) {
+    diagnoses(patientId: $patientId, hospitalId: $hospitalId) {
+      id
+      icdCode
+      description
+      isPrimary
+      diagnosedAt
+    }
+  }
+`;
+
+export const PATIENT_PRESCRIPTIONS_QUERY = gql`
+  query PatientPrescriptions($patientId: String!, $hospitalId: String) {
+    prescriptions(patientId: $patientId, hospitalId: $hospitalId) {
+      id
+      status
+      notes
+      createdAt
+      items {
+        drugName
+        dosage
+        frequency
+      }
+    }
+  }
+`;
+
+export const DELETE_DEPARTMENT_MUTATION = gql`
+  mutation DeleteDepartment($id: String!, $hospitalId: String) {
+    deleteDepartment(id: $id, hospitalId: $hospitalId)
+  }
+`;
+
+export const DELETE_WARD_MUTATION = gql`
+  mutation DeleteWard($id: String!, $hospitalId: String) {
+    deleteWard(id: $id, hospitalId: $hospitalId)
+  }
+`;
+
+export const DELETE_BED_MUTATION = gql`
+  mutation DeleteBed($id: String!, $hospitalId: String) {
+    deleteBed(id: $id, hospitalId: $hospitalId)
   }
 `;
 
@@ -226,7 +317,7 @@ export const CREATE_PATIENT_MUTATION = gql`
 `;
 
 export const UPDATE_PATIENT_MUTATION = gql`
-  mutation UpdatePatient($id: String!, $input: CreatePatientInput!, $hospitalId: String) {
+  mutation UpdatePatient($id: String!, $input: UpdatePatientInput!, $hospitalId: String) {
     updatePatient(id: $id, input: $input, hospitalId: $hospitalId) {
       id
       fullName
@@ -250,16 +341,8 @@ export const UPDATE_PATIENT_STATUS = gql`
 `;
 
 export const DELETE_PATIENT_DOCUMENT = gql`
-  mutation DeletePatientDocument(
-    $patientId: String!
-    $documentId: String!
-    $hospitalId: String
-  ) {
-    deletePatientDocument(
-      patientId: $patientId
-      documentId: $documentId
-      hospitalId: $hospitalId
-    )
+  mutation DeletePatientDocument($patientId: String!, $id: String!, $hospitalId: String) {
+    deletePatientDocument(patientId: $patientId, id: $id, hospitalId: $hospitalId)
   }
 `;
 
@@ -523,6 +606,19 @@ export const CREATE_CLINICAL_NOTE_MUTATION = gql`
       assessment
       plan
       createdAt
+    }
+  }
+`;
+
+export const CREATE_DIAGNOSIS_MUTATION = gql`
+  mutation CreateDiagnosis($input: CreateDiagnosisInput!, $hospitalId: String) {
+    createDiagnosis(input: $input, hospitalId: $hospitalId) {
+      id
+      patientId
+      icdCode
+      description
+      isPrimary
+      diagnosedAt
     }
   }
 `;

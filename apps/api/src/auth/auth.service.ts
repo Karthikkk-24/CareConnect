@@ -1,7 +1,12 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Role, User, UserRole } from '../database/entities';
+import { Hospital, Role, User, UserRole } from '../database/entities';
 import type { AuthenticatedUser } from './auth.types';
 
 @Injectable()
@@ -13,9 +18,14 @@ export class AuthService {
     private readonly userRolesRepo: Repository<UserRole>,
     @InjectRepository(Role)
     private readonly rolesRepo: Repository<Role>,
+    @InjectRepository(Hospital)
+    private readonly hospitalsRepo: Repository<Hospital>,
   ) {}
 
-  async syncAndGetUser(authId: string, email?: string): Promise<AuthenticatedUser | null> {
+  async syncAndGetUser(
+    authId: string,
+    email?: string,
+  ): Promise<AuthenticatedUser | null> {
     let user = await this.usersRepo.findOne({
       where: { authId },
       relations: ['userRoles', 'userRoles.role', 'userRoles.role.permissions'],
@@ -25,11 +35,21 @@ export class AuthService {
     if (!user && email) {
       user = await this.usersRepo.findOne({
         where: { email },
-        relations: ['userRoles', 'userRoles.role', 'userRoles.role.permissions'],
+        relations: [
+          'userRoles',
+          'userRoles.role',
+          'userRoles.role.permissions',
+        ],
       });
       if (user) {
-        await this.usersRepo.update(user.id, { authId });
-        user.authId = authId;
+        // Only reclaim pending invite placeholders — never steal an active Clerk-linked account
+        const isPending = user.authId.startsWith('pending_');
+        if (isPending || user.authId === authId) {
+          await this.usersRepo.update(user.id, { authId });
+          user.authId = authId;
+        } else {
+          user = null;
+        }
       }
     }
 
@@ -42,7 +62,11 @@ export class AuthService {
       user = await this.usersRepo.save(user);
       user = await this.usersRepo.findOne({
         where: { id: user.id },
-        relations: ['userRoles', 'userRoles.role', 'userRoles.role.permissions'],
+        relations: [
+          'userRoles',
+          'userRoles.role',
+          'userRoles.role.permissions',
+        ],
       });
     }
 
@@ -59,7 +83,9 @@ export class AuthService {
     const roles = user.userRoles?.map((ur) => ur.role.slug) ?? [];
     const permissions = [
       ...new Set(
-        user.userRoles?.flatMap((ur) => ur.role.permissions?.map((p) => p.slug) ?? []) ?? [],
+        user.userRoles?.flatMap(
+          (ur) => ur.role.permissions?.map((p) => p.slug) ?? [],
+        ) ?? [],
       ),
     ];
 
@@ -78,21 +104,66 @@ export class AuthService {
   /**
    * Hospital registration path only: assign hospital_admin when user has no roles yet
    * and is completing first-time hospital setup.
+   *
+   * Tenancy rules:
+   * - Cannot switch to a different hospital once hospitalId is set (unless super_admin).
+   * - Joining an existing hospital requires assignHospitalAdmin bootstrap OR invite flow.
+   * - Bootstrap admin only when that hospital has zero hospital_admin members yet.
    */
   async completeOnboarding(
-    userId: string,
+    actor: AuthenticatedUser,
     fullName: string,
     hospitalId?: string,
     assignHospitalAdmin = false,
   ) {
-    await this.usersRepo.update(userId, {
+    const user = await this.usersRepo.findOne({ where: { id: actor.id } });
+    if (!user) throw new NotFoundException('User not found');
+
+    const isSuperAdmin = actor.roles.includes('super_admin');
+
+    if (hospitalId) {
+      const hospital = await this.hospitalsRepo.findOne({
+        where: { id: hospitalId },
+      });
+      if (!hospital) throw new NotFoundException('Hospital not found');
+
+      if (user.hospitalId && user.hospitalId !== hospitalId && !isSuperAdmin) {
+        throw new ForbiddenException('Cannot switch hospital membership');
+      }
+
+      if (!user.hospitalId && !assignHospitalAdmin && !isSuperAdmin) {
+        throw new ForbiddenException(
+          'Hospital membership requires a staff invite or hospital registration',
+        );
+      }
+
+      if (!user.hospitalId && assignHospitalAdmin && !isSuperAdmin) {
+        const adminRole = await this.rolesRepo.findOne({
+          where: { slug: 'hospital_admin' },
+        });
+        if (adminRole) {
+          const existingAdmins = await this.userRolesRepo.count({
+            where: { roleId: adminRole.id, hospitalId },
+          });
+          if (existingAdmins > 0) {
+            throw new ForbiddenException(
+              'Hospital already has an administrator; join via staff invite',
+            );
+          }
+        }
+      }
+    }
+
+    await this.usersRepo.update(user.id, {
       fullName,
-      hospitalId,
+      hospitalId: hospitalId ?? user.hospitalId,
       onboardingCompleted: true,
     });
 
     if (hospitalId && assignHospitalAdmin) {
-      const existingRoles = await this.userRolesRepo.find({ where: { userId } });
+      const existingRoles = await this.userRolesRepo.find({
+        where: { userId: user.id },
+      });
       if (existingRoles.length === 0) {
         const adminRole = await this.rolesRepo.findOne({
           where: { slug: 'hospital_admin' },
@@ -101,7 +172,7 @@ export class AuthService {
         if (adminRole) {
           await this.userRolesRepo.save(
             this.userRolesRepo.create({
-              userId,
+              userId: user.id,
               roleId: adminRole.id,
               hospitalId,
             }),
@@ -120,7 +191,9 @@ export class AuthService {
 
     const existingRoles = await this.userRolesRepo.find({ where: { userId } });
     if (existingRoles.length === 0) {
-      const patientRole = await this.rolesRepo.findOne({ where: { slug: 'patient' } });
+      const patientRole = await this.rolesRepo.findOne({
+        where: { slug: 'patient' },
+      });
       if (patientRole) {
         await this.userRolesRepo.save(
           this.userRolesRepo.create({

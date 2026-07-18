@@ -10,6 +10,7 @@ import {
   FileText,
   Pill,
   FlaskConical,
+  Stethoscope,
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
@@ -20,9 +21,11 @@ import {
   BEDS_QUERY,
   CREATE_APPOINTMENT_MUTATION,
   CREATE_CLINICAL_NOTE_MUTATION,
+  CREATE_DIAGNOSIS_MUTATION,
   CREATE_LAB_ORDER_MUTATION,
   CREATE_PRESCRIPTION_MUTATION,
   CREATE_VITAL_SIGN_MUTATION,
+  STAFF_MEMBERS_QUERY,
   WARDS_QUERY,
 } from '@/lib/graphql/queries';
 
@@ -36,6 +39,7 @@ type ActionKey =
   | 'admit'
   | 'vitals'
   | 'soap'
+  | 'diagnosis'
   | 'prescription'
   | 'lab';
 
@@ -44,6 +48,7 @@ const actions: { key: ActionKey; label: string; icon: typeof Calendar }[] = [
   { key: 'admit', label: 'Admit Patient', icon: Activity },
   { key: 'vitals', label: 'Record Vitals', icon: HeartPulse },
   { key: 'soap', label: 'Add SOAP Note', icon: FileText },
+  { key: 'diagnosis', label: 'Add Diagnosis', icon: Stethoscope },
   { key: 'prescription', label: 'Add Prescription', icon: Pill },
   { key: 'lab', label: 'Order Lab Test', icon: FlaskConical },
 ];
@@ -59,6 +64,7 @@ export function PatientClinicalActions({ patientId, hospitalId }: PatientClinica
   const [admitPatient, { loading: admitLoading }] = useMutation(ADMIT_PATIENT_MUTATION);
   const [createVitalSign, { loading: vitalsLoading }] = useMutation(CREATE_VITAL_SIGN_MUTATION);
   const [createClinicalNote, { loading: noteLoading }] = useMutation(CREATE_CLINICAL_NOTE_MUTATION);
+  const [createDiagnosis, { loading: diagnosisLoading }] = useMutation(CREATE_DIAGNOSIS_MUTATION);
   const [createPrescription, { loading: rxLoading }] = useMutation(CREATE_PRESCRIPTION_MUTATION);
   const [createLabOrder, { loading: labLoading }] = useMutation(CREATE_LAB_ORDER_MUTATION);
 
@@ -187,6 +193,27 @@ export function PatientClinicalActions({ patientId, hospitalId }: PatientClinica
     }
   };
 
+  const handleDiagnosis = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    try {
+      await createDiagnosis({
+        variables: {
+          hospitalId,
+          input: {
+            patientId,
+            description: form.get('description') as string,
+            icdCode: (form.get('icdCode') as string) || undefined,
+            isPrimary: form.get('isPrimary') === 'on',
+          },
+        },
+      });
+      handleSuccess('Diagnosis recorded');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to record diagnosis');
+    }
+  };
+
   const handlePrescription = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
@@ -236,7 +263,13 @@ export function PatientClinicalActions({ patientId, hospitalId }: PatientClinica
   };
 
   const isLoading =
-    appointmentLoading || admitLoading || vitalsLoading || noteLoading || rxLoading || labLoading;
+    appointmentLoading ||
+    admitLoading ||
+    vitalsLoading ||
+    noteLoading ||
+    diagnosisLoading ||
+    rxLoading ||
+    labLoading;
 
   return (
     <ClayCard className="lg:col-span-3">
@@ -281,7 +314,7 @@ export function PatientClinicalActions({ patientId, hospitalId }: PatientClinica
                       required
                       className="sm:col-span-2"
                     />
-                    <ClayInput name="doctorId" label="Doctor ID (optional)" placeholder="UUID" />
+                    <DoctorSelect hospitalId={hospitalId} />
                     <ClayTextarea name="reason" label="Reason" rows={2} className="sm:col-span-2" />
                     <div className="flex gap-2 sm:col-span-2">
                       <ClayButton type="submit" size="sm" isLoading={isLoading}>
@@ -396,6 +429,26 @@ export function PatientClinicalActions({ patientId, hospitalId }: PatientClinica
                   </form>
                 ) : null}
 
+                {key === 'diagnosis' ? (
+                  <form onSubmit={handleDiagnosis} className="grid gap-3 sm:grid-cols-2">
+                    <ClayInput
+                      name="description"
+                      label="Diagnosis *"
+                      required
+                      placeholder="e.g. Type 2 diabetes mellitus"
+                      className="sm:col-span-2"
+                    />
+                    <ClayInput name="icdCode" label="ICD Code" placeholder="e.g. E11.9" />
+                    <label className="flex items-center gap-2 text-sm text-clay-text">
+                      <input type="checkbox" name="isPrimary" className="rounded" />
+                      Primary diagnosis
+                    </label>
+                    <ClayButton type="submit" size="sm" isLoading={isLoading} className="sm:col-span-2">
+                      Save Diagnosis
+                    </ClayButton>
+                  </form>
+                ) : null}
+
                 {key === 'prescription' ? (
                   <form onSubmit={handlePrescription} className="grid gap-3 sm:grid-cols-2">
                     <ClayInput name="drugName" label="Drug Name *" required />
@@ -430,5 +483,37 @@ export function PatientClinicalActions({ patientId, hospitalId }: PatientClinica
         ))}
       </div>
     </ClayCard>
+  );
+}
+
+function DoctorSelect({ hospitalId }: { hospitalId?: string }) {
+  const { data } = useQuery(STAFF_MEMBERS_QUERY, {
+    variables: { hospitalId },
+    skip: !hospitalId,
+  });
+  const doctors = (data?.staffMembers ?? []).filter(
+    (s: { roleSlug: string; isActive: boolean }) =>
+      s.isActive && (s.roleSlug === 'doctor' || s.roleSlug === 'hospital_admin'),
+  );
+
+  return (
+    <div className="flex flex-col gap-2">
+      <label htmlFor="clinical-doctor" className="text-sm font-medium text-clay-text">
+        Doctor (optional)
+      </label>
+      <select
+        id="clinical-doctor"
+        name="doctorId"
+        className="rounded-2xl border border-white/60 bg-clay-surface px-4 py-3 text-sm shadow-clay-inset"
+        defaultValue=""
+      >
+        <option value="">Unassigned</option>
+        {doctors.map((d: { userId: string; fullName: string }) => (
+          <option key={d.userId} value={d.userId}>
+            {d.fullName}
+          </option>
+        ))}
+      </select>
+    </div>
   );
 }

@@ -1,11 +1,13 @@
 import { ExecutionContext, Injectable } from '@nestjs/common';
 import { GqlExecutionContext } from '@nestjs/graphql';
 import { AuthGuard } from '@nestjs/passport';
+import type { Request } from 'express';
 
 @Injectable()
 export class GqlAuthGuard extends AuthGuard('clerk-jwt') {
-  getRequest(context: ExecutionContext) {
+  getRequest(context: ExecutionContext): Request {
     const ctx = GqlExecutionContext.create(context);
-    return ctx.getContext().req;
+    const gqlContext = ctx.getContext<{ req: Request }>();
+    return gqlContext.req;
   }
 }

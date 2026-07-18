@@ -21,7 +21,10 @@ export class StaffResolver {
     @CurrentUser() user: AuthenticatedUser,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<StaffType[]> {
-    const resolvedHospitalId = this.staffService.resolveHospitalId(user, hospitalId);
+    const resolvedHospitalId = this.staffService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
     const members = await this.staffService.findByHospital(resolvedHospitalId);
     return members.map((m) => this.staffService.toStaffType(m));
   }
@@ -44,8 +47,15 @@ export class StaffResolver {
     @Args('input') input: CreateStaffInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<StaffType> {
-    const resolvedHospitalId = this.staffService.resolveHospitalId(user, hospitalId);
-    const member = await this.staffService.create(resolvedHospitalId, input, user);
+    const resolvedHospitalId = this.staffService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    const member = await this.staffService.create(
+      resolvedHospitalId,
+      input,
+      user,
+    );
     const inviteToken = (member as { inviteToken?: string }).inviteToken;
     const full = await this.staffService.findById(member.id);
     return this.staffService.toStaffType({ ...full!, inviteToken });
@@ -80,7 +90,11 @@ export class StaffResolver {
     @CurrentUser() user: AuthenticatedUser,
     @Args('token') token: string,
   ): Promise<StaffType> {
-    const member = await this.staffService.acceptInvite(token, user.authId, user.email);
+    const member = await this.staffService.acceptInvite(
+      token,
+      user.authId,
+      user.email,
+    );
     return this.staffService.toStaffType(member);
   }
 }

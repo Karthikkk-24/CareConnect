@@ -9,7 +9,11 @@ import { Roles } from '../rbac/roles.decorator';
 import { RolesGuard } from '../rbac/roles.guard';
 import { AuditService } from '../audit/audit.service';
 import { HospitalsService } from './hospitals.service';
-import { CreateHospitalInput, HospitalType, UpdateHospitalInput } from './hospitals.types';
+import {
+  CreateHospitalInput,
+  HospitalType,
+  UpdateHospitalInput,
+} from './hospitals.types';
 
 @Resolver(() => HospitalType)
 @UseGuards(GqlAuthGuard, RolesGuard)

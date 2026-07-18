@@ -26,7 +26,9 @@ export class Ward {
   @Column({ name: 'department_id', type: 'uuid', nullable: true })
   departmentId?: string;
 
-  @ManyToOne(() => Department, (department) => department.wards, { nullable: true })
+  @ManyToOne(() => Department, (department) => department.wards, {
+    nullable: true,
+  })
   @JoinColumn({ name: 'department_id' })
   department?: Department;
 

@@ -12,7 +12,13 @@ import { BillingService } from './billing.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Invoice, InvoiceItem, Payment, Patient, Admission]),
+    TypeOrmModule.forFeature([
+      Invoice,
+      InvoiceItem,
+      Payment,
+      Patient,
+      Admission,
+    ]),
   ],
   providers: [BillingResolver, BillingService],
   exports: [BillingService],

@@ -20,7 +20,10 @@ export class DashboardResolver {
     @CurrentUser() user: AuthenticatedUser,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<DashboardStatsType> {
-    const resolvedHospitalId = this.dashboardService.resolveHospitalId(user, hospitalId);
+    const resolvedHospitalId = this.dashboardService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
     return this.dashboardService.getStats(resolvedHospitalId);
   }
 }

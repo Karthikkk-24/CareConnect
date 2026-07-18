@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -32,16 +36,24 @@ import {
 @Injectable()
 export class ClinicalService {
   constructor(
-    @InjectRepository(VitalSign) private readonly vitalsRepo: Repository<VitalSign>,
-    @InjectRepository(Diagnosis) private readonly diagnosesRepo: Repository<Diagnosis>,
-    @InjectRepository(ClinicalNote) private readonly notesRepo: Repository<ClinicalNote>,
-    @InjectRepository(Prescription) private readonly prescriptionsRepo: Repository<Prescription>,
+    @InjectRepository(VitalSign)
+    private readonly vitalsRepo: Repository<VitalSign>,
+    @InjectRepository(Diagnosis)
+    private readonly diagnosesRepo: Repository<Diagnosis>,
+    @InjectRepository(ClinicalNote)
+    private readonly notesRepo: Repository<ClinicalNote>,
+    @InjectRepository(Prescription)
+    private readonly prescriptionsRepo: Repository<Prescription>,
     @InjectRepository(PrescriptionItem)
     private readonly prescriptionItemsRepo: Repository<PrescriptionItem>,
-    @InjectRepository(LabOrder) private readonly labOrdersRepo: Repository<LabOrder>,
-    @InjectRepository(LabResult) private readonly labResultsRepo: Repository<LabResult>,
-    @InjectRepository(Patient) private readonly patientsRepo: Repository<Patient>,
-    @InjectRepository(Admission) private readonly admissionsRepo: Repository<Admission>,
+    @InjectRepository(LabOrder)
+    private readonly labOrdersRepo: Repository<LabOrder>,
+    @InjectRepository(LabResult)
+    private readonly labResultsRepo: Repository<LabResult>,
+    @InjectRepository(Patient)
+    private readonly patientsRepo: Repository<Patient>,
+    @InjectRepository(Admission)
+    private readonly admissionsRepo: Repository<Admission>,
     private readonly audit: AuditService,
   ) {}
 
@@ -60,8 +72,13 @@ export class ClinicalService {
     return id;
   }
 
-  private async assertPatient(hospitalId: string, patientId: string): Promise<Patient> {
-    const patient = await this.patientsRepo.findOne({ where: { id: patientId, hospitalId } });
+  private async assertPatient(
+    hospitalId: string,
+    patientId: string,
+  ): Promise<Patient> {
+    const patient = await this.patientsRepo.findOne({
+      where: { id: patientId, hospitalId },
+    });
     if (!patient) throw new NotFoundException('Patient not found');
     return patient;
   }
@@ -83,7 +100,8 @@ export class ClinicalService {
       recordedById: vital.recordedById,
       bloodPressure: vital.bloodPressure,
       heartRate: vital.heartRate,
-      temperature: vital.temperature != null ? Number(vital.temperature) : undefined,
+      temperature:
+        vital.temperature != null ? Number(vital.temperature) : undefined,
       spo2: vital.spo2,
       weight: vital.weight != null ? Number(vital.weight) : undefined,
       height: vital.height != null ? Number(vital.height) : undefined,
@@ -414,7 +432,10 @@ export class ClinicalService {
     return this.toLabResultType(result);
   }
 
-  async listLabOrders(hospitalId: string, status?: string): Promise<LabOrderType[]> {
+  async listLabOrders(
+    hospitalId: string,
+    status?: string,
+  ): Promise<LabOrderType[]> {
     const where: { hospitalId: string; status?: string } = { hospitalId };
     if (status) where.status = status;
     const orders = await this.labOrdersRepo.find({
@@ -423,5 +444,58 @@ export class ClinicalService {
       order: { createdAt: 'DESC' },
     });
     return orders.map((o) => this.toLabOrderType(o));
+  }
+
+  async listVitalSigns(
+    hospitalId: string,
+    patientId: string,
+  ): Promise<VitalSignType[]> {
+    await this.assertPatient(hospitalId, patientId);
+    const rows = await this.vitalsRepo.find({
+      where: { hospitalId, patientId },
+      order: { recordedAt: 'DESC' },
+      take: 50,
+    });
+    return rows.map((v) => this.toVitalType(v));
+  }
+
+  async listClinicalNotes(
+    hospitalId: string,
+    patientId: string,
+  ): Promise<ClinicalNoteType[]> {
+    await this.assertPatient(hospitalId, patientId);
+    const rows = await this.notesRepo.find({
+      where: { hospitalId, patientId },
+      order: { createdAt: 'DESC' },
+      take: 50,
+    });
+    return rows.map((n) => this.toClinicalNoteType(n));
+  }
+
+  async listDiagnoses(
+    hospitalId: string,
+    patientId: string,
+  ): Promise<DiagnosisType[]> {
+    await this.assertPatient(hospitalId, patientId);
+    const rows = await this.diagnosesRepo.find({
+      where: { hospitalId, patientId },
+      order: { diagnosedAt: 'DESC' },
+      take: 50,
+    });
+    return rows.map((d) => this.toDiagnosisType(d));
+  }
+
+  async listPrescriptions(
+    hospitalId: string,
+    patientId: string,
+  ): Promise<PrescriptionType[]> {
+    await this.assertPatient(hospitalId, patientId);
+    const rows = await this.prescriptionsRepo.find({
+      where: { hospitalId, patientId },
+      relations: ['items'],
+      order: { createdAt: 'DESC' },
+      take: 50,
+    });
+    return rows.map((p) => this.toPrescriptionType(p));
   }
 }

@@ -10,6 +10,7 @@ import {
   PatientInsurance,
   PatientMedicalHistory,
   PatientMedication,
+  User,
 } from '../database/entities';
 import { PatientsResolver } from './patients.resolver';
 import { PatientsService } from './patients.service';
@@ -26,6 +27,7 @@ import { PatientsService } from './patients.service';
       PatientDocument,
       PatientConsent,
       PatientImportJob,
+      User,
     ]),
   ],
   providers: [PatientsResolver, PatientsService],

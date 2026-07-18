@@ -47,7 +47,10 @@ export function Pricing() {
       <div className="mx-auto max-w-7xl">
         <div className="mb-12 text-center">
           <h2 className="mb-4 text-3xl font-bold text-clay-text">Simple, transparent pricing</h2>
-          <p className="text-clay-text-muted">Choose the plan that fits your hospital</p>
+          <p className="text-clay-text-muted">
+            Open-source software — register a workspace to try every module. Listed plan limits are
+            illustrative only and are not enforced in the app.
+          </p>
         </div>
         <div className="grid gap-8 md:grid-cols-3">
           {plans.map((plan) => (
@@ -79,7 +82,7 @@ export function Pricing() {
                   variant={plan.highlighted ? 'primary' : 'secondary'}
                   className="w-full"
                 >
-                  {plan.cta}
+                  {plan.cta === 'Contact Sales' ? 'Get Started' : plan.cta}
                 </ClayButton>
               </Link>
             </ClayCard>

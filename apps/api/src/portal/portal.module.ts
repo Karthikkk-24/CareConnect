@@ -6,7 +6,6 @@ import {
   LabResult,
   Patient,
   Prescription,
-  PrescriptionItem,
 } from '../database/entities';
 import { AppointmentsModule } from '../appointments/appointments.module';
 import { ClinicalModule } from '../clinical/clinical.module';
@@ -18,8 +17,8 @@ import { PortalService } from './portal.service';
     TypeOrmModule.forFeature([
       Patient,
       Appointment,
-  Prescription,
-  LabOrder,
+      Prescription,
+      LabOrder,
       LabResult,
     ]),
     AppointmentsModule,

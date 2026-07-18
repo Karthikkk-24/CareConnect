@@ -1,10 +1,16 @@
-import { PortalSidebar } from '@/components/layout/portal-sidebar';
+import { Suspense } from 'react';
+import { PortalLayoutClient } from './portal-layout-client';
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen gap-6 bg-clay-bg p-6">
-      <PortalSidebar />
-      <main className="flex-1 overflow-auto">{children}</main>
-    </div>
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-clay-bg text-clay-text-muted">
+          Loading portal…
+        </div>
+      }
+    >
+      <PortalLayoutClient>{children}</PortalLayoutClient>
+    </Suspense>
   );
 }

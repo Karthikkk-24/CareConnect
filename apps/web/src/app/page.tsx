@@ -10,7 +10,7 @@ export default function HomePage() {
   return (
     <>
       <MarketingHeader />
-      <main>
+      <main id="main-content">
         <Hero />
         <Features />
         <HowItWorks />

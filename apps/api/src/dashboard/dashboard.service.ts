@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { AppointmentsService } from '../appointments/appointments.service';
 import { AdmissionsService } from '../admissions/admissions.service';

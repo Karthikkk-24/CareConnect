@@ -25,10 +25,14 @@ import {
 @Injectable()
 export class DischargeService {
   constructor(
-    @InjectRepository(Discharge) private readonly dischargesRepo: Repository<Discharge>,
-    @InjectRepository(FollowUp) private readonly followUpsRepo: Repository<FollowUp>,
-    @InjectRepository(Admission) private readonly admissionsRepo: Repository<Admission>,
-    @InjectRepository(Patient) private readonly patientsRepo: Repository<Patient>,
+    @InjectRepository(Discharge)
+    private readonly dischargesRepo: Repository<Discharge>,
+    @InjectRepository(FollowUp)
+    private readonly followUpsRepo: Repository<FollowUp>,
+    @InjectRepository(Admission)
+    private readonly admissionsRepo: Repository<Admission>,
+    @InjectRepository(Patient)
+    private readonly patientsRepo: Repository<Patient>,
     @InjectRepository(Bed) private readonly bedsRepo: Repository<Bed>,
     private readonly audit: AuditService,
   ) {}
@@ -156,7 +160,10 @@ export class DischargeService {
       action: 'create',
       resource: 'discharge',
       resourceId: discharge.id,
-      metadata: { patientId: discharge.patientId, admissionId: discharge.admissionId },
+      metadata: {
+        patientId: discharge.patientId,
+        admissionId: discharge.admissionId,
+      },
     });
 
     return this.toDischargeType(discharge);
@@ -239,7 +246,10 @@ export class DischargeService {
     return this.toFollowUpType(saved);
   }
 
-  async followUps(hospitalId: string, status?: string): Promise<FollowUpType[]> {
+  async followUps(
+    hospitalId: string,
+    status?: string,
+  ): Promise<FollowUpType[]> {
     const where: { hospitalId: string; status?: string } = { hospitalId };
     if (status) where.status = status;
 
@@ -252,8 +262,13 @@ export class DischargeService {
     return items.map((item) => this.toFollowUpType(item));
   }
 
-  async dischargesForPatient(hospitalId: string, patientId: string): Promise<DischargeType[]> {
-    const patient = await this.patientsRepo.findOne({ where: { id: patientId, hospitalId } });
+  async dischargesForPatient(
+    hospitalId: string,
+    patientId: string,
+  ): Promise<DischargeType[]> {
+    const patient = await this.patientsRepo.findOne({
+      where: { id: patientId, hospitalId },
+    });
     if (!patient) throw new NotFoundException('Patient not found');
 
     const discharges = await this.dischargesRepo.find({

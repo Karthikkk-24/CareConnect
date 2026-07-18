@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Hospital } from '../database/entities';
@@ -36,7 +40,10 @@ export class HospitalsService {
     return this.hospitalsRepo.findOne({ where: { id } });
   }
 
-  async findByIdForUser(id: string, user: AuthenticatedUser): Promise<Hospital | null> {
+  async findByIdForUser(
+    id: string,
+    user: AuthenticatedUser,
+  ): Promise<Hospital | null> {
     const hospital = await this.findById(id);
     if (!hospital) return null;
     if (user.roles.includes('super_admin')) return hospital;
@@ -45,7 +52,10 @@ export class HospitalsService {
   }
 
   async findAll(): Promise<Hospital[]> {
-    return this.hospitalsRepo.find({ where: { isActive: true }, order: { createdAt: 'DESC' } });
+    return this.hospitalsRepo.find({
+      where: { isActive: true },
+      order: { createdAt: 'DESC' },
+    });
   }
 
   async findForUser(user: AuthenticatedUser): Promise<Hospital[]> {
@@ -54,7 +64,11 @@ export class HospitalsService {
     return hospital ? [hospital] : [];
   }
 
-  async update(id: string, input: UpdateHospitalInput, user: AuthenticatedUser): Promise<Hospital> {
+  async update(
+    id: string,
+    input: UpdateHospitalInput,
+    user: AuthenticatedUser,
+  ): Promise<Hospital> {
     const hospital = await this.findByIdForUser(id, user);
     if (!hospital) throw new NotFoundException('Hospital not found');
 

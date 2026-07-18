@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useMutation, useQuery } from '@apollo/client';
-import { BedDouble, Building, DoorClosed, Layers, Plus } from 'lucide-react';
+import { BedDouble, Building, DoorClosed, Layers, Plus, Trash2 } from 'lucide-react';
 import { ClayBadge, ClayButton, ClayCard, ClayInput } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
 import {
@@ -11,6 +11,9 @@ import {
   CREATE_BED_MUTATION,
   CREATE_DEPARTMENT_MUTATION,
   CREATE_WARD_MUTATION,
+  DELETE_BED_MUTATION,
+  DELETE_DEPARTMENT_MUTATION,
+  DELETE_WARD_MUTATION,
   DEPARTMENTS_QUERY,
   ME_QUERY,
   WARDS_QUERY,
@@ -91,6 +94,30 @@ export default function FacilitySettingsPage() {
     onCompleted: () => {
       setMessage('Bed created');
       setBedLabel('');
+      bedsQuery.refetch();
+    },
+    onError: (err) => setError(err.message),
+  });
+
+  const [deleteDepartment] = useMutation(DELETE_DEPARTMENT_MUTATION, {
+    onCompleted: () => {
+      setMessage('Department deleted');
+      departmentsQuery.refetch();
+    },
+    onError: (err) => setError(err.message),
+  });
+  const [deleteWard] = useMutation(DELETE_WARD_MUTATION, {
+    onCompleted: () => {
+      setMessage('Ward deleted');
+      setSelectedWardId(null);
+      wardsQuery.refetch();
+      bedsQuery.refetch();
+    },
+    onError: (err) => setError(err.message),
+  });
+  const [deleteBed] = useMutation(DELETE_BED_MUTATION, {
+    onCompleted: () => {
+      setMessage('Bed deleted');
       bedsQuery.refetch();
     },
     onError: (err) => setError(err.message),
@@ -226,12 +253,27 @@ export default function FacilitySettingsPage() {
               departments.map((d) => (
                 <div
                   key={d.id}
-                  className="rounded-2xl bg-clay-primary-light/20 px-3 py-2 text-sm"
+                  className="flex items-start justify-between gap-2 rounded-2xl bg-clay-primary-light/20 px-3 py-2 text-sm"
                 >
-                  <p className="font-medium text-clay-text">{d.name}</p>
-                  {d.description ? (
-                    <p className="text-xs text-clay-text-muted">{d.description}</p>
-                  ) : null}
+                  <div className="min-w-0">
+                    <p className="font-medium text-clay-text">{d.name}</p>
+                    {d.description ? (
+                      <p className="text-xs text-clay-text-muted">{d.description}</p>
+                    ) : null}
+                  </div>
+                  <ClayButton
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    aria-label={`Delete ${d.name}`}
+                    onClick={() => {
+                      if (confirm(`Delete department “${d.name}”?`)) {
+                        deleteDepartment({ variables: { id: d.id, hospitalId } });
+                      }
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 text-clay-error" />
+                  </ClayButton>
                 </div>
               ))
             )}
@@ -291,21 +333,38 @@ export default function FacilitySettingsPage() {
               wards.map((w) => {
                 const isActive = selectedWardId === w.id;
                 return (
-                  <button
+                  <div
                     key={w.id}
-                    type="button"
-                    onClick={() => setSelectedWardId(isActive ? null : w.id)}
-                    className={`block w-full rounded-2xl px-3 py-2 text-left text-sm transition ${
+                    className={`flex items-start gap-2 rounded-2xl px-3 py-2 text-sm transition ${
                       isActive
                         ? 'bg-clay-primary-light text-clay-primary shadow-clay-inset'
-                        : 'bg-clay-primary-light/20 text-clay-text hover:bg-clay-primary-light/40'
+                        : 'bg-clay-primary-light/20 text-clay-text'
                     }`}
                   >
-                    <p className="font-medium">{w.name}</p>
-                    {w.floor ? (
-                      <p className="text-xs text-clay-text-muted">Floor {w.floor}</p>
-                    ) : null}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedWardId(isActive ? null : w.id)}
+                      className="min-w-0 flex-1 text-left"
+                    >
+                      <p className="font-medium">{w.name}</p>
+                      {w.floor ? (
+                        <p className="text-xs text-clay-text-muted">Floor {w.floor}</p>
+                      ) : null}
+                    </button>
+                    <ClayButton
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      aria-label={`Delete ${w.name}`}
+                      onClick={() => {
+                        if (confirm(`Delete ward “${w.name}”? Beds in this ward must be removed first.`)) {
+                          deleteWard({ variables: { id: w.id, hospitalId } });
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 text-clay-error" />
+                    </ClayButton>
+                  </div>
                 );
               })
             )}
@@ -352,20 +411,37 @@ export default function FacilitySettingsPage() {
               visibleBeds.map((b) => (
                 <div
                   key={b.id}
-                  className="flex items-center justify-between rounded-2xl bg-clay-primary-light/20 px-3 py-2 text-sm"
+                  className="flex items-center justify-between gap-2 rounded-2xl bg-clay-primary-light/20 px-3 py-2 text-sm"
                 >
                   <span className="font-medium text-clay-text">{b.label}</span>
-                  <ClayBadge
-                    variant={
-                      b.status === 'available'
-                        ? 'success'
-                        : b.status === 'occupied'
-                          ? 'warning'
-                          : 'default'
-                    }
-                  >
-                    {b.status}
-                  </ClayBadge>
+                  <div className="flex items-center gap-2">
+                    <ClayBadge
+                      variant={
+                        b.status === 'available'
+                          ? 'success'
+                          : b.status === 'occupied'
+                            ? 'warning'
+                            : 'default'
+                      }
+                    >
+                      {b.status}
+                    </ClayBadge>
+                    {b.status !== 'occupied' ? (
+                      <ClayButton
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        aria-label={`Delete ${b.label}`}
+                        onClick={() => {
+                          if (confirm(`Delete bed “${b.label}”?`)) {
+                            deleteBed({ variables: { id: b.id, hospitalId } });
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4 text-clay-error" />
+                      </ClayButton>
+                    ) : null}
+                  </div>
                 </div>
               ))
             )}

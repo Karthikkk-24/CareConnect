@@ -14,6 +14,7 @@ import type { AuthenticatedUser, JwtPayload } from './auth.types';
 @Injectable()
 export class ClerkJwtStrategy extends PassportStrategy(Strategy, 'clerk-jwt') {
   private static readonly logger = new Logger(ClerkJwtStrategy.name);
+  private readonly authorizedParties: string[];
 
   constructor(
     configService: ConfigService,
@@ -27,6 +28,12 @@ export class ClerkJwtStrategy extends PassportStrategy(Strategy, 'clerk-jwt') {
     }
 
     const jwksUri = `${issuer.replace(/\/$/, '')}/.well-known/jwks.json`;
+    const partiesRaw =
+      configService.get<string>('CLERK_AUTHORIZED_PARTIES') ?? '';
+    const authorizedParties = partiesRaw
+      .split(',')
+      .map((p) => p.trim())
+      .filter(Boolean);
 
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -41,11 +48,25 @@ export class ClerkJwtStrategy extends PassportStrategy(Strategy, 'clerk-jwt') {
         jwksUri,
       }),
     });
+
+    this.authorizedParties = authorizedParties;
   }
 
   async validate(payload: ClerkJwtPayload): Promise<AuthenticatedUser> {
     if (!payload?.sub) {
       throw new UnauthorizedException('Invalid Clerk token: missing sub');
+    }
+
+    if (this.authorizedParties.length > 0) {
+      const azp = payload.azp;
+      if (!azp || !this.authorizedParties.includes(azp)) {
+        ClerkJwtStrategy.logger.warn(
+          `Rejected token with unauthorized azp=${azp ?? '(none)'}`,
+        );
+        throw new UnauthorizedException(
+          'Invalid Clerk token: unauthorized party',
+        );
+      }
     }
 
     const email = extractEmail(payload);
@@ -83,7 +104,8 @@ function extractEmail(payload: ClerkJwtPayload): string | undefined {
   if (Array.isArray(list) && list.length > 0) {
     const primaryId = payload.primary_email_address_id;
     const primary =
-      (primaryId ? list.find((entry) => entry?.id === primaryId) : undefined) ?? list[0];
+      (primaryId ? list.find((entry) => entry?.id === primaryId) : undefined) ??
+      list[0];
     if (primary?.email_address) return primary.email_address;
   }
 

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -7,11 +8,27 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomBytes, randomUUID } from 'crypto';
 import { Repository } from 'typeorm';
-import { Role, StaffInvite, StaffProfile, User, UserRole } from '../database/entities';
+import {
+  Role,
+  StaffInvite,
+  StaffProfile,
+  User,
+  UserRole,
+} from '../database/entities';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { ClerkAdminService } from '../clerk/clerk-admin.service';
 import { AuditService } from '../audit/audit.service';
 import { CreateStaffInput, UpdateStaffInput } from './staff.types';
+
+const ASSIGNABLE_STAFF_ROLES = new Set([
+  'hospital_manager',
+  'doctor',
+  'nurse',
+  'receptionist',
+  'lab_technician',
+  'pharmacist',
+  'accountant',
+]);
 
 @Injectable()
 export class StaffService {
@@ -29,6 +46,15 @@ export class StaffService {
     private readonly clerkAdmin: ClerkAdminService,
     private readonly audit: AuditService,
   ) {}
+
+  private assertAssignableRole(roleSlug: string, actor: AuthenticatedUser) {
+    if (actor.roles.includes('super_admin')) return;
+    if (!ASSIGNABLE_STAFF_ROLES.has(roleSlug)) {
+      throw new BadRequestException(
+        `Role "${roleSlug}" cannot be assigned via staff invite`,
+      );
+    }
+  }
 
   assertHospitalAccess(user: AuthenticatedUser, hospitalId: string) {
     if (user.roles.includes('super_admin')) return;
@@ -52,7 +78,10 @@ export class StaffService {
     });
   }
 
-  async findByIdForUser(id: string, actor: AuthenticatedUser): Promise<StaffProfile | null> {
+  async findByIdForUser(
+    id: string,
+    actor: AuthenticatedUser,
+  ): Promise<StaffProfile | null> {
     const staff = await this.findById(id);
     if (!staff) return null;
     this.assertHospitalAccess(actor, staff.hospitalId);
@@ -65,13 +94,19 @@ export class StaffService {
     actor: AuthenticatedUser,
   ): Promise<StaffProfile> {
     this.assertHospitalAccess(actor, hospitalId);
+    this.assertAssignableRole(input.roleSlug, actor);
 
-    const role = await this.rolesRepo.findOne({ where: { slug: input.roleSlug } });
+    const role = await this.rolesRepo.findOne({
+      where: { slug: input.roleSlug },
+    });
     if (!role) throw new NotFoundException(`Role ${input.roleSlug} not found`);
 
     let authId: string;
     if (this.clerkAdmin.isConfigured()) {
-      const invited = await this.clerkAdmin.inviteStaffByEmail(input.email, input.fullName);
+      const invited = await this.clerkAdmin.inviteStaffByEmail(
+        input.email,
+        input.fullName,
+      );
       // Clerk assigns the real `user_...` id on invite acceptance. Until then,
       // stash a deterministic placeholder so the users table row stays unique;
       // syncAndGetUser upgrades authId to the real Clerk id on first login.
@@ -80,12 +115,18 @@ export class StaffService {
       authId = `pending_${randomUUID()}`;
     }
 
-    const existingByEmail = await this.usersRepo.findOne({ where: { email: input.email } });
+    const existingByEmail = await this.usersRepo.findOne({
+      where: { email: input.email },
+    });
     let user: User;
     if (existingByEmail) {
       user = existingByEmail;
       if (!user.hospitalId) {
-        await this.usersRepo.update(user.id, { hospitalId, fullName: input.fullName, authId });
+        await this.usersRepo.update(user.id, {
+          hospitalId,
+          fullName: input.fullName,
+          authId,
+        });
         user.hospitalId = hospitalId;
         user.authId = authId;
       }
@@ -152,7 +193,11 @@ export class StaffService {
     return staff;
   }
 
-  async update(id: string, input: UpdateStaffInput, actor: AuthenticatedUser): Promise<StaffProfile> {
+  async update(
+    id: string,
+    input: UpdateStaffInput,
+    actor: AuthenticatedUser,
+  ): Promise<StaffProfile> {
     const staff = await this.findByIdForUser(id, actor);
     if (!staff) throw new NotFoundException('Staff member not found');
 
@@ -161,10 +206,17 @@ export class StaffService {
     }
 
     if (input.roleSlug) {
-      const role = await this.rolesRepo.findOne({ where: { slug: input.roleSlug } });
-      if (!role) throw new NotFoundException(`Role ${input.roleSlug} not found`);
+      this.assertAssignableRole(input.roleSlug, actor);
+      const role = await this.rolesRepo.findOne({
+        where: { slug: input.roleSlug },
+      });
+      if (!role)
+        throw new NotFoundException(`Role ${input.roleSlug} not found`);
 
-      await this.userRolesRepo.delete({ userId: staff.userId, hospitalId: staff.hospitalId });
+      await this.userRolesRepo.delete({
+        userId: staff.userId,
+        hospitalId: staff.hospitalId,
+      });
       await this.userRolesRepo.save(
         this.userRolesRepo.create({
           userId: staff.userId,
@@ -219,13 +271,21 @@ export class StaffService {
     return true;
   }
 
-  async acceptInvite(token: string, authId: string, email: string): Promise<StaffProfile> {
+  async acceptInvite(
+    token: string,
+    authId: string,
+    email: string,
+  ): Promise<StaffProfile> {
     const invite = await this.invitesRepo.findOne({ where: { token } });
     if (!invite) throw new NotFoundException('Invite not found');
-    if (invite.acceptedAt) throw new UnauthorizedException('Invite already accepted');
-    if (invite.expiresAt < new Date()) throw new UnauthorizedException('Invite expired');
+    if (invite.acceptedAt)
+      throw new UnauthorizedException('Invite already accepted');
+    if (invite.expiresAt < new Date())
+      throw new UnauthorizedException('Invite expired');
     if (invite.email.toLowerCase() !== email.toLowerCase()) {
-      throw new ForbiddenException('Invite email does not match signed-in user');
+      throw new ForbiddenException(
+        'Invite email does not match signed-in user',
+      );
     }
 
     const staff = invite.staffProfileId
@@ -249,7 +309,8 @@ export class StaffService {
   toStaffType(staff: StaffProfile & { inviteToken?: string }) {
     const roleSlug = staff.user?.userRoles?.[0]?.role?.slug ?? 'staff';
     const inviteToken = staff.inviteToken;
-    const webOrigin = process.env.CORS_ORIGIN?.replace(/\/$/, '') || 'http://localhost:3000';
+    const webOrigin =
+      process.env.CORS_ORIGIN?.replace(/\/$/, '') || 'http://localhost:3000';
     return {
       id: staff.id,
       userId: staff.userId,

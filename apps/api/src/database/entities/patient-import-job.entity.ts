@@ -1,4 +1,11 @@
-import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 import { Hospital } from './hospital.entity';
 import { User } from './user.entity';
 
@@ -21,7 +28,11 @@ export class PatientImportJob {
   @JoinColumn({ name: 'created_by' })
   createdBy?: User;
 
-  @Column({ type: 'enum', enum: ['pending', 'processing', 'completed', 'failed'], default: 'pending' })
+  @Column({
+    type: 'enum',
+    enum: ['pending', 'processing', 'completed', 'failed'],
+    default: 'pending',
+  })
   status: string;
 
   @Column({ name: 'total_rows', default: 0 })

@@ -1,7 +1,7 @@
 import { UnauthorizedException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Role, User, UserRole } from '../database/entities';
+import { Role, User, UserRole, Hospital } from '../database/entities';
 import { AuthService } from './auth.service';
 
 describe('AuthService', () => {
@@ -18,9 +18,14 @@ describe('AuthService', () => {
     find: jest.fn(),
     save: jest.fn(),
     create: jest.fn(),
+    count: jest.fn(),
   };
 
   const rolesRepo = {
+    findOne: jest.fn(),
+  };
+
+  const hospitalsRepo = {
     findOne: jest.fn(),
   };
 
@@ -33,6 +38,7 @@ describe('AuthService', () => {
         { provide: getRepositoryToken(User), useValue: usersRepo },
         { provide: getRepositoryToken(UserRole), useValue: userRolesRepo },
         { provide: getRepositoryToken(Role), useValue: rolesRepo },
+        { provide: getRepositoryToken(Hospital), useValue: hospitalsRepo },
       ],
     }).compile();
 
@@ -50,12 +56,12 @@ describe('AuthService', () => {
         userRoles: [],
       });
 
-      await expect(service.syncAndGetUser('auth-1', 'inactive@hospital.com')).rejects.toThrow(
-        UnauthorizedException,
-      );
-      await expect(service.syncAndGetUser('auth-1', 'inactive@hospital.com')).rejects.toThrow(
-        'Account is deactivated',
-      );
+      await expect(
+        service.syncAndGetUser('auth-1', 'inactive@hospital.com'),
+      ).rejects.toThrow(UnauthorizedException);
+      await expect(
+        service.syncAndGetUser('auth-1', 'inactive@hospital.com'),
+      ).rejects.toThrow('Account is deactivated');
     });
 
     it('returns authenticated user when active', async () => {
@@ -77,7 +83,10 @@ describe('AuthService', () => {
         ],
       });
 
-      const result = await service.syncAndGetUser('auth-1', 'active@hospital.com');
+      const result = await service.syncAndGetUser(
+        'auth-1',
+        'active@hospital.com',
+      );
 
       expect(result).toEqual({
         id: 'user-1',

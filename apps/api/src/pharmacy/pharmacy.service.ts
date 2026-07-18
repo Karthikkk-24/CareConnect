@@ -58,7 +58,9 @@ export class PharmacyService {
     };
   }
 
-  toPendingPrescriptionType(prescription: Prescription): PendingPrescriptionType {
+  toPendingPrescriptionType(
+    prescription: Prescription,
+  ): PendingPrescriptionType {
     return {
       id: prescription.id,
       hospitalId: prescription.hospitalId,
@@ -138,13 +140,17 @@ export class PharmacyService {
     return this.toPharmacyStockType(stock);
   }
 
-  async listPendingPrescriptions(hospitalId: string): Promise<PendingPrescriptionType[]> {
+  async listPendingPrescriptions(
+    hospitalId: string,
+  ): Promise<PendingPrescriptionType[]> {
     const prescriptions = await this.prescriptionsRepo.find({
       where: { hospitalId, status: 'pending' },
       relations: ['items', 'patient'],
       order: { createdAt: 'ASC' },
     });
-    return prescriptions.map((prescription) => this.toPendingPrescriptionType(prescription));
+    return prescriptions.map((prescription) =>
+      this.toPendingPrescriptionType(prescription),
+    );
   }
 
   async dispensePrescription(
@@ -158,7 +164,9 @@ export class PharmacyService {
     });
     if (!prescription) throw new NotFoundException('Prescription not found');
     if (prescription.status !== 'pending') {
-      throw new BadRequestException('Only pending prescriptions can be dispensed');
+      throw new BadRequestException(
+        'Only pending prescriptions can be dispensed',
+      );
     }
 
     prescription.status = 'dispensed';

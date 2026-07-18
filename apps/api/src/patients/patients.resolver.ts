@@ -33,8 +33,16 @@ export class PatientsResolver {
     @Args('search', { nullable: true }) search?: string,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<PatientsPageType> {
-    const resolvedHospitalId = this.patientsService.resolveHospitalId(user, hospitalId);
-    return this.patientsService.findAll(resolvedHospitalId, page, limit, search);
+    const resolvedHospitalId = this.patientsService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.patientsService.findAll(
+      resolvedHospitalId,
+      page,
+      limit,
+      search,
+    );
   }
 
   @Query(() => PatientDetailType)
@@ -44,7 +52,10 @@ export class PatientsResolver {
     @Args('id') id: string,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<PatientDetailType> {
-    const resolvedHospitalId = this.patientsService.resolveHospitalId(user, hospitalId);
+    const resolvedHospitalId = this.patientsService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
     return this.patientsService.findById(id, resolvedHospitalId);
   }
 
@@ -55,7 +66,10 @@ export class PatientsResolver {
     @Args('input') input: CreatePatientInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<PatientType> {
-    const resolvedHospitalId = this.patientsService.resolveHospitalId(user, hospitalId);
+    const resolvedHospitalId = this.patientsService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
     return this.patientsService.create(resolvedHospitalId, input, user);
   }
 
@@ -67,8 +81,16 @@ export class PatientsResolver {
     @Args('input') input: UpdatePatientInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<PatientType> {
-    const resolvedHospitalId = this.patientsService.resolveHospitalId(user, hospitalId);
-    return this.patientsService.updatePatient(id, input, resolvedHospitalId, user);
+    const resolvedHospitalId = this.patientsService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.patientsService.updatePatient(
+      id,
+      input,
+      resolvedHospitalId,
+      user,
+    );
   }
 
   @Mutation(() => Boolean)
@@ -78,7 +100,10 @@ export class PatientsResolver {
     @Args('id') id: string,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<boolean> {
-    const resolvedHospitalId = this.patientsService.resolveHospitalId(user, hospitalId);
+    const resolvedHospitalId = this.patientsService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
     return this.patientsService.deletePatient(id, resolvedHospitalId, user);
   }
 
@@ -90,20 +115,37 @@ export class PatientsResolver {
     @Args('status') status: string,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<PatientType> {
-    const resolvedHospitalId = this.patientsService.resolveHospitalId(user, hospitalId);
-    return this.patientsService.updatePatientStatus(id, status, resolvedHospitalId, user);
+    const resolvedHospitalId = this.patientsService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.patientsService.updatePatientStatus(
+      id,
+      status,
+      resolvedHospitalId,
+      user,
+    );
   }
 
   @Mutation(() => BulkImportResultType)
   @Permissions(PERMISSIONS.PATIENTS_WRITE)
   async importPatients(
     @CurrentUser() user: AuthenticatedUser,
-    @Args('rows', { type: () => [BulkPatientRowInput] }) rows: BulkPatientRowInput[],
+    @Args('rows', { type: () => [BulkPatientRowInput] })
+    rows: BulkPatientRowInput[],
     @Args('dryRun', { defaultValue: true }) dryRun: boolean,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<BulkImportResultType> {
-    const resolvedHospitalId = this.patientsService.resolveHospitalId(user, hospitalId);
-    return this.patientsService.bulkImport(resolvedHospitalId, rows, user.id, dryRun);
+    const resolvedHospitalId = this.patientsService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.patientsService.bulkImport(
+      resolvedHospitalId,
+      rows,
+      user.id,
+      dryRun,
+    );
   }
 
   @Mutation(() => PatientDocumentType)
@@ -114,7 +156,10 @@ export class PatientsResolver {
     @Args('input') input: PatientDocumentInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<PatientDocumentType> {
-    const resolvedHospitalId = this.patientsService.resolveHospitalId(user, hospitalId);
+    const resolvedHospitalId = this.patientsService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
     const doc = await this.patientsService.addDocument(
       patientId,
       resolvedHospitalId,
@@ -139,8 +184,16 @@ export class PatientsResolver {
     @Args('patientId') patientId: string,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<boolean> {
-    const resolvedHospitalId = this.patientsService.resolveHospitalId(user, hospitalId);
-    return this.patientsService.deletePatientDocument(id, patientId, resolvedHospitalId, user);
+    const resolvedHospitalId = this.patientsService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.patientsService.deletePatientDocument(
+      id,
+      patientId,
+      resolvedHospitalId,
+      user,
+    );
   }
 
   @Mutation(() => PatientType)
@@ -149,14 +202,19 @@ export class PatientsResolver {
     @CurrentUser() user: AuthenticatedUser,
     @Args('patientId') patientId: string,
     @Args('userId', { nullable: true }) userId?: string,
+    @Args('email', { nullable: true }) email?: string,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<PatientType> {
-    const resolvedHospitalId = this.patientsService.resolveHospitalId(user, hospitalId);
+    const resolvedHospitalId = this.patientsService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
     return this.patientsService.linkPatientAccount(
       patientId,
       resolvedHospitalId,
       user,
       userId,
+      email,
     );
   }
 }

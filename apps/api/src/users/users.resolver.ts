@@ -34,12 +34,15 @@ export class UsersResolver {
     assignHospitalAdmin?: boolean,
   ): Promise<UserType> {
     await this.authService.completeOnboarding(
-      user.id,
+      user,
       fullName,
       hospitalId,
       assignHospitalAdmin ?? false,
     );
-    const refreshed = await this.authService.syncAndGetUser(user.authId, user.email);
+    const refreshed = await this.authService.syncAndGetUser(
+      user.authId,
+      user.email,
+    );
     return {
       id: refreshed!.id,
       email: refreshed!.email,
@@ -58,7 +61,10 @@ export class UsersResolver {
     @Args('fullName') fullName: string,
   ): Promise<UserType> {
     await this.authService.completePatientOnboarding(user.id, fullName);
-    const refreshed = await this.authService.syncAndGetUser(user.authId, user.email);
+    const refreshed = await this.authService.syncAndGetUser(
+      user.authId,
+      user.email,
+    );
     return {
       id: refreshed!.id,
       email: refreshed!.email,
