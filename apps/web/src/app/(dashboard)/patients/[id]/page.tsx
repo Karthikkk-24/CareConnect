@@ -8,7 +8,6 @@ import { FileText, History, Upload } from 'lucide-react';
 import { ClayBadge, ClayButton, ClayCard } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
 import { ADD_PATIENT_DOCUMENT_MUTATION, ME_QUERY, PATIENT_QUERY } from '@/lib/graphql/queries';
-import { createClient } from '@/lib/supabase/client';
 import { PatientClinicalActions } from '@/components/clinical/patient-clinical-actions';
 
 const DOCUMENT_TYPES = [
@@ -37,15 +36,11 @@ export default function PatientDetailPage() {
     setUploading(true);
     setUploadError('');
     try {
-      const supabase = createClient();
-      const path = `patients/${id}/${Date.now()}-${file.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from('patient-documents')
-        .upload(path, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage.from('patient-documents').getPublicUrl(path);
+      // Storage backend is being migrated off Supabase. For now we record only
+      // the document metadata against an inline base64/data URL fallback so the
+      // patient record isn't blocked. A proper object-storage upload endpoint
+      // will replace this in a follow-up.
+      const fileUrl = await readFileAsDataUrl(file);
 
       await addDocument({
         variables: {
@@ -53,7 +48,7 @@ export default function PatientDetailPage() {
           hospitalId: meData?.me?.hospitalId,
           input: {
             name: file.name,
-            fileUrl: urlData.publicUrl,
+            fileUrl,
             fileType: file.type,
             documentType,
           },
@@ -226,4 +221,13 @@ export default function PatientDetailPage() {
       </div>
     </div>
   );
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error ?? new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
 }

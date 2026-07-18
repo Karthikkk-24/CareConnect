@@ -1,6 +1,28 @@
+'use client';
+
+import { useEffect } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useQuery } from '@apollo/client';
 import { DashboardSidebar } from '@/components/layout/dashboard-sidebar';
+import { ME_QUERY } from '@/lib/graphql/queries';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const { data } = useQuery(ME_QUERY, { errorPolicy: 'all' });
+  const me = data?.me;
+
+  useEffect(() => {
+    if (!me) return;
+    if (!me.onboardingCompleted && !pathname.startsWith('/onboarding')) {
+      router.replace('/onboarding');
+      return;
+    }
+    if (me.onboardingCompleted && Array.isArray(me.roles) && me.roles.includes('patient')) {
+      router.replace('/portal');
+    }
+  }, [me, pathname, router]);
+
   return (
     <div className="flex min-h-screen gap-6 bg-clay-bg p-6">
       <a

@@ -25,9 +25,10 @@ export class AppointmentsResolver {
     @Args('date', { nullable: true }) date?: string,
     @Args('doctorId', { nullable: true }) doctorId?: string,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
+    @Args('status', { nullable: true }) status?: string,
   ): Promise<AppointmentType[]> {
     const resolvedHospitalId = this.appointmentsService.resolveHospitalId(user, hospitalId);
-    return this.appointmentsService.findAll(resolvedHospitalId, date, doctorId);
+    return this.appointmentsService.findAll(resolvedHospitalId, date, doctorId, status);
   }
 
   @Mutation(() => AppointmentType)

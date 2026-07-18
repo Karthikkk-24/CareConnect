@@ -50,6 +50,9 @@ packages/ui/storybook-static
 # Built shared packages
 packages/types/dist
 
+# Generated GraphQL schema (Nest autoSchemaFile)
+apps/api/src/schema.gql
+
 # Legacy
 legacy/node_modules
 

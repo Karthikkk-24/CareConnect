@@ -1,5 +1,8 @@
 import { Field, ID, InputType, Int, ObjectType } from '@nestjs/graphql';
 import { IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+import { PatientType } from '../patients/patients.types';
+import { BedType, WardType } from '../facility/facility.types';
+import { UserSummaryType } from '../users/users.types';
 
 @ObjectType()
 export class AdmissionType {
@@ -12,14 +15,26 @@ export class AdmissionType {
   @Field(() => ID)
   patientId: string;
 
+  @Field(() => PatientType, { nullable: true })
+  patient?: PatientType;
+
   @Field(() => ID, { nullable: true })
   attendingDoctorId?: string;
+
+  @Field(() => UserSummaryType, { nullable: true })
+  attendingDoctor?: UserSummaryType;
 
   @Field(() => ID, { nullable: true })
   wardId?: string;
 
+  @Field(() => WardType, { nullable: true })
+  ward?: WardType;
+
   @Field(() => ID, { nullable: true })
   bedId?: string;
+
+  @Field(() => BedType, { nullable: true })
+  bed?: BedType;
 
   @Field()
   admittedAt: Date;

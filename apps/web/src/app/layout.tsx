@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
+import { ClerkProvider } from '@clerk/nextjs';
 import { Providers } from '@/components/providers';
 import './globals.css';
 
@@ -16,9 +17,16 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   return (
     <html lang="en" className="h-full antialiased">
       <body className="min-h-full">
-        <NextIntlClientProvider locale="en" messages={messages}>
-          <Providers>{children}</Providers>
-        </NextIntlClientProvider>
+        <ClerkProvider
+          signInUrl="/login"
+          signUpUrl="/register"
+          signInFallbackRedirectUrl="/dashboard"
+          signUpFallbackRedirectUrl="/onboarding"
+        >
+          <NextIntlClientProvider locale="en" messages={messages}>
+            <Providers>{children}</Providers>
+          </NextIntlClientProvider>
+        </ClerkProvider>
       </body>
     </html>
   );

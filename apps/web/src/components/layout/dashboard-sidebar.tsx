@@ -17,8 +17,8 @@ import {
   BarChart3,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { useClerk } from '@clerk/nextjs';
 import { cn } from '@careconnect/ui';
-import { createClient } from '@/lib/supabase/client';
 import { ME_QUERY } from '@/lib/graphql/queries';
 
 const baseNavKeys = [
@@ -40,6 +40,7 @@ export function DashboardSidebar() {
   const t = useTranslations('nav');
   const pathname = usePathname();
   const router = useRouter();
+  const clerk = useClerk();
   const { data: meData } = useQuery(ME_QUERY);
 
   const roles: string[] = meData?.me?.roles ?? [];
@@ -53,8 +54,7 @@ export function DashboardSidebar() {
     : baseNavKeys;
 
   const handleLogout = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    await clerk.signOut();
     router.push('/login');
     router.refresh();
   };

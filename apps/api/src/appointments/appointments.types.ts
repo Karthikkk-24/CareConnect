@@ -8,6 +8,8 @@ import {
   MinLength,
 } from 'class-validator';
 import { APPOINTMENT_STATUSES } from '../database/entities/appointment.entity';
+import { PatientType } from '../patients/patients.types';
+import { UserSummaryType } from '../users/users.types';
 
 @ObjectType()
 export class AppointmentType {
@@ -20,8 +22,14 @@ export class AppointmentType {
   @Field(() => ID)
   patientId: string;
 
+  @Field(() => PatientType, { nullable: true })
+  patient?: PatientType;
+
   @Field(() => ID, { nullable: true })
   doctorId?: string;
+
+  @Field(() => UserSummaryType, { nullable: true })
+  doctor?: UserSummaryType;
 
   @Field(() => ID, { nullable: true })
   departmentId?: string;

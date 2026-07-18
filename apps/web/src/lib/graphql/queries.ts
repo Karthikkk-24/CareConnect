@@ -402,6 +402,73 @@ export const BED_OCCUPANCY_QUERY = gql`
   }
 `;
 
+export const DEPARTMENTS_QUERY = gql`
+  query Departments($hospitalId: String) {
+    departments(hospitalId: $hospitalId) {
+      id
+      name
+      description
+      createdAt
+    }
+  }
+`;
+
+export const WARDS_QUERY = gql`
+  query Wards($hospitalId: String, $departmentId: String) {
+    wards(hospitalId: $hospitalId, departmentId: $departmentId) {
+      id
+      name
+      floor
+      departmentId
+      createdAt
+    }
+  }
+`;
+
+export const BEDS_QUERY = gql`
+  query Beds($hospitalId: String, $wardId: String) {
+    beds(hospitalId: $hospitalId, wardId: $wardId) {
+      id
+      label
+      status
+      wardId
+      createdAt
+    }
+  }
+`;
+
+export const CREATE_DEPARTMENT_MUTATION = gql`
+  mutation CreateDepartment($input: CreateDepartmentInput!, $hospitalId: String) {
+    createDepartment(input: $input, hospitalId: $hospitalId) {
+      id
+      name
+      description
+    }
+  }
+`;
+
+export const CREATE_WARD_MUTATION = gql`
+  mutation CreateWard($input: CreateWardInput!, $hospitalId: String) {
+    createWard(input: $input, hospitalId: $hospitalId) {
+      id
+      name
+      floor
+      departmentId
+    }
+  }
+`;
+
+export const CREATE_BED_MUTATION = gql`
+  mutation CreateBed($input: CreateBedInput!, $hospitalId: String) {
+    createBed(input: $input, hospitalId: $hospitalId) {
+      id
+      label
+      status
+      wardId
+    }
+  }
+`;
+
 export const CREATE_VITAL_SIGN_MUTATION = gql`
   mutation CreateVitalSign($input: CreateVitalInput!, $hospitalId: String) {
     createVitalSign(input: $input, hospitalId: $hospitalId) {

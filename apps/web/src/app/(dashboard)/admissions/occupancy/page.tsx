@@ -65,7 +65,13 @@ export default function BedOccupancyPage() {
             ) : wards.length === 0 ? (
               <tr>
                 <td colSpan={4} className="px-6 py-8 text-center text-clay-text-muted">
-                  No wards configured. Create wards and beds under Settings / Facility.
+                  <p>No wards configured yet.</p>
+                  <Link
+                    href="/settings/facility"
+                    className="mt-2 inline-block text-sm text-clay-primary hover:underline"
+                  >
+                    Set up departments, wards, and beds →
+                  </Link>
                 </td>
               </tr>
             ) : (

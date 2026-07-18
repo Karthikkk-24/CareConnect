@@ -9,7 +9,7 @@ import { randomBytes, randomUUID } from 'crypto';
 import { Repository } from 'typeorm';
 import { Role, StaffInvite, StaffProfile, User, UserRole } from '../database/entities';
 import type { AuthenticatedUser } from '../auth/auth.types';
-import { SupabaseAdminService } from '../supabase/supabase-admin.service';
+import { ClerkAdminService } from '../clerk/clerk-admin.service';
 import { AuditService } from '../audit/audit.service';
 import { CreateStaffInput, UpdateStaffInput } from './staff.types';
 
@@ -26,7 +26,7 @@ export class StaffService {
     private readonly userRolesRepo: Repository<UserRole>,
     @InjectRepository(StaffInvite)
     private readonly invitesRepo: Repository<StaffInvite>,
-    private readonly supabaseAdmin: SupabaseAdminService,
+    private readonly clerkAdmin: ClerkAdminService,
     private readonly audit: AuditService,
   ) {}
 
@@ -70,11 +70,14 @@ export class StaffService {
     if (!role) throw new NotFoundException(`Role ${input.roleSlug} not found`);
 
     let authId: string;
-    if (this.supabaseAdmin.isConfigured()) {
-      const invited = await this.supabaseAdmin.inviteUserByEmail(input.email, input.fullName);
-      authId = invited.id;
+    if (this.clerkAdmin.isConfigured()) {
+      const invited = await this.clerkAdmin.inviteStaffByEmail(input.email, input.fullName);
+      // Clerk assigns the real `user_...` id on invite acceptance. Until then,
+      // stash a deterministic placeholder so the users table row stays unique;
+      // syncAndGetUser upgrades authId to the real Clerk id on first login.
+      authId = invited.clerkUserId ?? `pending_${randomUUID()}`;
     } else {
-      authId = randomUUID();
+      authId = `pending_${randomUUID()}`;
     }
 
     const existingByEmail = await this.usersRepo.findOne({ where: { email: input.email } });

@@ -148,8 +148,30 @@ export class ClinicalService {
       id: order.id,
       hospitalId: order.hospitalId,
       patientId: order.patientId,
+      patient: order.patient
+        ? {
+            id: order.patient.id,
+            hospitalId: order.patient.hospitalId,
+            fullName: order.patient.fullName,
+            email: order.patient.email,
+            phone: order.patient.phone,
+            dateOfBirth: order.patient.dateOfBirth,
+            gender: order.patient.gender,
+            status: order.patient.status,
+            createdAt: order.patient.createdAt,
+            updatedAt: order.patient.updatedAt,
+          }
+        : undefined,
       admissionId: order.admissionId,
       orderedById: order.orderedById,
+      orderedBy: order.orderedBy
+        ? {
+            id: order.orderedBy.id,
+            fullName: order.orderedBy.fullName,
+            email: order.orderedBy.email,
+            avatarUrl: order.orderedBy.avatarUrl,
+          }
+        : undefined,
       testName: order.testName,
       status: order.status,
       notes: order.notes,
@@ -397,6 +419,7 @@ export class ClinicalService {
     if (status) where.status = status;
     const orders = await this.labOrdersRepo.find({
       where,
+      relations: ['patient', 'orderedBy'],
       order: { createdAt: 'DESC' },
     });
     return orders.map((o) => this.toLabOrderType(o));

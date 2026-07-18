@@ -10,6 +10,8 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { PatientType } from '../patients/patients.types';
+import { UserSummaryType } from '../users/users.types';
 
 @ObjectType()
 export class VitalSignType {
@@ -181,11 +183,17 @@ export class LabOrderType {
   @Field(() => ID)
   patientId: string;
 
+  @Field(() => PatientType, { nullable: true })
+  patient?: PatientType;
+
   @Field(() => ID, { nullable: true })
   admissionId?: string;
 
   @Field(() => ID, { nullable: true })
   orderedById?: string;
+
+  @Field(() => UserSummaryType, { nullable: true })
+  orderedBy?: UserSummaryType;
 
   @Field()
   testName: string;

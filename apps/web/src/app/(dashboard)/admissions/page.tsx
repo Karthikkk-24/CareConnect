@@ -10,9 +10,11 @@ import { DashboardHeader } from '@/components/layout/dashboard-header';
 import {
   ACTIVE_ADMISSIONS_QUERY,
   ADMIT_PATIENT_MUTATION,
+  BEDS_QUERY,
   DISCHARGE_ADMISSION_MUTATION,
   ME_QUERY,
   PATIENTS_QUERY,
+  WARDS_QUERY,
 } from '@/lib/graphql/queries';
 
 export default function AdmissionsPage() {
@@ -37,6 +39,21 @@ export default function AdmissionsPage() {
     skip: !hospitalId || patientSearch.length < 2,
   });
 
+  const { data: wardsData } = useQuery(WARDS_QUERY, {
+    variables: { hospitalId },
+    skip: !hospitalId,
+  });
+
+  const { data: bedsData } = useQuery(BEDS_QUERY, {
+    variables: { hospitalId, wardId: wardId || undefined },
+    skip: !hospitalId || !wardId,
+  });
+
+  const wards: Array<{ id: string; name: string; floor?: string }> = wardsData?.wards ?? [];
+  const beds: Array<{ id: string; label: string; status: string; wardId: string }> =
+    bedsData?.beds ?? [];
+  const availableBeds = beds.filter((b) => b.status === 'available');
+
   const [admitPatient, { loading: admitting }] = useMutation(ADMIT_PATIENT_MUTATION, {
     onCompleted: () => {
       refetch();
@@ -58,7 +75,15 @@ export default function AdmissionsPage() {
     e.preventDefault();
     setError('');
     if (!patientId.trim()) {
-      setError('Patient ID is required');
+      setError('Patient is required');
+      return;
+    }
+    if (!wardId) {
+      setError('Ward is required');
+      return;
+    }
+    if (!bedId) {
+      setError('Bed is required');
       return;
     }
     try {
@@ -67,8 +92,8 @@ export default function AdmissionsPage() {
           hospitalId,
           input: {
             patientId: patientId.trim(),
-            wardId: wardId || undefined,
-            bedId: bedId || undefined,
+            wardId,
+            bedId,
             reason: reason || undefined,
           },
         },
@@ -129,25 +154,69 @@ export default function AdmissionsPage() {
               </div>
             ) : null}
             <ClayInput
-              label="Patient ID *"
-              placeholder="UUID"
+              label="Selected Patient ID"
+              placeholder="Pick a patient using search above"
               value={patientId}
-              onChange={(e) => setPatientId(e.target.value)}
+              readOnly
               required
             />
             <div className="grid gap-4 sm:grid-cols-2">
-              <ClayInput
-                label="Ward ID (optional)"
-                placeholder="UUID"
-                value={wardId}
-                onChange={(e) => setWardId(e.target.value)}
-              />
-              <ClayInput
-                label="Bed ID (optional)"
-                placeholder="UUID"
-                value={bedId}
-                onChange={(e) => setBedId(e.target.value)}
-              />
+              <div className="flex flex-col gap-2">
+                <label htmlFor="admit-ward" className="text-sm font-medium text-clay-text">
+                  Ward *
+                </label>
+                <select
+                  id="admit-ward"
+                  value={wardId}
+                  onChange={(e) => {
+                    setWardId(e.target.value);
+                    setBedId('');
+                  }}
+                  required
+                  className="w-full rounded-2xl border border-white/60 bg-clay-surface px-4 py-3 text-sm text-clay-text shadow-clay-inset outline-none focus:ring-2 focus:ring-clay-primary/30"
+                >
+                  <option value="">Select ward</option>
+                  {wards.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name}
+                      {w.floor ? ` · Floor ${w.floor}` : ''}
+                    </option>
+                  ))}
+                </select>
+                {wards.length === 0 ? (
+                  <Link
+                    href="/settings/facility"
+                    className="text-xs text-clay-primary hover:underline"
+                  >
+                    No wards yet — set them up →
+                  </Link>
+                ) : null}
+              </div>
+              <div className="flex flex-col gap-2">
+                <label htmlFor="admit-bed" className="text-sm font-medium text-clay-text">
+                  Bed *
+                </label>
+                <select
+                  id="admit-bed"
+                  value={bedId}
+                  onChange={(e) => setBedId(e.target.value)}
+                  disabled={!wardId}
+                  required
+                  className="w-full rounded-2xl border border-white/60 bg-clay-surface px-4 py-3 text-sm text-clay-text shadow-clay-inset outline-none focus:ring-2 focus:ring-clay-primary/30 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <option value="">{wardId ? 'Select bed' : 'Choose ward first'}</option>
+                  {availableBeds.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.label}
+                    </option>
+                  ))}
+                </select>
+                {wardId && availableBeds.length === 0 ? (
+                  <p className="text-xs text-clay-text-muted">
+                    No available beds in this ward.
+                  </p>
+                ) : null}
+              </div>
             </div>
             <ClayTextarea
               label="Reason"

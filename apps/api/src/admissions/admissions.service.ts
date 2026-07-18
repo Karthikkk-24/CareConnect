@@ -46,9 +46,51 @@ export class AdmissionsService {
       id: admission.id,
       hospitalId: admission.hospitalId,
       patientId: admission.patientId,
+      patient: admission.patient
+        ? {
+            id: admission.patient.id,
+            hospitalId: admission.patient.hospitalId,
+            fullName: admission.patient.fullName,
+            email: admission.patient.email,
+            phone: admission.patient.phone,
+            dateOfBirth: admission.patient.dateOfBirth,
+            gender: admission.patient.gender,
+            status: admission.patient.status,
+            createdAt: admission.patient.createdAt,
+            updatedAt: admission.patient.updatedAt,
+          }
+        : undefined,
       attendingDoctorId: admission.attendingDoctorId,
+      attendingDoctor: admission.attendingDoctor
+        ? {
+            id: admission.attendingDoctor.id,
+            fullName: admission.attendingDoctor.fullName,
+            email: admission.attendingDoctor.email,
+            avatarUrl: admission.attendingDoctor.avatarUrl,
+          }
+        : undefined,
       wardId: admission.wardId,
+      ward: admission.ward
+        ? {
+            id: admission.ward.id,
+            hospitalId: admission.ward.hospitalId,
+            departmentId: admission.ward.departmentId,
+            name: admission.ward.name,
+            floor: admission.ward.floor,
+            createdAt: admission.ward.createdAt,
+          }
+        : undefined,
       bedId: admission.bedId,
+      bed: admission.bed
+        ? {
+            id: admission.bed.id,
+            hospitalId: admission.bed.hospitalId,
+            wardId: admission.bed.wardId,
+            label: admission.bed.label,
+            status: admission.bed.status,
+            createdAt: admission.bed.createdAt,
+          }
+        : undefined,
       admittedAt: admission.admittedAt,
       dischargedAt: admission.dischargedAt,
       reason: admission.reason,
@@ -59,7 +101,10 @@ export class AdmissionsService {
   }
 
   private async findAdmissionOrThrow(id: string, hospitalId: string): Promise<Admission> {
-    const admission = await this.admissionsRepo.findOne({ where: { id, hospitalId } });
+    const admission = await this.admissionsRepo.findOne({
+      where: { id, hospitalId },
+      relations: ['patient', 'attendingDoctor', 'ward', 'bed'],
+    });
     if (!admission) throw new NotFoundException('Admission not found');
     return admission;
   }
@@ -95,7 +140,7 @@ export class AdmissionsService {
     bed.status = 'occupied';
     await this.bedsRepo.save(bed);
 
-    const admission = await this.admissionsRepo.save(
+    const saved = await this.admissionsRepo.save(
       this.admissionsRepo.create({
         hospitalId,
         patientId: input.patientId,
@@ -110,6 +155,8 @@ export class AdmissionsService {
 
     patient.status = 'admitted';
     await this.patientsRepo.save(patient);
+
+    const admission = await this.findAdmissionOrThrow(saved.id, hospitalId);
 
     await this.audit.log({
       actorId: actor.id,
@@ -126,6 +173,7 @@ export class AdmissionsService {
   async activeAdmissions(hospitalId: string): Promise<AdmissionType[]> {
     const admissions = await this.admissionsRepo.find({
       where: { hospitalId, status: 'active' },
+      relations: ['patient', 'attendingDoctor', 'ward', 'bed'],
       order: { admittedAt: 'DESC' },
     });
     return admissions.map((a) => this.toAdmissionType(a));

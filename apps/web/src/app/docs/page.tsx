@@ -15,8 +15,15 @@ export default function DocsPage() {
           </p>
           <ol className="list-decimal space-y-2 pl-5 text-sm text-clay-text">
             <li>Copy environment files with <code>pnpm setup:env</code></li>
-            <li>Set Supabase credentials in <code>apps/api/.env</code> and <code>apps/web/.env.local</code></li>
-            <li>Apply migrations with <code>supabase db push</code></li>
+            <li>
+              Set <code>DATABASE_URL</code> (Neon), <code>CLERK_SECRET_KEY</code> and
+              <code>CLERK_ISSUER</code> in <code>apps/api/.env</code>
+            </li>
+            <li>
+              Set <code>NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY</code> and
+              <code>CLERK_SECRET_KEY</code> in <code>apps/web/.env.local</code>
+            </li>
+            <li>Apply migrations to your Neon database</li>
             <li>Run <code>pnpm --filter @careconnect/types build && pnpm dev</code></li>
           </ol>
           <p className="mt-6 text-sm text-clay-text-muted">

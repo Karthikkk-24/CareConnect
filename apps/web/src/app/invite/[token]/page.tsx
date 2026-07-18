@@ -1,32 +1,21 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useMutation } from '@apollo/client';
+import { useAuth } from '@clerk/nextjs';
 import { ClayButton, ClayCard } from '@careconnect/ui';
 import { ACCEPT_STAFF_INVITE } from '@/lib/graphql/queries';
-import { createClient } from '@/lib/supabase/client';
 
 export default function InvitePage() {
   const { token } = useParams<{ token: string }>();
   const router = useRouter();
-  const [checkingAuth, setCheckingAuth] = useState(true);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const { isLoaded, isSignedIn } = useAuth();
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
   const [acceptInvite, { loading }] = useMutation(ACCEPT_STAFF_INVITE);
-
-  useEffect(() => {
-    const checkSession = async () => {
-      const supabase = createClient();
-      const { data } = await supabase.auth.getUser();
-      setIsLoggedIn(!!data.user);
-      setCheckingAuth(false);
-    };
-    checkSession();
-  }, []);
 
   const handleAccept = async () => {
     setError('');
@@ -46,7 +35,7 @@ export default function InvitePage() {
 
   const invitePath = `/invite/${token}`;
 
-  if (checkingAuth) {
+  if (!isLoaded) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-clay-bg px-6">
         <p className="text-clay-text-muted">Loading invite...</p>
@@ -69,7 +58,7 @@ export default function InvitePage() {
           You&apos;ve been invited to join a hospital team on CareConnect.
         </p>
 
-        {!isLoggedIn ? (
+        {!isSignedIn ? (
           <div className="flex flex-col gap-3">
             <p className="text-sm text-clay-text">
               Sign in or create an account with the email address that received this invite.

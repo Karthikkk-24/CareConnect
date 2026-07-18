@@ -5,22 +5,20 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useApolloClient } from '@apollo/client';
+import { useSignIn } from '@clerk/nextjs';
 import { loginSchema, type LoginInput } from '@careconnect/types';
 import { useTranslations } from 'next-intl';
 import { ClayButton, ClayCard, ClayInput } from '@careconnect/ui';
-import { createClient } from '@/lib/supabase/client';
-import { ME_QUERY } from '@/lib/graphql/queries';
 
 export function LoginForm() {
   const t = useTranslations('auth');
   const router = useRouter();
   const searchParams = useSearchParams();
-  const apollo = useApolloClient();
+  const { isLoaded, signIn, setActive } = useSignIn();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const redirectTo = searchParams.get('redirect');
+  const redirectTo = searchParams.get('redirect') ?? '/dashboard';
 
   const {
     register,
@@ -31,38 +29,42 @@ export function LoginForm() {
   });
 
   const onSubmit = async (data: LoginInput) => {
+    if (!isLoaded) return;
     setLoading(true);
     setError('');
 
-    const supabase = createClient();
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email: data.email,
-      password: data.password,
-    });
-
-    if (authError) {
-      setError(authError.message);
-      setLoading(false);
-      return;
-    }
-
-    if (redirectTo) {
-      router.push(redirectTo);
-      router.refresh();
-      return;
-    }
-
     try {
-      const { data: meData } = await apollo.query({ query: ME_QUERY, fetchPolicy: 'network-only' });
-      if (meData?.me && !meData.me.onboardingCompleted) {
-        router.push('/onboarding');
+      const attempt = await signIn.create({
+        identifier: data.email,
+        password: data.password,
+      });
+
+      if (attempt.status === 'complete') {
+        await setActive({ session: attempt.createdSessionId });
+        router.push(redirectTo);
+        router.refresh();
       } else {
-        router.push('/dashboard');
+        setError('Additional verification is required. Please continue in a supported client.');
       }
-    } catch {
-      router.push('/dashboard');
+    } catch (err) {
+      setError(extractClerkError(err));
+    } finally {
+      setLoading(false);
     }
-    router.refresh();
+  };
+
+  const signInWithGoogle = async () => {
+    if (!isLoaded) return;
+    setError('');
+    try {
+      await signIn.authenticateWithRedirect({
+        strategy: 'oauth_google',
+        redirectUrl: '/auth/callback',
+        redirectUrlComplete: redirectTo,
+      });
+    } catch (err) {
+      setError(extractClerkError(err));
+    }
   };
 
   return (
@@ -110,6 +112,21 @@ export function LoginForm() {
         </ClayButton>
       </form>
 
+      <div className="my-4 flex items-center gap-3 text-xs text-clay-text-muted">
+        <span className="h-px flex-1 bg-clay-text-muted/20" />
+        <span>or</span>
+        <span className="h-px flex-1 bg-clay-text-muted/20" />
+      </div>
+
+      <ClayButton
+        type="button"
+        variant="secondary"
+        className="w-full"
+        onClick={signInWithGoogle}
+      >
+        Continue with Google
+      </ClayButton>
+
       <p className="mt-6 text-center text-sm text-clay-text-muted">
         {t('noAccount')}{' '}
         <Link href="/register" className="font-medium text-clay-primary hover:underline">
@@ -118,4 +135,14 @@ export function LoginForm() {
       </p>
     </ClayCard>
   );
+}
+
+function extractClerkError(err: unknown): string {
+  if (err && typeof err === 'object' && 'errors' in err) {
+    const errors = (err as { errors?: Array<{ longMessage?: string; message?: string }> }).errors;
+    if (Array.isArray(errors) && errors.length > 0) {
+      return errors[0].longMessage ?? errors[0].message ?? 'Sign-in failed';
+    }
+  }
+  return err instanceof Error ? err.message : 'Sign-in failed';
 }

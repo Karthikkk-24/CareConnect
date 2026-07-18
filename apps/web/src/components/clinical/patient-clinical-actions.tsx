@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { useMutation } from '@apollo/client';
+import { useMutation, useQuery } from '@apollo/client';
 import {
   Calendar,
   Activity,
@@ -17,11 +17,13 @@ import { ClayButton, ClayCard, ClayInput } from '@careconnect/ui';
 import { ClayTextarea } from '@/components/clinical/clay-textarea';
 import {
   ADMIT_PATIENT_MUTATION,
+  BEDS_QUERY,
   CREATE_APPOINTMENT_MUTATION,
   CREATE_CLINICAL_NOTE_MUTATION,
   CREATE_LAB_ORDER_MUTATION,
   CREATE_PRESCRIPTION_MUTATION,
   CREATE_VITAL_SIGN_MUTATION,
+  WARDS_QUERY,
 } from '@/lib/graphql/queries';
 
 interface PatientClinicalActionsProps {
@@ -50,6 +52,8 @@ export function PatientClinicalActions({ patientId, hospitalId }: PatientClinica
   const [expanded, setExpanded] = useState<ActionKey | null>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [admitWardId, setAdmitWardId] = useState('');
+  const [admitBedId, setAdmitBedId] = useState('');
 
   const [createAppointment, { loading: appointmentLoading }] = useMutation(CREATE_APPOINTMENT_MUTATION);
   const [admitPatient, { loading: admitLoading }] = useMutation(ADMIT_PATIENT_MUTATION);
@@ -57,6 +61,20 @@ export function PatientClinicalActions({ patientId, hospitalId }: PatientClinica
   const [createClinicalNote, { loading: noteLoading }] = useMutation(CREATE_CLINICAL_NOTE_MUTATION);
   const [createPrescription, { loading: rxLoading }] = useMutation(CREATE_PRESCRIPTION_MUTATION);
   const [createLabOrder, { loading: labLoading }] = useMutation(CREATE_LAB_ORDER_MUTATION);
+
+  const wardsQuery = useQuery(WARDS_QUERY, {
+    variables: { hospitalId },
+    skip: !hospitalId || expanded !== 'admit',
+  });
+  const bedsQuery = useQuery(BEDS_QUERY, {
+    variables: { hospitalId, wardId: admitWardId || undefined },
+    skip: !hospitalId || !admitWardId || expanded !== 'admit',
+  });
+
+  const wards: Array<{ id: string; name: string; floor?: string }> =
+    wardsQuery.data?.wards ?? [];
+  const beds: Array<{ id: string; label: string; status: string }> = bedsQuery.data?.beds ?? [];
+  const availableBeds = beds.filter((b) => b.status === 'available');
 
   const toggle = (key: ActionKey) => {
     setExpanded((prev) => (prev === key ? null : key));
@@ -94,18 +112,28 @@ export function PatientClinicalActions({ patientId, hospitalId }: PatientClinica
   const handleAdmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
+    if (!admitWardId) {
+      setError('Please select a ward');
+      return;
+    }
+    if (!admitBedId) {
+      setError('Please select a bed');
+      return;
+    }
     try {
       await admitPatient({
         variables: {
           hospitalId,
           input: {
             patientId,
-            wardId: (form.get('wardId') as string) || undefined,
-            bedId: (form.get('bedId') as string) || undefined,
-            reason: form.get('reason') as string,
+            wardId: admitWardId,
+            bedId: admitBedId,
+            reason: (form.get('reason') as string) || undefined,
           },
         },
       });
+      setAdmitWardId('');
+      setAdmitBedId('');
       handleSuccess('Patient admitted successfully');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to admit patient');
@@ -270,8 +298,70 @@ export function PatientClinicalActions({ patientId, hospitalId }: PatientClinica
 
                 {key === 'admit' ? (
                   <form onSubmit={handleAdmit} className="grid gap-3 sm:grid-cols-2">
-                    <ClayInput name="wardId" label="Ward ID (optional)" placeholder="UUID" />
-                    <ClayInput name="bedId" label="Bed ID (optional)" placeholder="UUID" />
+                    <div className="flex flex-col gap-2">
+                      <label
+                        htmlFor="clinical-admit-ward"
+                        className="text-sm font-medium text-clay-text"
+                      >
+                        Ward *
+                      </label>
+                      <select
+                        id="clinical-admit-ward"
+                        value={admitWardId}
+                        onChange={(e) => {
+                          setAdmitWardId(e.target.value);
+                          setAdmitBedId('');
+                        }}
+                        required
+                        className="w-full rounded-2xl border border-white/60 bg-clay-surface px-4 py-3 text-sm text-clay-text shadow-clay-inset outline-none focus:ring-2 focus:ring-clay-primary/30"
+                      >
+                        <option value="">Select ward</option>
+                        {wards.map((w) => (
+                          <option key={w.id} value={w.id}>
+                            {w.name}
+                            {w.floor ? ` · Floor ${w.floor}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      {wards.length === 0 && !wardsQuery.loading ? (
+                        <Link
+                          href="/settings/facility"
+                          className="text-xs text-clay-primary hover:underline"
+                        >
+                          No wards yet — set them up →
+                        </Link>
+                      ) : null}
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label
+                        htmlFor="clinical-admit-bed"
+                        className="text-sm font-medium text-clay-text"
+                      >
+                        Bed *
+                      </label>
+                      <select
+                        id="clinical-admit-bed"
+                        value={admitBedId}
+                        onChange={(e) => setAdmitBedId(e.target.value)}
+                        disabled={!admitWardId}
+                        required
+                        className="w-full rounded-2xl border border-white/60 bg-clay-surface px-4 py-3 text-sm text-clay-text shadow-clay-inset outline-none focus:ring-2 focus:ring-clay-primary/30 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <option value="">
+                          {admitWardId ? 'Select bed' : 'Choose ward first'}
+                        </option>
+                        {availableBeds.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.label}
+                          </option>
+                        ))}
+                      </select>
+                      {admitWardId && availableBeds.length === 0 && !bedsQuery.loading ? (
+                        <p className="text-xs text-clay-text-muted">
+                          No available beds in this ward.
+                        </p>
+                      ) : null}
+                    </div>
                     <ClayTextarea name="reason" label="Reason" rows={2} className="sm:col-span-2" />
                     <ClayButton type="submit" size="sm" isLoading={isLoading} className="sm:col-span-2">
                       Admit

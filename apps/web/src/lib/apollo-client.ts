@@ -1,31 +1,39 @@
 'use client';
 
+import { useMemo } from 'react';
 import { ApolloClient, HttpLink, InMemoryCache, from } from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
-import { createClient } from '@/lib/supabase/client';
+import { useAuth } from '@clerk/nextjs';
 
-const httpLink = new HttpLink({
-  uri: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/graphql',
-});
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/graphql';
 
-const authLink = setContext(async (_, { headers }) => {
-  const supabase = createClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+/**
+ * Returns a memoized Apollo client wired to the current Clerk session.
+ * The token is fetched lazily on every request so it stays fresh.
+ */
+export function useApolloClient() {
+  const { getToken, isLoaded, isSignedIn } = useAuth();
 
-  return {
-    headers: {
-      ...headers,
-      authorization: session?.access_token ? `Bearer ${session.access_token}` : '',
-    },
-  };
-});
+  return useMemo(() => {
+    const httpLink = new HttpLink({ uri: API_URL });
 
-export const apolloClient = new ApolloClient({
-  link: from([authLink, httpLink]),
-  cache: new InMemoryCache(),
-  defaultOptions: {
-    watchQuery: { fetchPolicy: 'cache-and-network' },
-  },
-});
+    const authLink = setContext(async (_, { headers }) => {
+      if (!isLoaded || !isSignedIn) return { headers };
+      const token = await getToken();
+      return {
+        headers: {
+          ...headers,
+          ...(token ? { authorization: `Bearer ${token}` } : {}),
+        },
+      };
+    });
+
+    return new ApolloClient({
+      link: from([authLink, httpLink]),
+      cache: new InMemoryCache(),
+      defaultOptions: {
+        watchQuery: { fetchPolicy: 'cache-and-network' },
+      },
+    });
+  }, [getToken, isLoaded, isSignedIn]);
+}

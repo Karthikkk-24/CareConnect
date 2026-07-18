@@ -26,3 +26,18 @@ export class UserType {
   @Field()
   onboardingCompleted: boolean;
 }
+
+@ObjectType()
+export class UserSummaryType {
+  @Field(() => ID)
+  id: string;
+
+  @Field()
+  fullName: string;
+
+  @Field({ nullable: true })
+  email?: string;
+
+  @Field({ nullable: true })
+  avatarUrl?: string;
+}

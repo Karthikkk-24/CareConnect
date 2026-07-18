@@ -46,7 +46,29 @@ export class AppointmentsService {
       id: appointment.id,
       hospitalId: appointment.hospitalId,
       patientId: appointment.patientId,
+      patient: appointment.patient
+        ? {
+            id: appointment.patient.id,
+            hospitalId: appointment.patient.hospitalId,
+            fullName: appointment.patient.fullName,
+            email: appointment.patient.email,
+            phone: appointment.patient.phone,
+            dateOfBirth: appointment.patient.dateOfBirth,
+            gender: appointment.patient.gender,
+            status: appointment.patient.status,
+            createdAt: appointment.patient.createdAt,
+            updatedAt: appointment.patient.updatedAt,
+          }
+        : undefined,
       doctorId: appointment.doctorId,
+      doctor: appointment.doctor
+        ? {
+            id: appointment.doctor.id,
+            fullName: appointment.doctor.fullName,
+            email: appointment.doctor.email,
+            avatarUrl: appointment.doctor.avatarUrl,
+          }
+        : undefined,
       departmentId: appointment.departmentId,
       scheduledAt: appointment.scheduledAt,
       reason: appointment.reason,
@@ -59,7 +81,10 @@ export class AppointmentsService {
   }
 
   private async findAppointmentOrThrow(id: string, hospitalId: string): Promise<Appointment> {
-    const appointment = await this.appointmentsRepo.findOne({ where: { id, hospitalId } });
+    const appointment = await this.appointmentsRepo.findOne({
+      where: { id, hospitalId },
+      relations: ['patient', 'doctor'],
+    });
     if (!appointment) throw new NotFoundException('Appointment not found');
     return appointment;
   }
@@ -81,7 +106,7 @@ export class AppointmentsService {
       if (!department) throw new NotFoundException('Department not found');
     }
 
-    const appointment = await this.appointmentsRepo.save(
+    const saved = await this.appointmentsRepo.save(
       this.appointmentsRepo.create({
         hospitalId,
         patientId: input.patientId,
@@ -94,6 +119,8 @@ export class AppointmentsService {
         status: 'scheduled',
       }),
     );
+
+    const appointment = await this.findAppointmentOrThrow(saved.id, hospitalId);
 
     await this.audit.log({
       actorId: actor.id,
@@ -111,11 +138,19 @@ export class AppointmentsService {
     hospitalId: string,
     date?: string,
     doctorId?: string,
+    status?: string,
   ): Promise<AppointmentType[]> {
     const where: Record<string, unknown> = { hospitalId };
 
     if (doctorId) {
       where.doctorId = doctorId;
+    }
+
+    if (status) {
+      if (!APPOINTMENT_STATUSES.includes(status as (typeof APPOINTMENT_STATUSES)[number])) {
+        throw new BadRequestException(`Invalid appointment status: ${status}`);
+      }
+      where.status = status;
     }
 
     if (date) {
@@ -128,6 +163,7 @@ export class AppointmentsService {
 
     const appointments = await this.appointmentsRepo.find({
       where,
+      relations: ['patient', 'doctor'],
       order: { scheduledAt: 'ASC' },
     });
 

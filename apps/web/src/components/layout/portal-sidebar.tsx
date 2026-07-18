@@ -11,8 +11,8 @@ import {
   User,
   LogOut,
 } from 'lucide-react';
+import { useClerk } from '@clerk/nextjs';
 import { cn } from '@careconnect/ui';
-import { createClient } from '@/lib/supabase/client';
 
 const navItems = [
   { href: '/portal', label: 'Overview', icon: LayoutDashboard },
@@ -26,10 +26,10 @@ const navItems = [
 export function PortalSidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const clerk = useClerk();
 
   const handleLogout = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    await clerk.signOut();
     router.push('/login');
     router.refresh();
   };

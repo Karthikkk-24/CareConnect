@@ -50,7 +50,7 @@ import { HospitalsModule } from './hospitals/hospitals.module';
 import { RbacModule } from './rbac/rbac.module';
 import { StaffModule } from './staff/staff.module';
 import { UsersModule } from './users/users.module';
-import { SupabaseModule } from './supabase/supabase.module';
+import { ClerkModule } from './clerk/clerk.module';
 import { AuditModule } from './audit/audit.module';
 import { FacilityModule } from './facility/facility.module';
 import { AppointmentsModule } from './appointments/appointments.module';
@@ -133,7 +133,7 @@ import { PortalModule } from './portal/portal.module';
     }),
     AuthModule,
     RbacModule,
-    SupabaseModule,
+    ClerkModule,
     AuditModule,
     UsersModule,
     HospitalsModule,

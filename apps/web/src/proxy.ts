@@ -1,12 +1,37 @@
-import { type NextRequest } from 'next/server';
-import { updateSession } from '@/lib/supabase/session';
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 
-export async function proxy(request: NextRequest) {
-  return updateSession(request);
-}
+const isProtectedRoute = createRouteMatcher([
+  '/dashboard(.*)',
+  '/staff(.*)',
+  '/patients(.*)',
+  '/appointments(.*)',
+  '/admissions(.*)',
+  '/settings(.*)',
+  '/finance(.*)',
+  '/pharmacy(.*)',
+  '/inventory(.*)',
+  '/reports(.*)',
+  '/portal(.*)',
+  '/doctor(.*)',
+  '/nurse(.*)',
+  '/lab(.*)',
+  '/follow-ups(.*)',
+  '/wards(.*)',
+  '/onboarding(.*)',
+  '/invite(.*)',
+]);
+
+export default clerkMiddleware(async (auth, req) => {
+  if (isProtectedRoute(req)) {
+    await auth.protect();
+  }
+});
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    // Skip Next.js internals and all static files, unless found in search params
+    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    // Always run for API routes
+    '/(api|trpc)(.*)',
   ],
 };

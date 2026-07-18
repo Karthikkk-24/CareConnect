@@ -4,7 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Role, StaffInvite, StaffProfile, User, UserRole } from '../database/entities';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
-import { SupabaseAdminService } from '../supabase/supabase-admin.service';
+import { ClerkAdminService } from '../clerk/clerk-admin.service';
 import { StaffService } from './staff.service';
 
 describe('StaffService', () => {
@@ -15,7 +15,7 @@ describe('StaffService', () => {
   const rolesRepo = { findOne: jest.fn() };
   const userRolesRepo = { findOne: jest.fn(), save: jest.fn(), create: jest.fn(), delete: jest.fn() };
   const invitesRepo = { save: jest.fn(), create: jest.fn(), findOne: jest.fn() };
-  const supabaseAdmin = { isConfigured: jest.fn(), inviteUserByEmail: jest.fn() };
+  const clerkAdmin = { isConfigured: jest.fn(), inviteStaffByEmail: jest.fn() };
   const audit = { log: jest.fn() };
 
   beforeEach(async () => {
@@ -29,7 +29,7 @@ describe('StaffService', () => {
         { provide: getRepositoryToken(Role), useValue: rolesRepo },
         { provide: getRepositoryToken(UserRole), useValue: userRolesRepo },
         { provide: getRepositoryToken(StaffInvite), useValue: invitesRepo },
-        { provide: SupabaseAdminService, useValue: supabaseAdmin },
+        { provide: ClerkAdminService, useValue: clerkAdmin },
         { provide: AuditService, useValue: audit },
       ],
     }).compile();
