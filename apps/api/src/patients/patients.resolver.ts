@@ -16,6 +16,7 @@ import {
   PatientDocumentType,
   PatientsPageType,
   PatientType,
+  UpdatePatientInput,
 } from './patients.types';
 
 @Resolver()
@@ -55,7 +56,42 @@ export class PatientsResolver {
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<PatientType> {
     const resolvedHospitalId = this.patientsService.resolveHospitalId(user, hospitalId);
-    return this.patientsService.create(resolvedHospitalId, input);
+    return this.patientsService.create(resolvedHospitalId, input, user);
+  }
+
+  @Mutation(() => PatientType)
+  @Permissions(PERMISSIONS.PATIENTS_WRITE)
+  async updatePatient(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('id') id: string,
+    @Args('input') input: UpdatePatientInput,
+    @Args('hospitalId', { nullable: true }) hospitalId?: string,
+  ): Promise<PatientType> {
+    const resolvedHospitalId = this.patientsService.resolveHospitalId(user, hospitalId);
+    return this.patientsService.updatePatient(id, input, resolvedHospitalId, user);
+  }
+
+  @Mutation(() => Boolean)
+  @Permissions(PERMISSIONS.PATIENTS_WRITE)
+  async deletePatient(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('id') id: string,
+    @Args('hospitalId', { nullable: true }) hospitalId?: string,
+  ): Promise<boolean> {
+    const resolvedHospitalId = this.patientsService.resolveHospitalId(user, hospitalId);
+    return this.patientsService.deletePatient(id, resolvedHospitalId, user);
+  }
+
+  @Mutation(() => PatientType)
+  @Permissions(PERMISSIONS.PATIENTS_WRITE)
+  async updatePatientStatus(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('id') id: string,
+    @Args('status') status: string,
+    @Args('hospitalId', { nullable: true }) hospitalId?: string,
+  ): Promise<PatientType> {
+    const resolvedHospitalId = this.patientsService.resolveHospitalId(user, hospitalId);
+    return this.patientsService.updatePatientStatus(id, status, resolvedHospitalId, user);
   }
 
   @Mutation(() => BulkImportResultType)
@@ -93,5 +129,17 @@ export class PatientsResolver {
       documentType: doc.documentType,
       createdAt: doc.createdAt,
     };
+  }
+
+  @Mutation(() => Boolean)
+  @Permissions(PERMISSIONS.PATIENTS_WRITE)
+  async deletePatientDocument(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('id') id: string,
+    @Args('patientId') patientId: string,
+    @Args('hospitalId', { nullable: true }) hospitalId?: string,
+  ): Promise<boolean> {
+    const resolvedHospitalId = this.patientsService.resolveHospitalId(user, hospitalId);
+    return this.patientsService.deletePatientDocument(id, patientId, resolvedHospitalId, user);
   }
 }

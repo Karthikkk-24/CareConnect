@@ -34,7 +34,11 @@ export function OnboardingForm() {
       }
 
       await completeOnboarding({
-        variables: { fullName: fullName.trim(), hospitalId },
+        variables: {
+          fullName: fullName.trim(),
+          hospitalId,
+          assignHospitalAdmin: !!hospitalId,
+        },
       });
 
       router.push('/dashboard');

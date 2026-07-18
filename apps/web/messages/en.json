@@ -1,0 +1,28 @@
+{
+  "auth": {
+    "welcomeBack": "Welcome back",
+    "signInSubtitle": "Sign in to your CareConnect account",
+    "email": "Email",
+    "password": "Password",
+    "forgotPassword": "Forgot password?",
+    "signIn": "Sign In",
+    "noAccount": "Don't have an account?",
+    "createOne": "Create one"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "staff": "Staff",
+    "patients": "Patients",
+    "appointments": "Appointments",
+    "settings": "Settings",
+    "finance": "Finance",
+    "pharmacy": "Pharmacy",
+    "inventory": "Inventory",
+    "reports": "Reports",
+    "hospitalProfile": "Hospital Profile",
+    "signOut": "Sign Out",
+    "brandSubtitle": "Hospital Admin",
+    "mainNav": "Main navigation",
+    "skipToContent": "Skip to main content"
+  }
+}

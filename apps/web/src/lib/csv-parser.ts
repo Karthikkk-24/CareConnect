@@ -18,15 +18,49 @@ const EXPECTED_HEADERS = [
   'identification_number',
 ];
 
+function parseCsvLine(line: string): string[] {
+  const values: string[] = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    const next = line[i + 1];
+
+    if (inQuotes) {
+      if (char === '"') {
+        if (next === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        current += char;
+      }
+    } else if (char === '"') {
+      inQuotes = true;
+    } else if (char === ',') {
+      values.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+
+  values.push(current.trim());
+  return values;
+}
+
 export function parsePatientCsv(text: string): BulkPatientRow[] {
   const lines = text.trim().split(/\r?\n/).filter(Boolean);
   if (lines.length < 2) return [];
 
-  const headers = lines[0].split(',').map((h) => h.trim().toLowerCase().replace(/\s+/g, '_'));
+  const headers = parseCsvLine(lines[0]).map((h) => h.toLowerCase().replace(/\s+/g, '_'));
   const rows: BulkPatientRow[] = [];
 
   for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(',').map((v) => v.trim().replace(/^"|"$/g, ''));
+    const values = parseCsvLine(lines[i]);
     const row: Record<string, string> = {};
     headers.forEach((h, idx) => {
       row[h] = values[idx] ?? '';

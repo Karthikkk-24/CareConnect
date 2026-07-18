@@ -1,4 +1,5 @@
 import { Field, ID, InputType, ObjectType } from '@nestjs/graphql';
+import { IsBoolean, IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
 
 @ObjectType()
 export class StaffType {
@@ -29,6 +30,9 @@ export class StaffType {
   @Field({ nullable: true })
   specialization?: string;
 
+  @Field({ nullable: true })
+  employeeId?: string;
+
   @Field()
   isActive: boolean;
 
@@ -39,41 +43,73 @@ export class StaffType {
 @InputType()
 export class CreateStaffInput {
   @Field()
+  @IsString()
+  @MinLength(2)
   fullName: string;
 
   @Field()
+  @IsEmail()
   email: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   phone?: string;
 
   @Field()
+  @IsString()
   roleSlug: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   department?: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   specialization?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  employeeId?: string;
 }
 
 @InputType()
 export class UpdateStaffInput {
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   fullName?: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   phone?: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   roleSlug?: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   department?: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   specialization?: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  employeeId?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsBoolean()
   isActive?: boolean;
 }

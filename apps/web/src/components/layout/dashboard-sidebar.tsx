@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useQuery } from '@apollo/client';
 import {
   LayoutDashboard,
   Users,
@@ -10,21 +11,46 @@ import {
   Settings,
   LogOut,
   Building2,
+  DollarSign,
+  Pill,
+  Package,
+  BarChart3,
 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { cn } from '@careconnect/ui';
 import { createClient } from '@/lib/supabase/client';
+import { ME_QUERY } from '@/lib/graphql/queries';
 
-const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/staff', label: 'Staff', icon: UserCog },
-  { href: '/patients', label: 'Patients', icon: Users },
-  { href: '/appointments', label: 'Appointments', icon: Calendar, disabled: true },
-  { href: '/settings', label: 'Settings', icon: Settings, disabled: true },
-];
+const baseNavKeys = [
+  { href: '/dashboard', key: 'dashboard', icon: LayoutDashboard },
+  { href: '/staff', key: 'staff', icon: UserCog },
+  { href: '/patients', key: 'patients', icon: Users },
+  { href: '/appointments', key: 'appointments', icon: Calendar },
+  { href: '/settings', key: 'settings', icon: Settings },
+] as const;
+
+const adminNavKeys = [
+  { href: '/finance', key: 'finance', icon: DollarSign },
+  { href: '/pharmacy', key: 'pharmacy', icon: Pill },
+  { href: '/inventory', key: 'inventory', icon: Package },
+  { href: '/reports', key: 'reports', icon: BarChart3 },
+] as const;
 
 export function DashboardSidebar() {
+  const t = useTranslations('nav');
   const pathname = usePathname();
   const router = useRouter();
+  const { data: meData } = useQuery(ME_QUERY);
+
+  const roles: string[] = meData?.me?.roles ?? [];
+  const isHospitalAdmin =
+    roles.includes('hospital_admin') ||
+    roles.includes('hospital_manager') ||
+    roles.includes('super_admin');
+
+  const navItems = isHospitalAdmin
+    ? [...baseNavKeys.slice(0, 4), ...adminNavKeys, baseNavKeys[4]]
+    : baseNavKeys;
 
   const handleLogout = async () => {
     const supabase = createClient();
@@ -34,48 +60,44 @@ export function DashboardSidebar() {
   };
 
   return (
-    <aside className="flex h-full w-64 flex-col rounded-3xl bg-clay-surface p-4 shadow-clay">
+    <aside
+      className="flex h-full w-64 flex-col rounded-3xl bg-clay-surface p-4 shadow-clay"
+      aria-label={t('mainNav')}
+    >
       <div className="mb-8 flex items-center gap-2 px-2">
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-clay-primary-light to-clay-primary text-sm font-bold text-white shadow-clay-sm">
+        <div
+          className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-clay-primary-light to-clay-primary text-sm font-bold text-white shadow-clay-sm"
+          aria-hidden="true"
+        >
           CC
         </div>
         <div>
           <p className="font-bold text-clay-text">CareConnect</p>
-          <p className="text-xs text-clay-text-muted">Hospital Admin</p>
+          <p className="text-xs text-clay-text-muted">{t('brandSubtitle')}</p>
         </div>
       </div>
 
-      <nav className="flex flex-1 flex-col gap-1">
+      <nav className="flex flex-1 flex-col gap-1" aria-label={t('mainNav')}>
         {navItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
           const Icon = item.icon;
-
-          if (item.disabled) {
-            return (
-              <span
-                key={item.href}
-                className="flex cursor-not-allowed items-center gap-3 rounded-2xl px-4 py-3 text-sm text-clay-text-muted/50"
-              >
-                <Icon className="h-5 w-5" />
-                {item.label}
-                <span className="ml-auto text-xs">Soon</span>
-              </span>
-            );
-          }
+          const label = t(item.key);
 
           return (
             <Link
               key={item.href}
               href={item.href}
+              aria-current={isActive ? 'page' : undefined}
               className={cn(
                 'flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition-all',
+                'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clay-primary',
                 isActive
                   ? 'bg-clay-primary-light text-clay-primary shadow-clay-inset'
                   : 'text-clay-text-muted hover:bg-clay-primary-light/50 hover:text-clay-primary',
               )}
             >
-              <Icon className="h-5 w-5" />
-              {item.label}
+              <Icon className="h-5 w-5" aria-hidden="true" />
+              {label}
             </Link>
           );
         })}
@@ -83,18 +105,20 @@ export function DashboardSidebar() {
 
       <div className="mt-auto space-y-1 border-t border-white/40 pt-4">
         <Link
-          href="/dashboard/hospital"
-          className="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm text-clay-text-muted hover:bg-clay-primary-light/50 hover:text-clay-primary"
+          href="/settings"
+          className="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm text-clay-text-muted hover:bg-clay-primary-light/50 hover:text-clay-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clay-primary"
         >
-          <Building2 className="h-5 w-5" />
-          Hospital Profile
+          <Building2 className="h-5 w-5" aria-hidden="true" />
+          {t('hospitalProfile')}
         </Link>
         <button
+          type="button"
           onClick={handleLogout}
-          className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm text-clay-error hover:bg-red-50"
+          aria-label={t('signOut')}
+          className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm text-clay-error hover:bg-red-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clay-error"
         >
-          <LogOut className="h-5 w-5" />
-          Sign Out
+          <LogOut className="h-5 w-5" aria-hidden="true" />
+          {t('signOut')}
         </button>
       </div>
     </aside>

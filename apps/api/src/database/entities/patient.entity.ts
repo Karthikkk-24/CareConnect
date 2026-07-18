@@ -10,6 +10,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Hospital } from './hospital.entity';
+import { User } from './user.entity';
 import { PatientEmergencyContact } from './patient-emergency-contact.entity';
 import { PatientInsurance } from './patient-insurance.entity';
 import { PatientAllergy } from './patient-allergy.entity';
@@ -29,6 +30,13 @@ export class Patient {
   @ManyToOne(() => Hospital)
   @JoinColumn({ name: 'hospital_id' })
   hospital: Hospital;
+
+  @Column({ name: 'user_id', type: 'uuid', nullable: true })
+  userId?: string;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'user_id' })
+  user?: User;
 
   @Column({ name: 'full_name', length: 255 })
   fullName: string;

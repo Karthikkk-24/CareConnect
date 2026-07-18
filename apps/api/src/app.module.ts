@@ -20,15 +20,49 @@ import {
   PatientMedication,
   Permission,
   Role,
+  StaffInvite,
   StaffProfile,
   User,
   UserRole,
+  AuditLog,
+  Department,
+  Ward,
+  Bed,
+  Appointment,
+  Admission,
+  VitalSign,
+  Diagnosis,
+  ClinicalNote,
+  Prescription,
+  PrescriptionItem,
+  LabOrder,
+  LabResult,
+  Discharge,
+  FollowUp,
+  Invoice,
+  InvoiceItem,
+  Payment,
+  InventoryItem,
+  PharmacyStock,
 } from './database/entities';
 import { PatientsModule } from './patients/patients.module';
 import { HospitalsModule } from './hospitals/hospitals.module';
 import { RbacModule } from './rbac/rbac.module';
 import { StaffModule } from './staff/staff.module';
 import { UsersModule } from './users/users.module';
+import { SupabaseModule } from './supabase/supabase.module';
+import { AuditModule } from './audit/audit.module';
+import { FacilityModule } from './facility/facility.module';
+import { AppointmentsModule } from './appointments/appointments.module';
+import { AdmissionsModule } from './admissions/admissions.module';
+import { ClinicalModule } from './clinical/clinical.module';
+import { DashboardModule } from './dashboard/dashboard.module';
+import { BillingModule } from './billing/billing.module';
+import { InventoryModule } from './inventory/inventory.module';
+import { PharmacyModule } from './pharmacy/pharmacy.module';
+import { ReportsModule } from './reports/reports.module';
+import { DischargeModule } from './discharge/discharge.module';
+import { PortalModule } from './portal/portal.module';
 
 @Module({
   imports: [
@@ -54,6 +88,8 @@ import { UsersModule } from './users/users.module';
           User,
           UserRole,
           StaffProfile,
+          StaffInvite,
+          AuditLog,
           Patient,
           PatientEmergencyContact,
           PatientInsurance,
@@ -63,6 +99,25 @@ import { UsersModule } from './users/users.module';
           PatientDocument,
           PatientConsent,
           PatientImportJob,
+          Department,
+          Ward,
+          Bed,
+          Appointment,
+          Admission,
+          VitalSign,
+          Diagnosis,
+          ClinicalNote,
+          Prescription,
+          PrescriptionItem,
+          LabOrder,
+          LabResult,
+          Discharge,
+          FollowUp,
+          Invoice,
+          InvoiceItem,
+          Payment,
+          InventoryItem,
+          PharmacyStock,
         ],
         synchronize: false,
         logging: config.get('NODE_ENV') === 'development',
@@ -78,10 +133,23 @@ import { UsersModule } from './users/users.module';
     }),
     AuthModule,
     RbacModule,
+    SupabaseModule,
+    AuditModule,
     UsersModule,
     HospitalsModule,
     StaffModule,
     PatientsModule,
+    FacilityModule,
+    AppointmentsModule,
+    AdmissionsModule,
+    ClinicalModule,
+    DashboardModule,
+    BillingModule,
+    InventoryModule,
+    PharmacyModule,
+    ReportsModule,
+    DischargeModule,
+    PortalModule,
   ],
 })
 export class AppModule {}

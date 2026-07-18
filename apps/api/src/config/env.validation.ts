@@ -13,6 +13,8 @@ export function validateEnv(config: Record<string, unknown>) {
     missing.push('SUPABASE_JWT_SECRET');
   }
 
+  // SUPABASE_URL + SERVICE_ROLE_KEY recommended for staff invites (validated as optional)
+
   if (missing.length > 0) {
     throw new Error(
       [

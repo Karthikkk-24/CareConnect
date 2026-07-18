@@ -13,6 +13,8 @@ supabase/    → Database migrations and config
 legacy/      → Original Vite + React prototype
 ```
 
+See [docs/architecture.md](docs/architecture.md) and [docs/api.md](docs/api.md) for details.
+
 ## Prerequisites
 
 - Node.js 20+
@@ -71,6 +73,16 @@ pnpm dev:web   # http://localhost:3000
 pnpm dev:api   # http://localhost:4000/graphql
 ```
 
+## Testing & docs
+
+```bash
+pnpm --filter api test          # Jest unit tests
+pnpm --filter web test:e2e      # Playwright smoke tests
+pnpm --filter @careconnect/ui storybook
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and PR guidelines.
+
 ## Project Status
 
 ### Phase 0 — Foundation ✅
@@ -96,16 +108,36 @@ pnpm dev:api   # http://localhost:4000/graphql
 - Bulk CSV import with dry-run validation
 - Document upload metadata (requires Supabase Storage bucket)
 
-### Upcoming — Phase 3
+### Phase 3 — Scheduling & Admissions ✅
 - Appointments and scheduling
 - Admissions and bed management
-- Clinical notes and prescriptions
+- Facility (wards, beds, departments)
+
+### Phase 4 — Clinical & Discharge ✅
+- Clinical notes, vitals, diagnoses, prescriptions, lab orders
+- Discharge summaries and follow-ups
+- Role-specific dashboards (doctor, nurse)
+
+### Phase 5 — Operations & Portal ✅
+- Billing, invoices, and payments
+- Inventory and pharmacy
+- Reports and analytics dashboard
+- Patient portal (appointments, records, prescriptions, lab results)
+- Staff invites and audit logging
+
+### Phase 6 — Polish ✅
+- Playwright E2E smoke tests
+- Jest unit tests (auth, staff, patients, RBAC guard)
+- API, architecture, and contributing docs
+- Storybook for `@careconnect/ui`
+- Accessibility improvements (login, patient wizard, dashboard nav)
+- i18n scaffold (`next-intl`, English default)
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | Next.js 16, Tailwind CSS 4, Apollo Client |
+| Frontend | Next.js 16, Tailwind CSS 4, Apollo Client, next-intl |
 | Backend | NestJS 11, GraphQL (code-first), TypeORM |
 | Database | Supabase PostgreSQL |
 | Auth | Supabase Auth + JWT guards |

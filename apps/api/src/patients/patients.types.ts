@@ -1,4 +1,18 @@
 import { Field, ID, InputType, Int, ObjectType } from '@nestjs/graphql';
+import {
+  IsArray,
+  IsBoolean,
+  IsEmail,
+  IsIn,
+  IsOptional,
+  IsString,
+  MinLength,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+
+const PATIENT_GENDERS = ['male', 'female', 'other', 'prefer_not_to_say'] as const;
+const PATIENT_STATUSES = ['registered', 'checked_in', 'admitted', 'discharged', 'inactive'] as const;
 
 @ObjectType()
 export class PatientType {
@@ -210,147 +224,361 @@ export class BulkImportResultType {
 @InputType()
 export class EmergencyContactInput {
   @Field()
+  @IsString()
+  @MinLength(1)
   name: string;
 
   @Field()
+  @IsString()
+  @MinLength(1)
   phone: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   relationship?: string;
 }
 
 @InputType()
 export class PatientInsuranceInput {
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   provider?: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   policyNumber?: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   groupNumber?: string;
 }
 
 @InputType()
 export class PatientAllergyInput {
   @Field()
+  @IsString()
+  @MinLength(1)
   allergen: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   severity?: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   reaction?: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   notes?: string;
 }
 
 @InputType()
 export class PatientMedicationInput {
   @Field()
+  @IsString()
+  @MinLength(1)
   name: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   dosage?: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   frequency?: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   prescriber?: string;
 }
 
 @InputType()
 export class MedicalHistoryInput {
   @Field()
+  @IsString()
+  @IsIn(['past', 'family', 'surgical'])
   type: string;
 
   @Field()
+  @IsString()
+  @MinLength(1)
   condition: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   diagnosisDate?: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   relation?: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   notes?: string;
 }
 
 @InputType()
 export class PatientConsentInput {
   @Field()
+  @IsString()
+  @IsIn(['treatment', 'data_sharing', 'research'])
   consentType: string;
 
   @Field()
+  @IsBoolean()
   granted: boolean;
 }
 
 @InputType()
 export class CreatePatientInput {
   @Field()
+  @IsString()
+  @MinLength(2)
   fullName: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsEmail()
   email?: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   phone?: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   dateOfBirth?: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsIn([...PATIENT_GENDERS])
   gender?: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   bloodGroup?: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   address?: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   city?: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   state?: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   zipCode?: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   country?: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   occupation?: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   identificationType?: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   identificationNumber?: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   primaryCarePhysician?: string;
 
   @Field(() => [EmergencyContactInput], { nullable: true })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => EmergencyContactInput)
   emergencyContacts?: EmergencyContactInput[];
 
   @Field(() => PatientInsuranceInput, { nullable: true })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PatientInsuranceInput)
   insurance?: PatientInsuranceInput;
 
   @Field(() => [PatientAllergyInput], { nullable: true })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PatientAllergyInput)
   allergies?: PatientAllergyInput[];
 
   @Field(() => [PatientMedicationInput], { nullable: true })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PatientMedicationInput)
   medications?: PatientMedicationInput[];
 
   @Field(() => [MedicalHistoryInput], { nullable: true })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => MedicalHistoryInput)
   medicalHistory?: MedicalHistoryInput[];
 
   @Field(() => [PatientConsentInput], { nullable: true })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PatientConsentInput)
+  consents?: PatientConsentInput[];
+}
+
+@InputType()
+export class UpdatePatientInput {
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  fullName?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  phone?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  dateOfBirth?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsIn([...PATIENT_GENDERS])
+  gender?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  bloodGroup?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  address?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  city?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  state?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  zipCode?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  country?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  occupation?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  identificationType?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  identificationNumber?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  primaryCarePhysician?: string;
+
+  @Field(() => [EmergencyContactInput], { nullable: true })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => EmergencyContactInput)
+  emergencyContacts?: EmergencyContactInput[];
+
+  @Field(() => PatientInsuranceInput, { nullable: true })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PatientInsuranceInput)
+  insurance?: PatientInsuranceInput;
+
+  @Field(() => [PatientAllergyInput], { nullable: true })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PatientAllergyInput)
+  allergies?: PatientAllergyInput[];
+
+  @Field(() => [PatientMedicationInput], { nullable: true })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PatientMedicationInput)
+  medications?: PatientMedicationInput[];
+
+  @Field(() => [MedicalHistoryInput], { nullable: true })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => MedicalHistoryInput)
+  medicalHistory?: MedicalHistoryInput[];
+
+  @Field(() => [PatientConsentInput], { nullable: true })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PatientConsentInput)
   consents?: PatientConsentInput[];
 }
 
@@ -405,14 +633,24 @@ export class BulkPatientRowInput {
 @InputType()
 export class PatientDocumentInput {
   @Field()
+  @IsString()
+  @MinLength(1)
   name: string;
 
   @Field()
+  @IsString()
+  @MinLength(1)
   fileUrl: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   fileType?: string;
 
   @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
   documentType?: string;
 }
+
+export { PATIENT_STATUSES };

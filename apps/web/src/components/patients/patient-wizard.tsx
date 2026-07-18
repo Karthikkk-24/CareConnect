@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createPatientSchema, type CreatePatientInput } from '@careconnect/types';
 import { ClayButton, ClayCard, ClayInput } from '@careconnect/ui';
@@ -11,31 +11,43 @@ const STEPS = ['Personal', 'Contact', 'Medical', 'Insurance', 'Consent'];
 interface PatientWizardProps {
   onSubmit: (data: CreatePatientInput) => Promise<void>;
   isLoading?: boolean;
+  defaultValues?: Partial<CreatePatientInput>;
+  submitLabel?: string;
 }
 
-export function PatientWizard({ onSubmit, isLoading }: PatientWizardProps) {
+export function PatientWizard({
+  onSubmit,
+  isLoading,
+  defaultValues,
+  submitLabel = 'Register Patient',
+}: PatientWizardProps) {
   const [step, setStep] = useState(0);
 
   const {
     register,
     handleSubmit,
     trigger,
-    watch,
-    setValue,
+    control,
     formState: { errors },
   } = useForm<CreatePatientInput>({
     resolver: zodResolver(createPatientSchema),
     defaultValues: {
       emergencyContacts: [{ name: '', phone: '' }],
+      allergies: [{ allergen: '' }],
+      medications: [{ name: '' }],
+      medicalHistory: [{ type: 'past', condition: '' }],
       consents: [
         { consentType: 'treatment', granted: false },
         { consentType: 'data_sharing', granted: false },
         { consentType: 'research', granted: false },
       ],
+      ...defaultValues,
     },
   });
 
-  const consents = watch('consents');
+  const allergies = useFieldArray({ control, name: 'allergies' });
+  const medications = useFieldArray({ control, name: 'medications' });
+  const history = useFieldArray({ control, name: 'medicalHistory' });
 
   const nextStep = async () => {
     const fields: (keyof CreatePatientInput)[][] = [
@@ -50,27 +62,19 @@ export function PatientWizard({ onSubmit, isLoading }: PatientWizardProps) {
     if (valid) setStep((s) => Math.min(s + 1, STEPS.length - 1));
   };
 
-  const addAllergy = () => {
-    const current = watch('allergies') ?? [];
-    setValue('allergies', [...current, { allergen: '' }]);
-  };
-
-  const addMedication = () => {
-    const current = watch('medications') ?? [];
-    setValue('medications', [...current, { name: '' }]);
-  };
-
-  const addHistory = () => {
-    const current = watch('medicalHistory') ?? [];
-    setValue('medicalHistory', [...current, { type: 'past', condition: '' }]);
-  };
-
   return (
     <ClayCard className="max-w-3xl">
-      <div className="mb-8 flex gap-2">
+      <div
+        className="mb-8 flex gap-2"
+        role="list"
+        aria-label="Registration steps"
+      >
         {STEPS.map((label, i) => (
           <div
             key={label}
+            role="listitem"
+            aria-current={i === step ? 'step' : undefined}
+            aria-label={`Step ${i + 1}: ${label}`}
             className={`flex-1 rounded-2xl px-3 py-2 text-center text-xs font-medium ${
               i === step
                 ? 'bg-clay-primary text-white shadow-clay-sm'
@@ -84,15 +88,18 @@ export function PatientWizard({ onSubmit, isLoading }: PatientWizardProps) {
         ))}
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
         {step === 0 && (
           <div className="grid gap-4 md:grid-cols-2">
             <ClayInput label="Full Name *" error={errors.fullName?.message} {...register('fullName')} />
             <ClayInput label="Date of Birth" type="date" {...register('dateOfBirth')} />
             <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-clay-text">Gender</label>
+              <label htmlFor="patient-gender" className="text-sm font-medium text-clay-text">
+                Gender
+              </label>
               <select
-                className="w-full rounded-2xl border border-white/60 bg-clay-surface px-4 py-3 shadow-clay-inset outline-none"
+                id="patient-gender"
+                className="w-full rounded-2xl border border-white/60 bg-clay-surface px-4 py-3 shadow-clay-inset outline-none focus-visible:ring-2 focus-visible:ring-clay-primary/30"
                 {...register('gender')}
               >
                 <option value="">Select</option>
@@ -130,40 +137,79 @@ export function PatientWizard({ onSubmit, isLoading }: PatientWizardProps) {
             <div>
               <div className="mb-2 flex items-center justify-between">
                 <label className="text-sm font-medium text-clay-text">Allergies</label>
-                <button type="button" onClick={addAllergy} className="text-sm text-clay-primary">
+                <button
+                  type="button"
+                  onClick={() => allergies.append({ allergen: '' })}
+                  className="text-sm text-clay-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clay-primary"
+                  aria-label="Add allergy"
+                >
                   + Add
                 </button>
               </div>
-              <ClayInput placeholder="Allergen" {...register('allergies.0.allergen')} />
+              {allergies.fields.map((field, i) => (
+                <div key={field.id} className="mb-2 grid gap-2 md:grid-cols-2">
+                  <ClayInput placeholder="Allergen" {...register(`allergies.${i}.allergen`)} />
+                  <ClayInput placeholder="Severity" {...register(`allergies.${i}.severity`)} />
+                  <ClayInput placeholder="Reaction" {...register(`allergies.${i}.reaction`)} />
+                  <ClayInput placeholder="Notes" {...register(`allergies.${i}.notes`)} />
+                </div>
+              ))}
             </div>
             <div>
               <div className="mb-2 flex items-center justify-between">
                 <label className="text-sm font-medium text-clay-text">Current Medications</label>
-                <button type="button" onClick={addMedication} className="text-sm text-clay-primary">
+                <button
+                  type="button"
+                  onClick={() => medications.append({ name: '' })}
+                  className="text-sm text-clay-primary"
+                >
                   + Add
                 </button>
               </div>
-              <ClayInput placeholder="Medication name" {...register('medications.0.name')} />
-              <ClayInput label="Dosage" className="mt-2" {...register('medications.0.dosage')} />
+              {medications.fields.map((field, i) => (
+                <div key={field.id} className="mb-2 grid gap-2 md:grid-cols-2">
+                  <ClayInput placeholder="Medication name" {...register(`medications.${i}.name`)} />
+                  <ClayInput placeholder="Dosage" {...register(`medications.${i}.dosage`)} />
+                  <ClayInput placeholder="Frequency" {...register(`medications.${i}.frequency`)} />
+                  <ClayInput placeholder="Prescriber" {...register(`medications.${i}.prescriber`)} />
+                </div>
+              ))}
             </div>
             <div>
               <div className="mb-2 flex items-center justify-between">
                 <label className="text-sm font-medium text-clay-text">Medical History</label>
-                <button type="button" onClick={addHistory} className="text-sm text-clay-primary">
+                <button
+                  type="button"
+                  onClick={() => history.append({ type: 'past', condition: '' })}
+                  className="text-sm text-clay-primary"
+                >
                   + Add
                 </button>
               </div>
-              <div className="grid gap-2 md:grid-cols-2">
-                <select
-                  className="rounded-2xl border border-white/60 bg-clay-surface px-4 py-3 shadow-clay-inset"
-                  {...register('medicalHistory.0.type')}
-                >
-                  <option value="past">Past</option>
-                  <option value="family">Family</option>
-                  <option value="surgical">Surgical</option>
-                </select>
-                <ClayInput placeholder="Condition" {...register('medicalHistory.0.condition')} />
-              </div>
+              {history.fields.map((field, i) => (
+                <div key={field.id} className="mb-2 grid gap-2 md:grid-cols-2">
+                  <select
+                    className="rounded-2xl border border-white/60 bg-clay-surface px-4 py-3 shadow-clay-inset"
+                    {...register(`medicalHistory.${i}.type`)}
+                  >
+                    <option value="past">Past</option>
+                    <option value="family">Family</option>
+                    <option value="surgical">Surgical</option>
+                  </select>
+                  <ClayInput placeholder="Condition" {...register(`medicalHistory.${i}.condition`)} />
+                  <ClayInput
+                    label="Diagnosis date"
+                    type="date"
+                    {...register(`medicalHistory.${i}.diagnosisDate`)}
+                  />
+                  <ClayInput placeholder="Relation" {...register(`medicalHistory.${i}.relation`)} />
+                  <ClayInput
+                    className="md:col-span-2"
+                    placeholder="Notes"
+                    {...register(`medicalHistory.${i}.notes`)}
+                  />
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -178,12 +224,18 @@ export function PatientWizard({ onSubmit, isLoading }: PatientWizardProps) {
 
         {step === 4 && (
           <div className="flex flex-col gap-4">
-            {consents?.map((consent, i) => (
-              <label key={consent.consentType} className="flex items-center gap-3 rounded-2xl bg-clay-primary-light/30 p-4">
+            {[0, 1, 2].map((i) => (
+              <label
+                key={i}
+                className="flex items-center gap-3 rounded-2xl bg-clay-primary-light/30 p-4"
+              >
+                <input type="hidden" {...register(`consents.${i}.consentType`)} />
                 <input type="checkbox" {...register(`consents.${i}.granted`)} className="h-5 w-5 rounded" />
                 <span className="text-sm text-clay-text">
                   I consent to{' '}
-                  <strong>{consent.consentType.replace(/_/g, ' ')}</strong>
+                  <strong>
+                    {i === 0 ? 'treatment' : i === 1 ? 'data sharing' : 'research'}
+                  </strong>
                 </span>
               </label>
             ))}
@@ -205,7 +257,7 @@ export function PatientWizard({ onSubmit, isLoading }: PatientWizardProps) {
             </ClayButton>
           ) : (
             <ClayButton type="submit" isLoading={isLoading}>
-              Register Patient
+              {submitLabel}
             </ClayButton>
           )}
         </div>

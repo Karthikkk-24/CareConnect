@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { registerSchema, type RegisterInput } from '@careconnect/types';
@@ -11,8 +11,11 @@ import { createClient } from '@/lib/supabase/client';
 
 export function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const redirectTo = searchParams.get('redirect');
 
   const {
     register,
@@ -46,6 +49,12 @@ export function RegisterForm() {
     if (authError) {
       setError(authError.message);
       setLoading(false);
+      return;
+    }
+
+    if (redirectTo) {
+      router.push(redirectTo);
+      router.refresh();
       return;
     }
 

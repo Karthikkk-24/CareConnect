@@ -1,0 +1,259 @@
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import {
+  Admission,
+  Invoice,
+  InvoiceItem,
+  Patient,
+  Payment,
+} from '../database/entities';
+import type { AuthenticatedUser } from '../auth/auth.types';
+import { AuditService } from '../audit/audit.service';
+import {
+  CreateInvoiceInput,
+  InvoiceItemType,
+  InvoiceType,
+  PaymentType,
+  RecordPaymentInput,
+} from './billing.types';
+
+@Injectable()
+export class BillingService {
+  constructor(
+    @InjectRepository(Invoice) private readonly invoicesRepo: Repository<Invoice>,
+    @InjectRepository(InvoiceItem) private readonly invoiceItemsRepo: Repository<InvoiceItem>,
+    @InjectRepository(Payment) private readonly paymentsRepo: Repository<Payment>,
+    @InjectRepository(Patient) private readonly patientsRepo: Repository<Patient>,
+    @InjectRepository(Admission) private readonly admissionsRepo: Repository<Admission>,
+    private readonly audit: AuditService,
+  ) {}
+
+  assertHospitalAccess(user: AuthenticatedUser, hospitalId: string) {
+    if (user.roles.includes('super_admin')) return;
+    if (!user.hospitalId || user.hospitalId !== hospitalId) {
+      throw new ForbiddenException('Access denied for this hospital');
+    }
+  }
+
+  resolveHospitalId(user: AuthenticatedUser, hospitalId?: string): string {
+    if (user.roles.includes('super_admin') && hospitalId) return hospitalId;
+    const id = hospitalId ?? user.hospitalId;
+    if (!id) throw new NotFoundException('Hospital context required');
+    this.assertHospitalAccess(user, id);
+    return id;
+  }
+
+  private toNumber(value: string | number | undefined | null): number {
+    if (value == null) return 0;
+    return Number(value);
+  }
+
+  toInvoiceItemType(item: InvoiceItem): InvoiceItemType {
+    return {
+      id: item.id,
+      description: item.description,
+      quantity: this.toNumber(item.quantity),
+      unitPrice: this.toNumber(item.unitPrice),
+      amount: this.toNumber(item.amount),
+    };
+  }
+
+  toPaymentType(payment: Payment): PaymentType {
+    return {
+      id: payment.id,
+      invoiceId: payment.invoiceId,
+      amount: this.toNumber(payment.amount),
+      method: payment.method,
+      paidAt: payment.paidAt,
+      recordedById: payment.recordedById,
+    };
+  }
+
+  toInvoiceType(invoice: Invoice): InvoiceType {
+    return {
+      id: invoice.id,
+      hospitalId: invoice.hospitalId,
+      patientId: invoice.patientId,
+      patient: invoice.patient
+        ? {
+            id: invoice.patient.id,
+            hospitalId: invoice.patient.hospitalId,
+            fullName: invoice.patient.fullName,
+            email: invoice.patient.email,
+            phone: invoice.patient.phone,
+            dateOfBirth: invoice.patient.dateOfBirth,
+            gender: invoice.patient.gender,
+            status: invoice.patient.status,
+            createdAt: invoice.patient.createdAt,
+            updatedAt: invoice.patient.updatedAt,
+          }
+        : undefined,
+      admissionId: invoice.admissionId,
+      status: invoice.status,
+      totalAmount: this.toNumber(invoice.totalAmount),
+      issuedAt: invoice.issuedAt,
+      items: (invoice.items ?? []).map((item) => this.toInvoiceItemType(item)),
+      payments: (invoice.payments ?? []).map((payment) => this.toPaymentType(payment)),
+      createdAt: invoice.createdAt,
+      updatedAt: invoice.updatedAt,
+    };
+  }
+
+  private async assertPatient(hospitalId: string, patientId: string) {
+    const patient = await this.patientsRepo.findOne({ where: { id: patientId, hospitalId } });
+    if (!patient) throw new NotFoundException('Patient not found');
+    return patient;
+  }
+
+  private async assertAdmission(hospitalId: string, admissionId?: string) {
+    if (!admissionId) return;
+    const admission = await this.admissionsRepo.findOne({
+      where: { id: admissionId, hospitalId },
+    });
+    if (!admission) throw new NotFoundException('Admission not found');
+  }
+
+  async createInvoice(
+    hospitalId: string,
+    input: CreateInvoiceInput,
+    actor: AuthenticatedUser,
+  ): Promise<InvoiceType> {
+    if (!input.items.length) {
+      throw new BadRequestException('Invoice must have at least one item');
+    }
+
+    await this.assertPatient(hospitalId, input.patientId);
+    await this.assertAdmission(hospitalId, input.admissionId);
+
+    const status = input.status ?? 'draft';
+    const totalAmount = input.items.reduce(
+      (sum, item) => sum + item.quantity * item.unitPrice,
+      0,
+    );
+
+    const invoice = await this.invoicesRepo.save(
+      this.invoicesRepo.create({
+        hospitalId,
+        patientId: input.patientId,
+        admissionId: input.admissionId,
+        status,
+        totalAmount: totalAmount.toFixed(2),
+        issuedAt: status === 'issued' || status === 'paid' ? new Date() : undefined,
+      }),
+    );
+
+    const items = await this.invoiceItemsRepo.save(
+      input.items.map((item) =>
+        this.invoiceItemsRepo.create({
+          invoiceId: invoice.id,
+          description: item.description,
+          quantity: item.quantity.toFixed(2),
+          unitPrice: item.unitPrice.toFixed(2),
+          amount: (item.quantity * item.unitPrice).toFixed(2),
+        }),
+      ),
+    );
+
+    invoice.items = items;
+    invoice.payments = [];
+
+    await this.audit.log({
+      actorId: actor.id,
+      hospitalId,
+      action: 'create',
+      resource: 'invoice',
+      resourceId: invoice.id,
+      metadata: { patientId: invoice.patientId, totalAmount },
+    });
+
+    return this.toInvoiceType(invoice);
+  }
+
+  async listInvoices(hospitalId: string): Promise<InvoiceType[]> {
+    const invoices = await this.invoicesRepo.find({
+      where: { hospitalId },
+      relations: ['items', 'payments', 'patient'],
+      order: { createdAt: 'DESC' },
+    });
+    return invoices.map((invoice) => this.toInvoiceType(invoice));
+  }
+
+  async getInvoice(hospitalId: string, id: string): Promise<InvoiceType> {
+    const invoice = await this.invoicesRepo.findOne({
+      where: { id, hospitalId },
+      relations: ['items', 'payments', 'patient'],
+    });
+    if (!invoice) throw new NotFoundException('Invoice not found');
+    return this.toInvoiceType(invoice);
+  }
+
+  async recordPayment(
+    hospitalId: string,
+    input: RecordPaymentInput,
+    actor: AuthenticatedUser,
+  ): Promise<InvoiceType> {
+    const invoice = await this.invoicesRepo.findOne({
+      where: { id: input.invoiceId, hospitalId },
+      relations: ['items', 'payments', 'patient'],
+    });
+    if (!invoice) throw new NotFoundException('Invoice not found');
+    if (invoice.status === 'void') {
+      throw new BadRequestException('Cannot record payment on a void invoice');
+    }
+
+    const payment = await this.paymentsRepo.save(
+      this.paymentsRepo.create({
+        invoiceId: invoice.id,
+        hospitalId,
+        amount: input.amount.toFixed(2),
+        method: input.method,
+        paidAt: new Date(),
+        recordedById: actor.id,
+      }),
+    );
+
+    invoice.payments = [...(invoice.payments ?? []), payment];
+
+    const paidTotal = invoice.payments.reduce(
+      (sum, p) => sum + this.toNumber(p.amount),
+      0,
+    );
+    const invoiceTotal = this.toNumber(invoice.totalAmount);
+
+    if (paidTotal >= invoiceTotal) {
+      invoice.status = 'paid';
+    } else if (invoice.status === 'draft') {
+      invoice.status = 'issued';
+      invoice.issuedAt = invoice.issuedAt ?? new Date();
+    }
+
+    await this.invoicesRepo.save(invoice);
+
+    await this.audit.log({
+      actorId: actor.id,
+      hospitalId,
+      action: 'create',
+      resource: 'payment',
+      resourceId: payment.id,
+      metadata: { invoiceId: invoice.id, amount: input.amount },
+    });
+
+    return this.toInvoiceType(invoice);
+  }
+
+  async sumRevenue(hospitalId: string): Promise<number> {
+    const result = await this.paymentsRepo
+      .createQueryBuilder('payment')
+      .select('COALESCE(SUM(payment.amount), 0)', 'total')
+      .where('payment.hospital_id = :hospitalId', { hospitalId })
+      .getRawOne<{ total: string }>();
+
+    return this.toNumber(result?.total);
+  }
+}

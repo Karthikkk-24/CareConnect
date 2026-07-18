@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Role, User, UserRole } from '../database/entities';
@@ -21,6 +21,18 @@ export class AuthService {
       relations: ['userRoles', 'userRoles.role', 'userRoles.role.permissions'],
     });
 
+    // Link invited staff who were created with a different auth_id placeholder
+    if (!user && email) {
+      user = await this.usersRepo.findOne({
+        where: { email },
+        relations: ['userRoles', 'userRoles.role', 'userRoles.role.permissions'],
+      });
+      if (user) {
+        await this.usersRepo.update(user.id, { authId });
+        user.authId = authId;
+      }
+    }
+
     if (!user && email) {
       user = this.usersRepo.create({
         authId,
@@ -35,6 +47,10 @@ export class AuthService {
     }
 
     if (!user) return null;
+
+    if (!user.isActive) {
+      throw new UnauthorizedException('Account is deactivated');
+    }
 
     return this.toAuthenticatedUser(user);
   }
@@ -59,19 +75,25 @@ export class AuthService {
     };
   }
 
-  async completeOnboarding(userId: string, fullName: string, hospitalId?: string) {
+  /**
+   * Hospital registration path only: assign hospital_admin when user has no roles yet
+   * and is completing first-time hospital setup.
+   */
+  async completeOnboarding(
+    userId: string,
+    fullName: string,
+    hospitalId?: string,
+    assignHospitalAdmin = false,
+  ) {
     await this.usersRepo.update(userId, {
       fullName,
       hospitalId,
       onboardingCompleted: true,
     });
 
-    if (hospitalId) {
-      const existingRole = await this.userRolesRepo.findOne({
-        where: { userId, hospitalId },
-      });
-
-      if (!existingRole) {
+    if (hospitalId && assignHospitalAdmin) {
+      const existingRoles = await this.userRolesRepo.find({ where: { userId } });
+      if (existingRoles.length === 0) {
         const adminRole = await this.rolesRepo.findOne({
           where: { slug: 'hospital_admin' },
         });

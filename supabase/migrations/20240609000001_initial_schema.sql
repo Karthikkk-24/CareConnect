@@ -44,10 +44,10 @@ CREATE TABLE role_permissions (
   PRIMARY KEY (role_id, permission_id)
 );
 
--- App users (linked to Supabase auth.users)
+-- App users (linked to Clerk user IDs — text, not UUID)
 CREATE TABLE users (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  auth_id UUID NOT NULL UNIQUE,
+  auth_id TEXT NOT NULL UNIQUE,
   email VARCHAR(255) NOT NULL,
   full_name VARCHAR(255) NOT NULL,
   avatar_url TEXT,
@@ -123,20 +123,5 @@ CREATE TRIGGER users_updated_at BEFORE UPDATE ON users
 CREATE TRIGGER staff_profiles_updated_at BEFORE UPDATE ON staff_profiles
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
--- Enable RLS
-ALTER TABLE hospitals ENABLE ROW LEVEL SECURITY;
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE staff_profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE user_roles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
-
--- RLS policies (service role bypasses; authenticated users read own data)
-CREATE POLICY users_read_own ON users
-  FOR SELECT USING (auth.uid() = auth_id);
-
-CREATE POLICY staff_read_hospital ON staff_profiles
-  FOR SELECT USING (
-    hospital_id IN (
-      SELECT hospital_id FROM users WHERE auth_id = auth.uid()
-    )
-  );
+-- AuthZ is enforced in NestJS (GqlAuthGuard + RolesGuard + hospital scope).
+-- No Supabase auth.uid() RLS — schema is Neon-compatible.

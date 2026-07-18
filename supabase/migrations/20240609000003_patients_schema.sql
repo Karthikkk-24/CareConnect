@@ -127,17 +127,4 @@ CREATE INDEX idx_patient_import_jobs_hospital_id ON patient_import_jobs(hospital
 CREATE TRIGGER patients_updated_at BEFORE UPDATE ON patients
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
--- RLS
-ALTER TABLE patients ENABLE ROW LEVEL SECURITY;
-ALTER TABLE patient_emergency_contacts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE patient_insurance ENABLE ROW LEVEL SECURITY;
-ALTER TABLE patient_allergies ENABLE ROW LEVEL SECURITY;
-ALTER TABLE patient_medications ENABLE ROW LEVEL SECURITY;
-ALTER TABLE patient_medical_history ENABLE ROW LEVEL SECURITY;
-ALTER TABLE patient_documents ENABLE ROW LEVEL SECURITY;
-ALTER TABLE patient_consents ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY patients_hospital_access ON patients
-  FOR SELECT USING (
-    hospital_id IN (SELECT hospital_id FROM users WHERE auth_id = auth.uid())
-  );
+-- AuthZ enforced in NestJS (no Supabase auth.uid() RLS)

@@ -4,39 +4,57 @@ import { NextResponse, type NextRequest } from 'next/server';
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet: { name: string; value: string; options?: Record<string, unknown> }[]) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          supabaseResponse = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options),
-          );
-        },
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseKey || supabaseUrl.includes('placeholder')) {
+    return supabaseResponse;
+  }
+
+  const supabase = createServerClient(supabaseUrl, supabaseKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet: { name: string; value: string; options?: Record<string, unknown> }[]) {
+        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+        supabaseResponse = NextResponse.next({ request });
+        cookiesToSet.forEach(({ name, value, options }) =>
+          supabaseResponse.cookies.set(name, value, options),
+        );
       },
     },
-  );
+  });
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const path = request.nextUrl.pathname;
   const isAuthRoute =
-    request.nextUrl.pathname.startsWith('/login') ||
-    request.nextUrl.pathname.startsWith('/register');
+    path.startsWith('/login') ||
+    path.startsWith('/register') ||
+    path.startsWith('/forgot-password');
+  const isOnboarding = path.startsWith('/onboarding');
+  const isInvite = path.startsWith('/invite');
   const isProtectedRoute =
-    request.nextUrl.pathname.startsWith('/dashboard') ||
-    request.nextUrl.pathname.startsWith('/onboarding') ||
-    request.nextUrl.pathname.startsWith('/staff') ||
-    request.nextUrl.pathname.startsWith('/patients');
+    path.startsWith('/dashboard') ||
+    path.startsWith('/staff') ||
+    path.startsWith('/patients') ||
+    path.startsWith('/appointments') ||
+    path.startsWith('/settings') ||
+    path.startsWith('/admissions') ||
+    path.startsWith('/wards') ||
+    path.startsWith('/doctor') ||
+    path.startsWith('/nurse') ||
+    path.startsWith('/lab') ||
+    path.startsWith('/follow-ups') ||
+    path.startsWith('/pharmacy') ||
+    path.startsWith('/finance') ||
+    path.startsWith('/portal') ||
+    path.startsWith('/reports') ||
+    isOnboarding;
 
-  if (!user && isProtectedRoute) {
+  if (!user && isProtectedRoute && !isInvite) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);

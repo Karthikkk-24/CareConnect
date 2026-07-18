@@ -9,10 +9,21 @@ import { ClayBadge, ClayButton, ClayCard } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
 import { ADD_PATIENT_DOCUMENT_MUTATION, ME_QUERY, PATIENT_QUERY } from '@/lib/graphql/queries';
 import { createClient } from '@/lib/supabase/client';
+import { PatientClinicalActions } from '@/components/clinical/patient-clinical-actions';
+
+const DOCUMENT_TYPES = [
+  { value: 'identification', label: 'Identification' },
+  { value: 'medical_record', label: 'Medical Record' },
+  { value: 'insurance', label: 'Insurance' },
+  { value: 'lab_result', label: 'Lab Result' },
+  { value: 'other', label: 'Other' },
+];
 
 export default function PatientDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const [documentType, setDocumentType] = useState('identification');
   const { data: meData } = useQuery(ME_QUERY);
   const { data, loading, refetch } = useQuery(PATIENT_QUERY, {
     variables: { id, hospitalId: meData?.me?.hospitalId },
@@ -24,6 +35,7 @@ export default function PatientDetailPage() {
 
   const handleUpload = async (file: File) => {
     setUploading(true);
+    setUploadError('');
     try {
       const supabase = createClient();
       const path = `patients/${id}/${Date.now()}-${file.name}`;
@@ -43,13 +55,13 @@ export default function PatientDetailPage() {
             name: file.name,
             fileUrl: urlData.publicUrl,
             fileType: file.type,
-            documentType: 'identification',
+            documentType,
           },
         },
       });
       refetch();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Upload failed');
+      setUploadError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
       setUploading(false);
     }
@@ -75,6 +87,11 @@ export default function PatientDetailPage() {
             Full History
           </ClayButton>
         </Link>
+        {patient.status === 'admitted' ? (
+          <Link href={`/patients/${id}/discharge`}>
+            <ClayButton size="sm">Discharge</ClayButton>
+          </Link>
+        ) : null}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -147,19 +164,33 @@ export default function PatientDetailPage() {
         </ClayCard>
 
         <ClayCard className="lg:col-span-3">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-semibold text-clay-text">Documents</h2>
-            <label className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-clay-surface px-4 py-2 text-sm font-medium text-clay-primary shadow-clay-sm hover:shadow-clay">
-              <Upload className="h-4 w-4" />
-              {uploading ? 'Uploading...' : 'Upload'}
-              <input
-                type="file"
-                className="hidden"
-                disabled={uploading}
-                onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])}
-              />
-            </label>
+            <div className="flex flex-wrap items-center gap-3">
+              <select
+                value={documentType}
+                onChange={(e) => setDocumentType(e.target.value)}
+                className="rounded-2xl border border-white/60 bg-clay-surface px-4 py-2 text-sm text-clay-text shadow-clay-inset outline-none"
+              >
+                {DOCUMENT_TYPES.map((type) => (
+                  <option key={type.value} value={type.value}>
+                    {type.label}
+                  </option>
+                ))}
+              </select>
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-clay-surface px-4 py-2 text-sm font-medium text-clay-primary shadow-clay-sm hover:shadow-clay">
+                <Upload className="h-4 w-4" />
+                {uploading ? 'Uploading...' : 'Upload'}
+                <input
+                  type="file"
+                  className="hidden"
+                  disabled={uploading}
+                  onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])}
+                />
+              </label>
+            </div>
           </div>
+          {uploadError ? <p className="mb-4 text-sm text-clay-error">{uploadError}</p> : null}
           {patient.documents?.length ? (
             <div className="grid gap-3 sm:grid-cols-2">
               {patient.documents.map((d: { id: string; name: string; fileUrl: string }) => (
@@ -190,6 +221,8 @@ export default function PatientDetailPage() {
             ))}
           </div>
         </ClayCard>
+
+        <PatientClinicalActions patientId={id} hospitalId={meData?.me?.hospitalId} />
       </div>
     </div>
   );

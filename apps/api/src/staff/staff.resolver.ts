@@ -28,13 +28,16 @@ export class StaffResolver {
 
   @Query(() => StaffType, { nullable: true })
   @Permissions(PERMISSIONS.STAFF_READ)
-  async staffMember(@Args('id') id: string): Promise<StaffType | null> {
-    const member = await this.staffService.findById(id);
+  async staffMember(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('id') id: string,
+  ): Promise<StaffType | null> {
+    const member = await this.staffService.findByIdForUser(id, user);
     return member ? this.staffService.toStaffType(member) : null;
   }
 
   @Mutation(() => StaffType)
-  @Roles(ROLES.HOSPITAL_ADMIN, ROLES.HOSPITAL_MANAGER)
+  @Roles(ROLES.HOSPITAL_ADMIN, ROLES.HOSPITAL_MANAGER, ROLES.SUPER_ADMIN)
   @Permissions(PERMISSIONS.STAFF_WRITE)
   async createStaffMember(
     @CurrentUser() user: AuthenticatedUser,
@@ -42,27 +45,41 @@ export class StaffResolver {
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<StaffType> {
     const resolvedHospitalId = this.staffService.resolveHospitalId(user, hospitalId);
-    const member = await this.staffService.create(resolvedHospitalId, input);
+    const member = await this.staffService.create(resolvedHospitalId, input, user);
     const full = await this.staffService.findById(member.id);
     return this.staffService.toStaffType(full!);
   }
 
   @Mutation(() => StaffType)
-  @Roles(ROLES.HOSPITAL_ADMIN, ROLES.HOSPITAL_MANAGER)
+  @Roles(ROLES.HOSPITAL_ADMIN, ROLES.HOSPITAL_MANAGER, ROLES.SUPER_ADMIN)
   @Permissions(PERMISSIONS.STAFF_WRITE)
   async updateStaffMember(
+    @CurrentUser() user: AuthenticatedUser,
     @Args('id') id: string,
     @Args('input') input: UpdateStaffInput,
   ): Promise<StaffType> {
-    const member = await this.staffService.update(id, input);
+    const member = await this.staffService.update(id, input, user);
     const full = await this.staffService.findById(member.id);
     return this.staffService.toStaffType(full!);
   }
 
   @Mutation(() => Boolean)
-  @Roles(ROLES.HOSPITAL_ADMIN)
+  @Roles(ROLES.HOSPITAL_ADMIN, ROLES.SUPER_ADMIN)
   @Permissions(PERMISSIONS.STAFF_WRITE)
-  async deleteStaffMember(@Args('id') id: string): Promise<boolean> {
-    return this.staffService.remove(id);
+  async deleteStaffMember(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('id') id: string,
+  ): Promise<boolean> {
+    return this.staffService.remove(id, user);
+  }
+
+  @Mutation(() => StaffType)
+  @UseGuards(GqlAuthGuard)
+  async acceptStaffInvite(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('token') token: string,
+  ): Promise<StaffType> {
+    const member = await this.staffService.acceptInvite(token, user.authId, user.email);
+    return this.staffService.toStaffType(member);
   }
 }

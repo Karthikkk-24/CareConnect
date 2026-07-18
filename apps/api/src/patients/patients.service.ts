@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ILike, Repository } from 'typeorm';
 import {
@@ -13,13 +19,21 @@ import {
   PatientMedication,
 } from '../database/entities';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import { AuditService } from '../audit/audit.service';
 import {
   BulkPatientRowInput,
   CreatePatientInput,
+  PATIENT_STATUSES,
   PatientDetailType,
   PatientDocumentInput,
   PatientType,
+  UpdatePatientInput,
 } from './patients.types';
+
+type PatientRelatedInput = Pick<
+  CreatePatientInput,
+  'emergencyContacts' | 'insurance' | 'allergies' | 'medications' | 'medicalHistory' | 'consents'
+>;
 
 @Injectable()
 export class PatientsService {
@@ -41,11 +55,21 @@ export class PatientsService {
     private readonly consentsRepo: Repository<PatientConsent>,
     @InjectRepository(PatientImportJob)
     private readonly importJobsRepo: Repository<PatientImportJob>,
+    private readonly audit: AuditService,
   ) {}
 
+  assertHospitalAccess(user: AuthenticatedUser, hospitalId: string) {
+    if (user.roles.includes('super_admin')) return;
+    if (!user.hospitalId || user.hospitalId !== hospitalId) {
+      throw new ForbiddenException('Access denied for this hospital');
+    }
+  }
+
   resolveHospitalId(user: AuthenticatedUser, hospitalId?: string): string {
+    if (user.roles.includes('super_admin') && hospitalId) return hospitalId;
     const id = hospitalId ?? user.hospitalId;
     if (!id) throw new NotFoundException('Hospital context required');
+    this.assertHospitalAccess(user, id);
     return id;
   }
 
@@ -154,7 +178,72 @@ export class PatientsService {
     };
   }
 
-  async create(hospitalId: string, input: CreatePatientInput): Promise<PatientType> {
+  private async findPatientOrThrow(id: string, hospitalId: string): Promise<Patient> {
+    const patient = await this.patientsRepo.findOne({ where: { id, hospitalId } });
+    if (!patient) throw new NotFoundException('Patient not found');
+    return patient;
+  }
+
+  private async assertNoDuplicates(
+    hospitalId: string,
+    fields: { email?: string; phone?: string; identificationNumber?: string },
+    excludePatientId?: string,
+  ) {
+    const conflicts: string[] = [];
+
+    if (fields.email?.trim()) {
+      const qb = this.patientsRepo
+        .createQueryBuilder('p')
+        .where('p.hospital_id = :hospitalId', { hospitalId })
+        .andWhere('LOWER(p.email) = LOWER(:email)', { email: fields.email.trim() });
+      if (excludePatientId) {
+        qb.andWhere('p.id != :excludePatientId', { excludePatientId });
+      }
+      if (await qb.getOne()) conflicts.push('email');
+    }
+
+    if (fields.phone?.trim()) {
+      const qb = this.patientsRepo
+        .createQueryBuilder('p')
+        .where('p.hospital_id = :hospitalId', { hospitalId })
+        .andWhere('p.phone = :phone', { phone: fields.phone.trim() });
+      if (excludePatientId) {
+        qb.andWhere('p.id != :excludePatientId', { excludePatientId });
+      }
+      if (await qb.getOne()) conflicts.push('phone');
+    }
+
+    if (fields.identificationNumber?.trim()) {
+      const qb = this.patientsRepo
+        .createQueryBuilder('p')
+        .where('p.hospital_id = :hospitalId', { hospitalId })
+        .andWhere('p.identification_number = :identificationNumber', {
+          identificationNumber: fields.identificationNumber.trim(),
+        });
+      if (excludePatientId) {
+        qb.andWhere('p.id != :excludePatientId', { excludePatientId });
+      }
+      if (await qb.getOne()) conflicts.push('identification number');
+    }
+
+    if (conflicts.length) {
+      throw new ConflictException(
+        `A patient with the same ${conflicts.join(', ')} already exists in this hospital`,
+      );
+    }
+  }
+
+  async create(
+    hospitalId: string,
+    input: CreatePatientInput,
+    actor: AuthenticatedUser,
+  ): Promise<PatientType> {
+    await this.assertNoDuplicates(hospitalId, {
+      email: input.email,
+      phone: input.phone,
+      identificationNumber: input.identificationNumber,
+    });
+
     const patient = await this.patientsRepo.save(
       this.patientsRepo.create({
         hospitalId,
@@ -177,10 +266,148 @@ export class PatientsService {
     );
 
     await this.saveRelatedRecords(patient.id, input);
+
+    await this.audit.log({
+      actorId: actor.id,
+      hospitalId,
+      action: 'create',
+      resource: 'patient',
+      resourceId: patient.id,
+      metadata: { fullName: patient.fullName },
+    });
+
     return this.toPatientType(patient);
   }
 
-  private async saveRelatedRecords(patientId: string, input: CreatePatientInput) {
+  async updatePatient(
+    id: string,
+    input: UpdatePatientInput,
+    hospitalId: string,
+    actor: AuthenticatedUser,
+  ): Promise<PatientType> {
+    const patient = await this.findPatientOrThrow(id, hospitalId);
+
+    const nextEmail = input.email !== undefined ? input.email : patient.email;
+    const nextPhone = input.phone !== undefined ? input.phone : patient.phone;
+    const nextIdentificationNumber =
+      input.identificationNumber !== undefined
+        ? input.identificationNumber
+        : patient.identificationNumber;
+
+    await this.assertNoDuplicates(
+      hospitalId,
+      {
+        email: nextEmail,
+        phone: nextPhone,
+        identificationNumber: nextIdentificationNumber,
+      },
+      id,
+    );
+
+    Object.assign(patient, {
+      fullName: input.fullName ?? patient.fullName,
+      email: input.email !== undefined ? input.email || undefined : patient.email,
+      phone: input.phone ?? patient.phone,
+      dateOfBirth: input.dateOfBirth ?? patient.dateOfBirth,
+      gender: input.gender ?? patient.gender,
+      bloodGroup: input.bloodGroup ?? patient.bloodGroup,
+      address: input.address ?? patient.address,
+      city: input.city ?? patient.city,
+      state: input.state ?? patient.state,
+      zipCode: input.zipCode ?? patient.zipCode,
+      country: input.country ?? patient.country,
+      occupation: input.occupation ?? patient.occupation,
+      identificationType: input.identificationType ?? patient.identificationType,
+      identificationNumber: input.identificationNumber ?? patient.identificationNumber,
+      primaryCarePhysician: input.primaryCarePhysician ?? patient.primaryCarePhysician,
+    });
+
+    const saved = await this.patientsRepo.save(patient);
+    await this.replaceRelatedRecords(saved.id, input);
+
+    await this.audit.log({
+      actorId: actor.id,
+      hospitalId,
+      action: 'update',
+      resource: 'patient',
+      resourceId: saved.id,
+    });
+
+    return this.toPatientType(saved);
+  }
+
+  async deletePatient(
+    id: string,
+    hospitalId: string,
+    actor: AuthenticatedUser,
+  ): Promise<boolean> {
+    const patient = await this.findPatientOrThrow(id, hospitalId);
+    await this.patientsRepo.softRemove(patient);
+
+    await this.audit.log({
+      actorId: actor.id,
+      hospitalId,
+      action: 'delete',
+      resource: 'patient',
+      resourceId: patient.id,
+      metadata: { fullName: patient.fullName },
+    });
+
+    return true;
+  }
+
+  async updatePatientStatus(
+    id: string,
+    status: string,
+    hospitalId: string,
+    actor: AuthenticatedUser,
+  ): Promise<PatientType> {
+    if (!PATIENT_STATUSES.includes(status as (typeof PATIENT_STATUSES)[number])) {
+      throw new BadRequestException(`Invalid patient status: ${status}`);
+    }
+
+    const patient = await this.findPatientOrThrow(id, hospitalId);
+    patient.status = status;
+    const saved = await this.patientsRepo.save(patient);
+
+    await this.audit.log({
+      actorId: actor.id,
+      hospitalId,
+      action: 'update_status',
+      resource: 'patient',
+      resourceId: saved.id,
+      metadata: { status },
+    });
+
+    return this.toPatientType(saved);
+  }
+
+  async deletePatientDocument(
+    id: string,
+    patientId: string,
+    hospitalId: string,
+    actor: AuthenticatedUser,
+  ): Promise<boolean> {
+    await this.findPatientOrThrow(patientId, hospitalId);
+
+    const document = await this.documentsRepo.findOne({ where: { id, patientId } });
+    if (!document) throw new NotFoundException('Patient document not found');
+
+    await this.documentsRepo.remove(document);
+
+    await this.audit.log({
+      actorId: actor.id,
+      hospitalId,
+      action: 'delete_document',
+      resource: 'patient_document',
+      resourceId: document.id,
+      metadata: { patientId, name: document.name },
+    });
+
+    return true;
+  }
+
+  private async saveRelatedRecords(patientId: string, input: PatientRelatedInput) {
     if (input.emergencyContacts?.length) {
       await this.emergencyRepo.save(
         input.emergencyContacts.map((c) =>
@@ -232,12 +459,83 @@ export class PatientsService {
     }
   }
 
+  private async replaceRelatedRecords(patientId: string, input: UpdatePatientInput) {
+    if (input.emergencyContacts !== undefined) {
+      await this.emergencyRepo.delete({ patientId });
+      if (input.emergencyContacts.length) {
+        await this.emergencyRepo.save(
+          input.emergencyContacts.map((c) =>
+            this.emergencyRepo.create({ patientId, ...c }),
+          ),
+        );
+      }
+    }
+
+    if (input.insurance !== undefined) {
+      await this.insuranceRepo.delete({ patientId });
+      if (input.insurance.provider || input.insurance.policyNumber || input.insurance.groupNumber) {
+        await this.insuranceRepo.save(
+          this.insuranceRepo.create({
+            patientId,
+            provider: input.insurance.provider,
+            policyNumber: input.insurance.policyNumber,
+            groupNumber: input.insurance.groupNumber,
+          }),
+        );
+      }
+    }
+
+    if (input.allergies !== undefined) {
+      await this.allergiesRepo.delete({ patientId });
+      if (input.allergies.length) {
+        await this.allergiesRepo.save(
+          input.allergies.map((a) => this.allergiesRepo.create({ patientId, ...a })),
+        );
+      }
+    }
+
+    if (input.medications !== undefined) {
+      await this.medicationsRepo.delete({ patientId });
+      if (input.medications.length) {
+        await this.medicationsRepo.save(
+          input.medications.map((m) => this.medicationsRepo.create({ patientId, ...m })),
+        );
+      }
+    }
+
+    if (input.medicalHistory !== undefined) {
+      await this.historyRepo.delete({ patientId });
+      if (input.medicalHistory.length) {
+        await this.historyRepo.save(
+          input.medicalHistory.map((h) => this.historyRepo.create({ patientId, ...h })),
+        );
+      }
+    }
+
+    if (input.consents !== undefined) {
+      await this.consentsRepo.delete({ patientId });
+      if (input.consents.length) {
+        await this.consentsRepo.save(
+          input.consents.map((c) =>
+            this.consentsRepo.create({
+              patientId,
+              consentType: c.consentType,
+              granted: c.granted,
+              grantedAt: c.granted ? new Date() : undefined,
+            }),
+          ),
+        );
+      }
+    }
+  }
+
   async bulkImport(
     hospitalId: string,
     rows: BulkPatientRowInput[],
     userId: string,
     dryRun = false,
   ) {
+    const actor = { id: userId } as AuthenticatedUser;
     const errors: { row: number; message: string }[] = [];
     let successCount = 0;
 
@@ -284,7 +582,7 @@ export class PatientsService {
         };
 
         try {
-          await this.create(hospitalId, input);
+          await this.create(hospitalId, input, actor);
           successCount++;
         } catch (err) {
           errors.push({

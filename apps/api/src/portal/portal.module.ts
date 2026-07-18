@@ -1,0 +1,30 @@
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import {
+  Appointment,
+  LabOrder,
+  LabResult,
+  Patient,
+  Prescription,
+  PrescriptionItem,
+} from '../database/entities';
+import { AppointmentsModule } from '../appointments/appointments.module';
+import { ClinicalModule } from '../clinical/clinical.module';
+import { PortalResolver } from './portal.resolver';
+import { PortalService } from './portal.service';
+
+@Module({
+  imports: [
+    TypeOrmModule.forFeature([
+      Patient,
+      Appointment,
+  Prescription,
+  LabOrder,
+      LabResult,
+    ]),
+    AppointmentsModule,
+    ClinicalModule,
+  ],
+  providers: [PortalResolver, PortalService],
+})
+export class PortalModule {}

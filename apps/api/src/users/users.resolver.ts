@@ -30,12 +30,23 @@ export class UsersResolver {
     @CurrentUser() user: AuthenticatedUser,
     @Args('fullName') fullName: string,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
+    @Args('assignHospitalAdmin', { nullable: true, defaultValue: false })
+    assignHospitalAdmin?: boolean,
   ): Promise<UserType> {
-    await this.authService.completeOnboarding(user.id, fullName, hospitalId);
-    return {
-      ...user,
+    await this.authService.completeOnboarding(
+      user.id,
       fullName,
       hospitalId,
+      assignHospitalAdmin ?? false,
+    );
+    const refreshed = await this.authService.syncAndGetUser(user.authId, user.email);
+    return {
+      id: refreshed!.id,
+      email: refreshed!.email,
+      fullName: refreshed!.fullName,
+      hospitalId: refreshed!.hospitalId,
+      roles: refreshed!.roles,
+      permissions: refreshed!.permissions,
       onboardingCompleted: true,
     };
   }

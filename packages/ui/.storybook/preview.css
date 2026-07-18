@@ -1,0 +1,194 @@
+:root {
+  --clay-bg: #f0f4fa;
+  --clay-surface: #ffffff;
+  --clay-primary: #4a7fd4;
+  --clay-primary-dark: #3568b8;
+  --clay-primary-light: #e8f0fc;
+  --clay-text: #2c3e5c;
+  --clay-text-muted: #7a8ba8;
+  --clay-error: #e85d5d;
+  --clay-shadow-dark: rgba(74, 127, 212, 0.18);
+  --clay-shadow-light: rgba(255, 255, 255, 0.9);
+}
+
+body {
+  font-family: 'Poppins', system-ui, sans-serif;
+  background: var(--clay-bg);
+  color: var(--clay-text);
+  margin: 0;
+  padding: 1rem;
+}
+
+.bg-clay-surface {
+  background: var(--clay-surface);
+}
+
+.bg-clay-primary-light {
+  background: var(--clay-primary-light);
+}
+
+.from-clay-primary-light {
+  --tw-gradient-from: var(--clay-primary-light);
+}
+
+.to-clay-primary {
+  --tw-gradient-to: var(--clay-primary);
+}
+
+.from-red-400 {
+  --tw-gradient-from: #f87171;
+}
+
+.to-clay-error {
+  --tw-gradient-to: var(--clay-error);
+}
+
+.text-white {
+  color: #fff;
+}
+
+.text-clay-primary {
+  color: var(--clay-primary);
+}
+
+.bg-transparent {
+  background: transparent;
+}
+
+.bg-gradient-to-br {
+  background-image: linear-gradient(to bottom right, var(--tw-gradient-from), var(--tw-gradient-to));
+}
+
+.shadow-clay-sm {
+  box-shadow:
+    4px 4px 12px var(--clay-shadow-dark),
+    -4px -4px 12px var(--clay-shadow-light);
+}
+
+.border-white\/60 {
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+.inline-flex {
+  display: inline-flex;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-center {
+  justify-content: center;
+}
+
+.gap-2 {
+  gap: 0.5rem;
+}
+
+.font-medium {
+  font-weight: 500;
+}
+
+.transition-all {
+  transition: all 0.2s;
+}
+
+.duration-200 {
+  transition-duration: 200ms;
+}
+
+.rounded-xl {
+  border-radius: 0.75rem;
+}
+
+.rounded-2xl {
+  border-radius: 1rem;
+}
+
+.px-4 {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.px-6 {
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+.px-8 {
+  padding-left: 2rem;
+  padding-right: 2rem;
+}
+
+.py-2 {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+.py-3 {
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+
+.py-4 {
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+.text-sm {
+  font-size: 0.875rem;
+}
+
+.text-base {
+  font-size: 1rem;
+}
+
+.text-lg {
+  font-size: 1.125rem;
+}
+
+.disabled\:opacity-50:disabled {
+  opacity: 0.5;
+}
+
+.disabled\:cursor-not-allowed:disabled {
+  cursor: not-allowed;
+}
+
+.active\:scale-\[0\.98\]:active {
+  transform: scale(0.98);
+}
+
+.h-4 {
+  height: 1rem;
+}
+
+.w-4 {
+  width: 1rem;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.rounded-full {
+  border-radius: 9999px;
+}
+
+.border-2 {
+  border-width: 2px;
+}
+
+.border-white\/30 {
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.border-t-white {
+  border-top-color: #fff;
+}
