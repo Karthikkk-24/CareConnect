@@ -23,8 +23,8 @@ lerna-debug.log*
 .env.*
 !.env.example
 
-# Local file uploads (patient documents)
-uploads/
+# Local file uploads (patient documents storage — not Nest source)
+/uploads/
 apps/api/uploads/
 
 # Editor

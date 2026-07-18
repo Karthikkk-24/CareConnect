@@ -63,6 +63,7 @@ import { PharmacyModule } from './pharmacy/pharmacy.module';
 import { ReportsModule } from './reports/reports.module';
 import { DischargeModule } from './discharge/discharge.module';
 import { PortalModule } from './portal/portal.module';
+import { UploadsModule } from './uploads/uploads.module';
 
 @Module({
   imports: [
@@ -150,6 +151,7 @@ import { PortalModule } from './portal/portal.module';
     ReportsModule,
     DischargeModule,
     PortalModule,
+    UploadsModule,
   ],
 })
 export class AppModule {}

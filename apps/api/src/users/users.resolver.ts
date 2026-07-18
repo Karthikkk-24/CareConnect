@@ -50,4 +50,23 @@ export class UsersResolver {
       onboardingCompleted: true,
     };
   }
+
+  @Mutation(() => UserType)
+  @UseGuards(GqlAuthGuard)
+  async completePatientOnboarding(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('fullName') fullName: string,
+  ): Promise<UserType> {
+    await this.authService.completePatientOnboarding(user.id, fullName);
+    const refreshed = await this.authService.syncAndGetUser(user.authId, user.email);
+    return {
+      id: refreshed!.id,
+      email: refreshed!.email,
+      fullName: refreshed!.fullName,
+      hospitalId: refreshed!.hospitalId,
+      roles: refreshed!.roles,
+      permissions: refreshed!.permissions,
+      onboardingCompleted: true,
+    };
+  }
 }

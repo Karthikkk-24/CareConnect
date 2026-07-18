@@ -46,8 +46,9 @@ export class StaffResolver {
   ): Promise<StaffType> {
     const resolvedHospitalId = this.staffService.resolveHospitalId(user, hospitalId);
     const member = await this.staffService.create(resolvedHospitalId, input, user);
+    const inviteToken = (member as { inviteToken?: string }).inviteToken;
     const full = await this.staffService.findById(member.id);
-    return this.staffService.toStaffType(full!);
+    return this.staffService.toStaffType({ ...full!, inviteToken });
   }
 
   @Mutation(() => StaffType)

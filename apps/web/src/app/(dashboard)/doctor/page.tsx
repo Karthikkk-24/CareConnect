@@ -36,7 +36,7 @@ export default function DoctorDashboardPage() {
     { label: 'Patients', href: '/patients', icon: Users },
     { label: 'Admissions', href: '/admissions', icon: FileText },
     { label: 'Order Lab', href: '/lab', icon: FlaskConical },
-    { label: 'Pharmacy Queue', href: '/lab', icon: Pill },
+    { label: 'Pharmacy Queue', href: '/pharmacy', icon: Pill },
   ];
 
   return (

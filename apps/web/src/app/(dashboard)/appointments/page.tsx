@@ -1,12 +1,14 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { Plus, Calendar, Clock } from 'lucide-react';
 import { ClayBadge, ClayButton, ClayCard } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
 import {
   APPOINTMENTS_QUERY,
+  CANCEL_APPOINTMENT_MUTATION,
   ME_QUERY,
   UPDATE_APPOINTMENT_STATUS_MUTATION,
 } from '@/lib/graphql/queries';
@@ -34,22 +36,31 @@ const statusVariant = (status: string) => {
 };
 
 export default function AppointmentsPage() {
-  const today = todayDateString();
+  const [selectedDate, setSelectedDate] = useState(todayDateString());
   const { data: meData } = useQuery(ME_QUERY);
   const hospitalId = meData?.me?.hospitalId;
 
   const { data, loading, refetch } = useQuery(APPOINTMENTS_QUERY, {
-    variables: { hospitalId, date: today },
+    variables: { hospitalId, date: selectedDate },
     skip: !hospitalId,
   });
 
   const [updateStatus] = useMutation(UPDATE_APPOINTMENT_STATUS_MUTATION, {
     onCompleted: () => refetch(),
   });
+  const [cancelAppointment] = useMutation(CANCEL_APPOINTMENT_MUTATION, {
+    onCompleted: () => refetch(),
+  });
 
   const appointments = data?.appointments ?? [];
 
   const handleStatus = async (id: string, status: string) => {
+    if (status === 'cancelled') {
+      await cancelAppointment({
+        variables: { input: { id }, hospitalId },
+      });
+      return;
+    }
     await updateStatus({ variables: { id, status, hospitalId } });
   };
 
@@ -57,10 +68,23 @@ export default function AppointmentsPage() {
     <div>
       <DashboardHeader
         title="Appointments"
-        subtitle={`Today's schedule — ${new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}`}
+        subtitle={new Date(selectedDate + 'T12:00:00').toLocaleDateString(undefined, {
+          weekday: 'long',
+          month: 'long',
+          day: 'numeric',
+        })}
       />
 
-      <div className="mb-6 flex justify-end">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <label className="flex items-center gap-2 text-sm text-clay-text">
+          Date
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="rounded-2xl border border-white/60 bg-clay-surface px-3 py-2 shadow-clay-inset"
+          />
+        </label>
         <Link href="/appointments/new">
           <ClayButton>
             <Plus className="h-4 w-4" />

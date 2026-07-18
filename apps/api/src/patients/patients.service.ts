@@ -407,6 +407,29 @@ export class PatientsService {
     return true;
   }
 
+  async linkPatientAccount(
+    patientId: string,
+    hospitalId: string,
+    actor: AuthenticatedUser,
+    userId?: string,
+  ): Promise<PatientType> {
+    const patient = await this.findPatientOrThrow(patientId, hospitalId);
+    const targetUserId = userId ?? actor.id;
+    patient.userId = targetUserId;
+    const saved = await this.patientsRepo.save(patient);
+
+    await this.audit.log({
+      actorId: actor.id,
+      hospitalId,
+      action: 'link_account',
+      resource: 'patient',
+      resourceId: saved.id,
+      metadata: { userId: targetUserId },
+    });
+
+    return this.toPatientType(saved);
+  }
+
   private async saveRelatedRecords(patientId: string, input: PatientRelatedInput) {
     if (input.emergencyContacts?.length) {
       await this.emergencyRepo.save(

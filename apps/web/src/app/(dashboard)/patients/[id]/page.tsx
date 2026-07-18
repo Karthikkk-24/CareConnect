@@ -7,8 +7,9 @@ import { useState } from 'react';
 import { FileText, History, Upload } from 'lucide-react';
 import { ClayBadge, ClayButton, ClayCard } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
-import { ADD_PATIENT_DOCUMENT_MUTATION, ME_QUERY, PATIENT_QUERY } from '@/lib/graphql/queries';
+import { ADD_PATIENT_DOCUMENT_MUTATION, DELETE_PATIENT_MUTATION, LINK_PATIENT_ACCOUNT, ME_QUERY, PATIENT_QUERY, UPDATE_PATIENT_STATUS } from '@/lib/graphql/queries';
 import { PatientClinicalActions } from '@/components/clinical/patient-clinical-actions';
+import { useAuth } from '@clerk/nextjs';
 
 const DOCUMENT_TYPES = [
   { value: 'identification', label: 'Identification' },
@@ -20,6 +21,7 @@ const DOCUMENT_TYPES = [
 
 export default function PatientDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const { getToken } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [documentType, setDocumentType] = useState('identification');
@@ -29,6 +31,9 @@ export default function PatientDetailPage() {
     skip: !id,
   });
   const [addDocument] = useMutation(ADD_PATIENT_DOCUMENT_MUTATION);
+  const [updateStatus] = useMutation(UPDATE_PATIENT_STATUS, { onCompleted: () => refetch() });
+  const [deletePatient] = useMutation(DELETE_PATIENT_MUTATION);
+  const [linkAccount] = useMutation(LINK_PATIENT_ACCOUNT, { onCompleted: () => refetch() });
 
   const patient = data?.patient;
 
@@ -36,11 +41,23 @@ export default function PatientDetailPage() {
     setUploading(true);
     setUploadError('');
     try {
-      // Storage backend is being migrated off Supabase. For now we record only
-      // the document metadata against an inline base64/data URL fallback so the
-      // patient record isn't blocked. A proper object-storage upload endpoint
-      // will replace this in a follow-up.
-      const fileUrl = await readFileAsDataUrl(file);
+      const token = await getToken();
+      const apiBase =
+        (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/graphql').replace(
+          /\/graphql\/?$/,
+          '',
+        );
+      const form = new FormData();
+      form.append('file', file);
+      const uploadRes = await fetch(`${apiBase}/uploads/patient-documents`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: form,
+      });
+      if (!uploadRes.ok) {
+        throw new Error('Upload failed');
+      }
+      const uploaded = (await uploadRes.json()) as { url: string; fileType?: string };
 
       await addDocument({
         variables: {
@@ -48,8 +65,8 @@ export default function PatientDetailPage() {
           hospitalId: meData?.me?.hospitalId,
           input: {
             name: file.name,
-            fileUrl,
-            fileType: file.type,
+            fileUrl: uploaded.url,
+            fileType: uploaded.fileType || file.type,
             documentType,
           },
         },
@@ -72,10 +89,15 @@ export default function PatientDetailPage() {
         subtitle={`Patient since ${new Date(patient.createdAt).toLocaleDateString()}`}
       />
 
-      <div className="mb-6 flex gap-3">
+      <div className="mb-6 flex flex-wrap gap-3">
         <ClayBadge>{patient.status}</ClayBadge>
         {patient.gender && <ClayBadge variant="info">{patient.gender}</ClayBadge>}
         {patient.bloodGroup && <ClayBadge variant="warning">{patient.bloodGroup}</ClayBadge>}
+        <Link href={`/patients/${id}/edit`}>
+          <ClayButton variant="secondary" size="sm">
+            Edit
+          </ClayButton>
+        </Link>
         <Link href={`/patients/${id}/history`}>
           <ClayButton variant="secondary" size="sm">
             <History className="h-4 w-4" />
@@ -87,6 +109,46 @@ export default function PatientDetailPage() {
             <ClayButton size="sm">Discharge</ClayButton>
           </Link>
         ) : null}
+        <select
+          aria-label="Update patient status"
+          className="rounded-2xl border border-white/60 bg-clay-surface px-3 py-2 text-sm shadow-clay-inset"
+          value={patient.status}
+          onChange={(e) =>
+            updateStatus({
+              variables: { id, status: e.target.value, hospitalId: meData?.me?.hospitalId },
+            })
+          }
+        >
+          {['registered', 'checked_in', 'admitted', 'discharged', 'inactive'].map((s) => (
+            <option key={s} value={s}>
+              {s.replace(/_/g, ' ')}
+            </option>
+          ))}
+        </select>
+        <ClayButton
+          size="sm"
+          variant="ghost"
+          onClick={() =>
+            linkAccount({
+              variables: { patientId: id, hospitalId: meData?.me?.hospitalId },
+            })
+          }
+        >
+          Link my portal account
+        </ClayButton>
+        <ClayButton
+          size="sm"
+          variant="ghost"
+          onClick={async () => {
+            if (!confirm('Soft-delete this patient?')) return;
+            await deletePatient({
+              variables: { id, hospitalId: meData?.me?.hospitalId },
+            });
+            window.location.href = '/patients';
+          }}
+        >
+          Delete
+        </ClayButton>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -221,13 +283,4 @@ export default function PatientDetailPage() {
       </div>
     </div>
   );
-}
-
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error ?? new Error('Failed to read file'));
-    reader.readAsDataURL(file);
-  });
 }

@@ -69,8 +69,9 @@ export default function InvoicesPage() {
                 createdAt: string;
                 patient?: { fullName: string };
               }) => (
-                <div
+                <Link
                   key={invoice.id}
+                  href={`/finance/invoices/${invoice.id}`}
                   className="flex items-center gap-4 px-6 py-4 transition hover:bg-clay-primary-light/20"
                 >
                   <div className="min-w-0 flex-1">
@@ -83,7 +84,7 @@ export default function InvoicesPage() {
                     </p>
                   </div>
                   <ClayBadge variant={statusVariant(invoice.status)}>{invoice.status}</ClayBadge>
-                </div>
+                </Link>
               ),
             )}
           </div>

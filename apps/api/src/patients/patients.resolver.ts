@@ -142,4 +142,21 @@ export class PatientsResolver {
     const resolvedHospitalId = this.patientsService.resolveHospitalId(user, hospitalId);
     return this.patientsService.deletePatientDocument(id, patientId, resolvedHospitalId, user);
   }
+
+  @Mutation(() => PatientType)
+  @Permissions(PERMISSIONS.PATIENTS_WRITE)
+  async linkPatientAccount(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('patientId') patientId: string,
+    @Args('userId', { nullable: true }) userId?: string,
+    @Args('hospitalId', { nullable: true }) hospitalId?: string,
+  ): Promise<PatientType> {
+    const resolvedHospitalId = this.patientsService.resolveHospitalId(user, hospitalId);
+    return this.patientsService.linkPatientAccount(
+      patientId,
+      resolvedHospitalId,
+      user,
+      userId,
+    );
+  }
 }

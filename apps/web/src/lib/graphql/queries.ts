@@ -40,6 +40,37 @@ export const CREATE_STAFF_MUTATION = gql`
       email
       roleSlug
       department
+      inviteToken
+      inviteUrl
+    }
+  }
+`;
+
+export const COMPLETE_PATIENT_ONBOARDING = gql`
+  mutation CompletePatientOnboarding($fullName: String!) {
+    completePatientOnboarding(fullName: $fullName) {
+      id
+      roles
+      onboardingCompleted
+    }
+  }
+`;
+
+export const LINK_PATIENT_ACCOUNT = gql`
+  mutation LinkPatientAccount($patientId: String!, $userId: String, $hospitalId: String) {
+    linkPatientAccount(patientId: $patientId, userId: $userId, hospitalId: $hospitalId) {
+      id
+      fullName
+      status
+    }
+  }
+`;
+
+export const CANCEL_APPOINTMENT_MUTATION = gql`
+  mutation CancelAppointment($input: CancelAppointmentInput!, $hospitalId: String) {
+    cancelAppointment(input: $input, hospitalId: $hospitalId) {
+      id
+      status
     }
   }
 `;

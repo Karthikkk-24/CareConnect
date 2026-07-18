@@ -36,6 +36,12 @@ export class StaffType {
   @Field()
   isActive: boolean;
 
+  @Field({ nullable: true })
+  inviteToken?: string;
+
+  @Field({ nullable: true })
+  inviteUrl?: string;
+
   @Field()
   createdAt: Date;
 }

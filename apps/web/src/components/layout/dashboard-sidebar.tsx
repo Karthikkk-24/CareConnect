@@ -15,26 +15,41 @@ import {
   Pill,
   Package,
   BarChart3,
+  BedDouble,
+  Stethoscope,
+  HeartPulse,
+  FlaskConical,
+  CalendarCheck,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useClerk } from '@clerk/nextjs';
 import { cn } from '@careconnect/ui';
 import { ME_QUERY } from '@/lib/graphql/queries';
 
-const baseNavKeys = [
+type NavItem = { href: string; key: string; icon: typeof LayoutDashboard };
+
+const baseNav: NavItem[] = [
   { href: '/dashboard', key: 'dashboard', icon: LayoutDashboard },
   { href: '/staff', key: 'staff', icon: UserCog },
   { href: '/patients', key: 'patients', icon: Users },
   { href: '/appointments', key: 'appointments', icon: Calendar },
+  { href: '/admissions', key: 'admissions', icon: BedDouble },
+  { href: '/follow-ups', key: 'followUps', icon: CalendarCheck },
   { href: '/settings', key: 'settings', icon: Settings },
-] as const;
+];
 
-const adminNavKeys = [
+const clinicalNav: NavItem[] = [
+  { href: '/doctor', key: 'doctor', icon: Stethoscope },
+  { href: '/nurse', key: 'nurse', icon: HeartPulse },
+  { href: '/lab', key: 'lab', icon: FlaskConical },
+];
+
+const adminNav: NavItem[] = [
   { href: '/finance', key: 'finance', icon: DollarSign },
   { href: '/pharmacy', key: 'pharmacy', icon: Pill },
   { href: '/inventory', key: 'inventory', icon: Package },
   { href: '/reports', key: 'reports', icon: BarChart3 },
-] as const;
+];
 
 export function DashboardSidebar() {
   const t = useTranslations('nav');
@@ -48,10 +63,37 @@ export function DashboardSidebar() {
     roles.includes('hospital_admin') ||
     roles.includes('hospital_manager') ||
     roles.includes('super_admin');
+  const isDoctor = roles.includes('doctor');
+  const isNurse = roles.includes('nurse');
+  const isLab = roles.includes('lab_technician');
+  const isPharmacist = roles.includes('pharmacist');
+  const isAccountant = roles.includes('accountant');
 
-  const navItems = isHospitalAdmin
-    ? [...baseNavKeys.slice(0, 4), ...adminNavKeys, baseNavKeys[4]]
-    : baseNavKeys;
+  const navItems: NavItem[] = [...baseNav];
+  if (isDoctor) navItems.splice(5, 0, clinicalNav[0]);
+  if (isNurse) navItems.splice(5, 0, clinicalNav[1]);
+  if (isLab || isHospitalAdmin) navItems.splice(5, 0, clinicalNav[2]);
+  if (isHospitalAdmin || isAccountant) {
+    navItems.splice(navItems.length - 1, 0, ...adminNav.filter((n) => n.key === 'finance' || n.key === 'reports'));
+  }
+  if (isHospitalAdmin || isPharmacist) {
+    navItems.splice(navItems.length - 1, 0, ...adminNav.filter((n) => n.key === 'pharmacy' || n.key === 'inventory'));
+  }
+  if (isHospitalAdmin) {
+    for (const item of adminNav) {
+      if (!navItems.some((n) => n.href === item.href)) {
+        navItems.splice(navItems.length - 1, 0, item);
+      }
+    }
+  }
+
+  // Deduplicate by href
+  const seen = new Set<string>();
+  const uniqueNav = navItems.filter((item) => {
+    if (seen.has(item.href)) return false;
+    seen.add(item.href);
+    return true;
+  });
 
   const handleLogout = async () => {
     await clerk.signOut();
@@ -77,11 +119,11 @@ export function DashboardSidebar() {
         </div>
       </div>
 
-      <nav className="flex flex-1 flex-col gap-1" aria-label={t('mainNav')}>
-        {navItems.map((item) => {
+      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto" aria-label={t('mainNav')}>
+        {uniqueNav.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
           const Icon = item.icon;
-          const label = t(item.key);
+          const label = t.has(item.key) ? t(item.key) : item.key;
 
           return (
             <Link
@@ -105,11 +147,11 @@ export function DashboardSidebar() {
 
       <div className="mt-auto space-y-1 border-t border-white/40 pt-4">
         <Link
-          href="/settings"
+          href="/settings/facility"
           className="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm text-clay-text-muted hover:bg-clay-primary-light/50 hover:text-clay-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clay-primary"
         >
           <Building2 className="h-5 w-5" aria-hidden="true" />
-          {t('hospitalProfile')}
+          Facility
         </Link>
         <button
           type="button"

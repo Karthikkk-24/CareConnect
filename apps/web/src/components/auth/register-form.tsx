@@ -6,8 +6,10 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useSignUp } from '@clerk/nextjs';
+import { useMutation } from '@apollo/client';
 import { registerSchema, type RegisterInput } from '@careconnect/types';
 import { ClayButton, ClayCard, ClayInput } from '@careconnect/ui';
+import { COMPLETE_PATIENT_ONBOARDING } from '@/lib/graphql/queries';
 
 export function RegisterForm() {
   const router = useRouter();
@@ -17,6 +19,7 @@ export function RegisterForm() {
   const [loading, setLoading] = useState(false);
   const [pendingCode, setPendingCode] = useState(false);
   const [code, setCode] = useState('');
+  const [completePatientOnboarding] = useMutation(COMPLETE_PATIENT_ONBOARDING);
 
   const redirectTo = searchParams.get('redirect') ?? '/onboarding';
 
@@ -24,6 +27,7 @@ export function RegisterForm() {
     register,
     handleSubmit,
     watch,
+    getValues,
     formState: { errors },
   } = useForm<RegisterInput>({
     resolver: zodResolver(registerSchema),
@@ -31,6 +35,22 @@ export function RegisterForm() {
   });
 
   const accountType = watch('accountType');
+
+  const finishSignup = async (fullName: string, type: RegisterInput['accountType']) => {
+    if (type === 'patient') {
+      try {
+        await completePatientOnboarding({ variables: { fullName } });
+      } catch {
+        // User row may still be syncing; portal will surface errors if role missing
+      }
+      router.push('/portal');
+    } else if (type === 'staff') {
+      router.push(redirectTo.startsWith('/invite') ? redirectTo : '/login');
+    } else {
+      router.push(redirectTo === '/onboarding' ? '/onboarding' : redirectTo);
+    }
+    router.refresh();
+  };
 
   const onSubmit = async (data: RegisterInput) => {
     if (!isLoaded) return;
@@ -50,8 +70,7 @@ export function RegisterForm() {
 
       if (attempt.status === 'complete') {
         await setActive({ session: attempt.createdSessionId });
-        router.push(redirectTo);
-        router.refresh();
+        await finishSignup(data.fullName, data.accountType);
         return;
       }
 
@@ -72,8 +91,8 @@ export function RegisterForm() {
       const result = await signUp.attemptEmailAddressVerification({ code });
       if (result.status === 'complete') {
         await setActive({ session: result.createdSessionId });
-        router.push(redirectTo);
-        router.refresh();
+        const values = getValues();
+        await finishSignup(values.fullName, values.accountType);
       } else {
         setError('Verification incomplete. Try again.');
       }
@@ -88,10 +107,13 @@ export function RegisterForm() {
     if (!isLoaded) return;
     setError('');
     try {
+      const type = getValues('accountType');
+      const dest =
+        type === 'patient' ? '/portal' : type === 'staff' ? '/login' : '/onboarding';
       await signUp.authenticateWithRedirect({
         strategy: 'oauth_google',
         redirectUrl: '/auth/callback',
-        redirectUrlComplete: redirectTo,
+        redirectUrlComplete: dest,
       });
     } catch (err) {
       setError(extractClerkError(err));

@@ -147,6 +147,8 @@ export class StaffService {
       metadata: { email: input.email, roleSlug: input.roleSlug },
     });
 
+    // Attach invite token for GraphQL response (not persisted on entity)
+    (staff as StaffProfile & { inviteToken?: string }).inviteToken = token;
     return staff;
   }
 
@@ -244,8 +246,10 @@ export class StaffService {
     return (await this.findById(staff.id))!;
   }
 
-  toStaffType(staff: StaffProfile) {
+  toStaffType(staff: StaffProfile & { inviteToken?: string }) {
     const roleSlug = staff.user?.userRoles?.[0]?.role?.slug ?? 'staff';
+    const inviteToken = staff.inviteToken;
+    const webOrigin = process.env.CORS_ORIGIN?.replace(/\/$/, '') || 'http://localhost:3000';
     return {
       id: staff.id,
       userId: staff.userId,
@@ -258,6 +262,8 @@ export class StaffService {
       specialization: staff.specialization,
       employeeId: staff.employeeId,
       isActive: staff.isActive,
+      inviteToken,
+      inviteUrl: inviteToken ? `${webOrigin}/invite/${inviteToken}` : undefined,
       createdAt: staff.createdAt,
     };
   }

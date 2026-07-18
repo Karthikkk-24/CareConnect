@@ -11,6 +11,6 @@ import { ClerkJwtStrategy } from './clerk-jwt.strategy';
     TypeOrmModule.forFeature([User, UserRole, Role]),
   ],
   providers: [AuthService, ClerkJwtStrategy],
-  exports: [AuthService, PassportModule],
+  exports: [AuthService, PassportModule, ClerkJwtStrategy],
 })
 export class AuthModule {}

@@ -110,4 +110,39 @@ export class AuthService {
       }
     }
   }
+
+  /** Patient portal path: assign patient role and mark onboarding complete. */
+  async completePatientOnboarding(userId: string, fullName: string) {
+    await this.usersRepo.update(userId, {
+      fullName,
+      onboardingCompleted: true,
+    });
+
+    const existingRoles = await this.userRolesRepo.find({ where: { userId } });
+    if (existingRoles.length === 0) {
+      const patientRole = await this.rolesRepo.findOne({ where: { slug: 'patient' } });
+      if (patientRole) {
+        await this.userRolesRepo.save(
+          this.userRolesRepo.create({
+            userId,
+            roleId: patientRole.id,
+            hospitalId: undefined,
+          }),
+        );
+      }
+    }
+  }
+
+  async assignRole(userId: string, roleSlug: string, hospitalId?: string) {
+    const role = await this.rolesRepo.findOne({ where: { slug: roleSlug } });
+    if (!role) return;
+    const existing = await this.userRolesRepo.findOne({
+      where: { userId, roleId: role.id, hospitalId: hospitalId ?? undefined },
+    });
+    if (!existing) {
+      await this.userRolesRepo.save(
+        this.userRolesRepo.create({ userId, roleId: role.id, hospitalId }),
+      );
+    }
+  }
 }
