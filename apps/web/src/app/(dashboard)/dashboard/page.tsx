@@ -119,7 +119,7 @@ export default function DashboardPage() {
               { done: !!meData?.me?.onboardingCompleted, text: 'Complete onboarding' },
               { done: staffCount > 0, text: 'Add your first staff member' },
               { done: patientCount > 0, text: 'Register your first patient' },
-              { done: hasAppointments, text: 'Set up appointment scheduling (Phase 3)' },
+              { done: hasAppointments, text: 'Schedule appointments for patients' },
             ].map((item) => (
               <li key={item.text} className="flex items-center gap-3 text-sm">
                 <span

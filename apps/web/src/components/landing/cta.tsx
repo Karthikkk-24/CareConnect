@@ -9,7 +9,8 @@ export function CTA() {
           Ready to transform your hospital?
         </h2>
         <p className="mb-8 text-clay-text-muted">
-          Join healthcare teams using CareConnect to deliver better patient care.
+          Join CareConnect to run patient records, scheduling, and clinical ops on your own Neon
+          database with Clerk sign-in.
         </p>
         <div className="flex flex-wrap justify-center gap-4">
           <Link href="/register">

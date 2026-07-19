@@ -47,10 +47,11 @@ export function Features() {
       <div className="mx-auto max-w-7xl">
         <div className="mb-12 text-center">
           <h2 className="mb-4 text-3xl font-bold text-clay-text md:text-4xl">
-            Everything your hospital needs
+            Everything you need to start
           </h2>
           <p className="mx-auto max-w-2xl text-clay-text-muted">
-            From patient intake to discharge and follow-ups — one platform for every department.
+            Core hospital workflows — patients, scheduling, clinical charting, pharmacy, and
+            billing — in one open-source stack.
           </p>
         </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

@@ -56,12 +56,8 @@ export class PortalService {
           where: { email: user.email, hospitalId: user.hospitalId },
         });
       }
-      // Without hospital context, only match when exactly one patient has this email
-      const matches = await this.patientsRepo.find({
-        where: { email: user.email },
-        take: 2,
-      });
-      if (matches.length === 1) return matches[0];
+      // Without hospital context and without an explicit userId link, do not
+      // soft-match by email across hospitals (prevents cross-tenant PHI).
       return null;
     }
 

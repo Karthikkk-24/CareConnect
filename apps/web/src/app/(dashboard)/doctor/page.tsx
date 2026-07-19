@@ -21,8 +21,8 @@ export default function DoctorDashboardPage() {
   const hospitalId = meData?.me?.hospitalId;
 
   const { data, loading } = useQuery(APPOINTMENTS_QUERY, {
-    variables: { hospitalId, date: today },
-    skip: !hospitalId,
+    variables: { hospitalId, date: today, doctorId: meData?.me?.id },
+    skip: !hospitalId || !meData?.me?.id,
   });
 
   const appointments = data?.appointments ?? [];

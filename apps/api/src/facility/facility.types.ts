@@ -106,3 +106,42 @@ export class CreateBedInput {
   @MinLength(1)
   label: string;
 }
+
+@InputType()
+export class UpdateDepartmentInput {
+  @Field()
+  @IsString()
+  @MinLength(1)
+  name: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  description?: string;
+}
+
+@InputType()
+export class UpdateWardInput {
+  @Field()
+  @IsString()
+  @MinLength(1)
+  name: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  floor?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsUUID()
+  departmentId?: string;
+}
+
+@InputType()
+export class UpdateBedInput {
+  @Field()
+  @IsString()
+  @MinLength(1)
+  label: string;
+}

@@ -32,6 +32,9 @@ jobs:
       - name: Lint API
         run: pnpm --filter api lint
 
+      - name: Unit tests (API)
+        run: pnpm --filter api test
+
       - name: Build API
         run: pnpm --filter api build
         env:

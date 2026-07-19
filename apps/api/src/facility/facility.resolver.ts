@@ -13,6 +13,9 @@ import {
   CreateDepartmentInput,
   CreateWardInput,
   DepartmentType,
+  UpdateBedInput,
+  UpdateDepartmentInput,
+  UpdateWardInput,
   WardType,
 } from './facility.types';
 
@@ -148,5 +151,55 @@ export class FacilityResolver {
       hospitalId,
     );
     return this.facilityService.deleteBed(resolvedHospitalId, id, user);
+  }
+
+  @Mutation(() => DepartmentType)
+  @Permissions(PERMISSIONS.HOSPITALS_WRITE)
+  async updateDepartment(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('id') id: string,
+    @Args('input') input: UpdateDepartmentInput,
+    @Args('hospitalId', { nullable: true }) hospitalId?: string,
+  ): Promise<DepartmentType> {
+    const resolvedHospitalId = this.facilityService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.facilityService.updateDepartment(
+      resolvedHospitalId,
+      id,
+      input,
+      user,
+    );
+  }
+
+  @Mutation(() => WardType)
+  @Permissions(PERMISSIONS.HOSPITALS_WRITE)
+  async updateWard(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('id') id: string,
+    @Args('input') input: UpdateWardInput,
+    @Args('hospitalId', { nullable: true }) hospitalId?: string,
+  ): Promise<WardType> {
+    const resolvedHospitalId = this.facilityService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.facilityService.updateWard(resolvedHospitalId, id, input, user);
+  }
+
+  @Mutation(() => BedType)
+  @Permissions(PERMISSIONS.HOSPITALS_WRITE)
+  async updateBed(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('id') id: string,
+    @Args('input') input: UpdateBedInput,
+    @Args('hospitalId', { nullable: true }) hospitalId?: string,
+  ): Promise<BedType> {
+    const resolvedHospitalId = this.facilityService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.facilityService.updateBed(resolvedHospitalId, id, input, user);
   }
 }

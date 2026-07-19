@@ -261,4 +261,71 @@ export class FacilityService {
     });
     return true;
   }
+
+  async updateDepartment(
+    hospitalId: string,
+    id: string,
+    input: { name: string; description?: string },
+    actor: AuthenticatedUser,
+  ): Promise<DepartmentType> {
+    const department = await this.departmentsRepo.findOne({
+      where: { id, hospitalId },
+    });
+    if (!department) throw new NotFoundException('Department not found');
+    department.name = input.name;
+    department.description = input.description;
+    const saved = await this.departmentsRepo.save(department);
+    await this.audit.log({
+      actorId: actor.id,
+      hospitalId,
+      action: 'update',
+      resource: 'department',
+      resourceId: id,
+    });
+    return this.toDepartmentType(saved);
+  }
+
+  async updateWard(
+    hospitalId: string,
+    id: string,
+    input: { name: string; floor?: string; departmentId?: string },
+    actor: AuthenticatedUser,
+  ): Promise<WardType> {
+    const ward = await this.wardsRepo.findOne({ where: { id, hospitalId } });
+    if (!ward) throw new NotFoundException('Ward not found');
+    ward.name = input.name;
+    ward.floor = input.floor;
+    if (input.departmentId !== undefined) {
+      ward.departmentId = input.departmentId || undefined;
+    }
+    const saved = await this.wardsRepo.save(ward);
+    await this.audit.log({
+      actorId: actor.id,
+      hospitalId,
+      action: 'update',
+      resource: 'ward',
+      resourceId: id,
+    });
+    return this.toWardType(saved);
+  }
+
+  async updateBed(
+    hospitalId: string,
+    id: string,
+    input: { label: string },
+    actor: AuthenticatedUser,
+  ): Promise<BedType> {
+    const bed = await this.bedsRepo.findOne({ where: { id, hospitalId } });
+    if (!bed) throw new NotFoundException('Bed not found');
+    bed.label = input.label;
+    const saved = await this.bedsRepo.save(bed);
+    await this.audit.log({
+      actorId: actor.id,
+      hospitalId,
+      action: 'update',
+      resource: 'bed',
+      resourceId: id,
+    });
+    return this.toBedType(saved);
+  }
 }

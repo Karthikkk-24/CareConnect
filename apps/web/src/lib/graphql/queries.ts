@@ -93,6 +93,8 @@ export const PATIENT_VITALS_QUERY = gql`
       heartRate
       temperature
       spo2
+      weight
+      height
       recordedAt
     }
   }
@@ -154,6 +156,36 @@ export const DELETE_WARD_MUTATION = gql`
 export const DELETE_BED_MUTATION = gql`
   mutation DeleteBed($id: String!, $hospitalId: String) {
     deleteBed(id: $id, hospitalId: $hospitalId)
+  }
+`;
+
+export const UPDATE_DEPARTMENT_MUTATION = gql`
+  mutation UpdateDepartment($id: String!, $input: UpdateDepartmentInput!, $hospitalId: String) {
+    updateDepartment(id: $id, input: $input, hospitalId: $hospitalId) {
+      id
+      name
+      description
+    }
+  }
+`;
+
+export const UPDATE_WARD_MUTATION = gql`
+  mutation UpdateWard($id: String!, $input: UpdateWardInput!, $hospitalId: String) {
+    updateWard(id: $id, input: $input, hospitalId: $hospitalId) {
+      id
+      name
+      floor
+    }
+  }
+`;
+
+export const UPDATE_BED_MUTATION = gql`
+  mutation UpdateBed($id: String!, $input: UpdateBedInput!, $hospitalId: String) {
+    updateBed(id: $id, input: $input, hospitalId: $hospitalId) {
+      id
+      label
+      status
+    }
   }
 `;
 
@@ -413,8 +445,8 @@ export const DASHBOARD_STATS_QUERY = gql`
 `;
 
 export const APPOINTMENTS_QUERY = gql`
-  query Appointments($hospitalId: String, $date: String, $status: String) {
-    appointments(hospitalId: $hospitalId, date: $date, status: $status) {
+  query Appointments($hospitalId: String, $date: String, $status: String, $doctorId: String) {
+    appointments(hospitalId: $hospitalId, date: $date, status: $status, doctorId: $doctorId) {
       id
       patientId
       patient {
@@ -490,16 +522,6 @@ export const ADMIT_PATIENT_MUTATION = gql`
       patientId
       status
       admittedAt
-    }
-  }
-`;
-
-export const DISCHARGE_ADMISSION_MUTATION = gql`
-  mutation DischargeAdmission($id: String!, $hospitalId: String) {
-    dischargeAdmission(input: { id: $id }, hospitalId: $hospitalId) {
-      id
-      status
-      dischargedAt
     }
   }
 `;

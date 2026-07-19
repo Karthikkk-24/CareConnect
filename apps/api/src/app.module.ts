@@ -1,7 +1,9 @@
 import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
 import { GraphQLModule } from '@nestjs/graphql';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { join } from 'path';
 import type { Request } from 'express';
@@ -122,18 +124,34 @@ import { UploadsModule } from './uploads/uploads.module';
         ],
         synchronize: false,
         logging: config.get('NODE_ENV') === 'development',
-        ssl:
-          config.get('DATABASE_SSL') === 'true'
-            ? { rejectUnauthorized: false }
-            : false,
+        ssl: (() => {
+          if (config.get('DATABASE_SSL') !== 'true') return false;
+          const isProd = config.get('NODE_ENV') === 'production';
+          // Neon provides trusted CAs; reject unauthorized in production.
+          return { rejectUnauthorized: isProd };
+        })(),
       }),
     }),
-    GraphQLModule.forRoot<ApolloDriverConfig>({
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60_000,
+        limit: 120,
+      },
+    ]),
+    GraphQLModule.forRootAsync<ApolloDriverConfig>({
       driver: ApolloDriver,
-      autoSchemaFile: join(process.cwd(), 'src/schema.gql'),
-      sortSchema: true,
-      playground: true,
-      context: ({ req }: { req: Request }) => ({ req }),
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const isProd = config.get('NODE_ENV') === 'production';
+        return {
+          autoSchemaFile: join(process.cwd(), 'src/schema.gql'),
+          sortSchema: true,
+          playground: !isProd,
+          introspection: !isProd,
+          context: ({ req }: { req: Request }) => ({ req }),
+        };
+      },
     }),
     AuthModule,
     RbacModule,
@@ -155,6 +173,12 @@ import { UploadsModule } from './uploads/uploads.module';
     DischargeModule,
     PortalModule,
     UploadsModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
   ],
 })
 export class AppModule {}

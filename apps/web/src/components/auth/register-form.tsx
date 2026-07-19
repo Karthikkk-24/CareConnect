@@ -121,7 +121,9 @@ export function RegisterForm() {
         type === 'patient'
           ? '/portal?completePatient=1'
           : type === 'staff'
-            ? '/login'
+            ? redirectTo.startsWith('/invite')
+              ? redirectTo
+              : '/login'
             : '/onboarding';
       await signUp.authenticateWithRedirect({
         strategy: 'oauth_google',

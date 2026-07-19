@@ -25,6 +25,10 @@ export default function PatientDetailPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [documentType, setDocumentType] = useState('identification');
+  const [linkEmail, setLinkEmail] = useState('');
+  const [linkMessage, setLinkMessage] = useState('');
+  const [linkError, setLinkError] = useState('');
+  const [showLinkForm, setShowLinkForm] = useState(false);
   const { data: meData } = useQuery(ME_QUERY);
   const { data, loading, refetch } = useQuery(PATIENT_QUERY, {
     variables: { id, hospitalId: meData?.me?.hospitalId },
@@ -34,7 +38,18 @@ export default function PatientDetailPage() {
   const [deleteDocument] = useMutation(DELETE_PATIENT_DOCUMENT, { onCompleted: () => refetch() });
   const [updateStatus] = useMutation(UPDATE_PATIENT_STATUS, { onCompleted: () => refetch() });
   const [deletePatient] = useMutation(DELETE_PATIENT_MUTATION);
-  const [linkAccount] = useMutation(LINK_PATIENT_ACCOUNT, { onCompleted: () => refetch() });
+  const [linkAccount, { loading: linking }] = useMutation(LINK_PATIENT_ACCOUNT, {
+    onCompleted: () => {
+      setLinkMessage('Portal account linked');
+      setLinkError('');
+      setShowLinkForm(false);
+      refetch();
+    },
+    onError: (err) => {
+      setLinkError(err.message);
+      setLinkMessage('');
+    },
+  });
 
   const vitalsQuery = useQuery(PATIENT_VITALS_QUERY, {
     variables: { patientId: id, hospitalId: meData?.me?.hospitalId },
@@ -151,18 +166,10 @@ export default function PatientDetailPage() {
           size="sm"
           variant="ghost"
           onClick={() => {
-            const email =
-              window.prompt(
-                'Portal user email to link (defaults to patient email)',
-                patient.email ?? '',
-              ) ?? '';
-            linkAccount({
-              variables: {
-                patientId: id,
-                hospitalId: meData?.me?.hospitalId,
-                email: email || undefined,
-              },
-            });
+            setShowLinkForm((v) => !v);
+            setLinkEmail(patient.email ?? '');
+            setLinkError('');
+            setLinkMessage('');
           }}
         >
           Link portal account
@@ -181,6 +188,52 @@ export default function PatientDetailPage() {
           Delete
         </ClayButton>
       </div>
+
+      {showLinkForm ? (
+        <ClayCard className="mb-6 max-w-lg">
+          <h2 className="mb-2 text-sm font-semibold text-clay-text">Link patient portal user</h2>
+          <p className="mb-3 text-xs text-clay-text-muted">
+            Enter the email of a CareConnect account with the patient role (they must register
+            first).
+          </p>
+          <form
+            className="flex flex-wrap items-end gap-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!linkEmail.trim()) {
+                setLinkError('Email is required');
+                return;
+              }
+              linkAccount({
+                variables: {
+                  patientId: id,
+                  hospitalId: meData?.me?.hospitalId,
+                  email: linkEmail.trim(),
+                },
+              });
+            }}
+          >
+            <div className="min-w-[16rem] flex-1">
+              <label className="mb-1 block text-xs font-medium text-clay-text" htmlFor="portal-email">
+                Portal user email
+              </label>
+              <input
+                id="portal-email"
+                type="email"
+                required
+                value={linkEmail}
+                onChange={(e) => setLinkEmail(e.target.value)}
+                className="w-full rounded-2xl border border-white/60 bg-clay-surface px-4 py-2 text-sm shadow-clay-inset outline-none focus:ring-2 focus:ring-clay-primary/30"
+              />
+            </div>
+            <ClayButton type="submit" size="sm" isLoading={linking}>
+              Link
+            </ClayButton>
+          </form>
+          {linkError ? <p className="mt-2 text-sm text-clay-error">{linkError}</p> : null}
+          {linkMessage ? <p className="mt-2 text-sm text-clay-success">{linkMessage}</p> : null}
+        </ClayCard>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <ClayCard className="lg:col-span-2">
@@ -332,11 +385,19 @@ export default function PatientDetailPage() {
                       id: string;
                       bloodPressure?: string;
                       heartRate?: number;
+                      temperature?: number;
+                      spo2?: number;
+                      weight?: number;
+                      height?: number;
                       recordedAt: string;
                     }) => (
                       <li key={v.id} className="text-clay-text-muted">
                         {new Date(v.recordedAt).toLocaleString()} — BP {v.bloodPressure ?? '—'} · HR{' '}
                         {v.heartRate ?? '—'}
+                        {v.temperature != null ? ` · Temp ${v.temperature}` : ''}
+                        {v.spo2 != null ? ` · SpO2 ${v.spo2}%` : ''}
+                        {v.weight != null ? ` · Wt ${v.weight}kg` : ''}
+                        {v.height != null ? ` · Ht ${v.height}cm` : ''}
                       </li>
                     ),
                   )}

@@ -37,7 +37,7 @@ export function Hero() {
               <Shield className="h-4 w-4 text-clay-primary" /> Role-based access control
             </span>
             <span className="flex items-center gap-2">
-              <Activity className="h-4 w-4 text-clay-primary" /> Live hospital dashboards
+              <Activity className="h-4 w-4 text-clay-primary" /> Hospital operations dashboard
             </span>
           </div>
         </div>

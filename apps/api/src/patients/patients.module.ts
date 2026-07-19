@@ -14,6 +14,7 @@ import {
 } from '../database/entities';
 import { PatientsResolver } from './patients.resolver';
 import { PatientsService } from './patients.service';
+import { UploadsModule } from '../uploads/uploads.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { PatientsService } from './patients.service';
       PatientImportJob,
       User,
     ]),
+    UploadsModule,
   ],
   providers: [PatientsResolver, PatientsService],
   exports: [PatientsService],

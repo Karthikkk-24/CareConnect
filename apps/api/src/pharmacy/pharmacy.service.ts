@@ -158,29 +158,65 @@ export class PharmacyService {
     input: DispensePrescriptionInput,
     actor: AuthenticatedUser,
   ): Promise<PendingPrescriptionType> {
-    const prescription = await this.prescriptionsRepo.findOne({
-      where: { id: input.prescriptionId, hospitalId },
-      relations: ['items', 'patient'],
+    return this.prescriptionsRepo.manager.transaction(async (manager) => {
+      const prescriptionsRepo = manager.getRepository(Prescription);
+      const stockRepo = manager.getRepository(PharmacyStock);
+
+      const prescription = await prescriptionsRepo.findOne({
+        where: { id: input.prescriptionId, hospitalId },
+        relations: ['items', 'patient'],
+      });
+      if (!prescription) throw new NotFoundException('Prescription not found');
+      if (prescription.status !== 'pending') {
+        throw new BadRequestException(
+          'Only pending prescriptions can be dispensed',
+        );
+      }
+
+      const items = prescription.items ?? [];
+      for (const item of items) {
+        const stock = await stockRepo
+          .createQueryBuilder('stock')
+          .where('stock.hospital_id = :hospitalId', { hospitalId })
+          .andWhere('LOWER(stock.drug_name) = LOWER(:drugName)', {
+            drugName: item.drugName,
+          })
+          .setLock('pessimistic_write')
+          .getOne();
+
+        if (!stock) {
+          throw new BadRequestException(
+            `No pharmacy stock for drug "${item.drugName}". Add stock before dispensing.`,
+          );
+        }
+
+        const available = this.toNumber(stock.quantity);
+        if (available < 1) {
+          throw new BadRequestException(
+            `Insufficient stock for "${item.drugName}" (available: ${available})`,
+          );
+        }
+
+        stock.quantity = String(available - 1);
+        await stockRepo.save(stock);
+      }
+
+      prescription.status = 'dispensed';
+      const saved = await prescriptionsRepo.save(prescription);
+
+      await this.audit.log({
+        actorId: actor.id,
+        hospitalId,
+        action: 'update',
+        resource: 'prescription',
+        resourceId: saved.id,
+        metadata: {
+          status: 'dispensed',
+          itemCount: items.length,
+        },
+      });
+
+      return this.toPendingPrescriptionType(saved);
     });
-    if (!prescription) throw new NotFoundException('Prescription not found');
-    if (prescription.status !== 'pending') {
-      throw new BadRequestException(
-        'Only pending prescriptions can be dispensed',
-      );
-    }
-
-    prescription.status = 'dispensed';
-    const saved = await this.prescriptionsRepo.save(prescription);
-
-    await this.audit.log({
-      actorId: actor.id,
-      hospitalId,
-      action: 'update',
-      resource: 'prescription',
-      resourceId: saved.id,
-      metadata: { status: 'dispensed' },
-    });
-
-    return this.toPendingPrescriptionType(saved);
   }
 }

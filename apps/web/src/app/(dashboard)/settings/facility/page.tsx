@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useMutation, useQuery } from '@apollo/client';
-import { BedDouble, Building, DoorClosed, Layers, Plus, Trash2 } from 'lucide-react';
+import { BedDouble, Building, DoorClosed, Layers, Pencil, Plus, Trash2 } from 'lucide-react';
 import { ClayBadge, ClayButton, ClayCard, ClayInput } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
 import {
@@ -16,6 +16,9 @@ import {
   DELETE_WARD_MUTATION,
   DEPARTMENTS_QUERY,
   ME_QUERY,
+  UPDATE_BED_MUTATION,
+  UPDATE_DEPARTMENT_MUTATION,
+  UPDATE_WARD_MUTATION,
   WARDS_QUERY,
 } from '@/lib/graphql/queries';
 
@@ -118,6 +121,27 @@ export default function FacilitySettingsPage() {
   const [deleteBed] = useMutation(DELETE_BED_MUTATION, {
     onCompleted: () => {
       setMessage('Bed deleted');
+      bedsQuery.refetch();
+    },
+    onError: (err) => setError(err.message),
+  });
+  const [updateDepartment] = useMutation(UPDATE_DEPARTMENT_MUTATION, {
+    onCompleted: () => {
+      setMessage('Department updated');
+      departmentsQuery.refetch();
+    },
+    onError: (err) => setError(err.message),
+  });
+  const [updateWard] = useMutation(UPDATE_WARD_MUTATION, {
+    onCompleted: () => {
+      setMessage('Ward updated');
+      wardsQuery.refetch();
+    },
+    onError: (err) => setError(err.message),
+  });
+  const [updateBed] = useMutation(UPDATE_BED_MUTATION, {
+    onCompleted: () => {
+      setMessage('Bed updated');
       bedsQuery.refetch();
     },
     onError: (err) => setError(err.message),
@@ -261,19 +285,45 @@ export default function FacilitySettingsPage() {
                       <p className="text-xs text-clay-text-muted">{d.description}</p>
                     ) : null}
                   </div>
-                  <ClayButton
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    aria-label={`Delete ${d.name}`}
-                    onClick={() => {
-                      if (confirm(`Delete department “${d.name}”?`)) {
-                        deleteDepartment({ variables: { id: d.id, hospitalId } });
-                      }
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4 text-clay-error" />
-                  </ClayButton>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <ClayButton
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      aria-label={`Rename ${d.name}`}
+                      onClick={() => {
+                        const name = window.prompt('Department name', d.name);
+                        if (!name?.trim()) return;
+                        const description =
+                          window.prompt('Description (optional)', d.description ?? '') ?? undefined;
+                        updateDepartment({
+                          variables: {
+                            id: d.id,
+                            hospitalId,
+                            input: {
+                              name: name.trim(),
+                              description: description?.trim() || undefined,
+                            },
+                          },
+                        });
+                      }}
+                    >
+                      <Pencil className="h-4 w-4 text-clay-primary" />
+                    </ClayButton>
+                    <ClayButton
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      aria-label={`Delete ${d.name}`}
+                      onClick={() => {
+                        if (confirm(`Delete department “${d.name}”?`)) {
+                          deleteDepartment({ variables: { id: d.id, hospitalId } });
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 text-clay-error" />
+                    </ClayButton>
+                  </div>
                 </div>
               ))
             )}
@@ -355,6 +405,30 @@ export default function FacilitySettingsPage() {
                       type="button"
                       size="sm"
                       variant="ghost"
+                      aria-label={`Rename ${w.name}`}
+                      onClick={() => {
+                        const name = window.prompt('Ward name', w.name);
+                        if (!name?.trim()) return;
+                        const floor =
+                          window.prompt('Floor (optional)', w.floor ?? '') ?? undefined;
+                        updateWard({
+                          variables: {
+                            id: w.id,
+                            hospitalId,
+                            input: {
+                              name: name.trim(),
+                              floor: floor?.trim() || undefined,
+                            },
+                          },
+                        });
+                      }}
+                    >
+                      <Pencil className="h-4 w-4 text-clay-primary" />
+                    </ClayButton>
+                    <ClayButton
+                      type="button"
+                      size="sm"
+                      variant="ghost"
                       aria-label={`Delete ${w.name}`}
                       onClick={() => {
                         if (confirm(`Delete ward “${w.name}”? Beds in this ward must be removed first.`)) {
@@ -427,19 +501,40 @@ export default function FacilitySettingsPage() {
                       {b.status}
                     </ClayBadge>
                     {b.status !== 'occupied' ? (
-                      <ClayButton
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        aria-label={`Delete ${b.label}`}
-                        onClick={() => {
-                          if (confirm(`Delete bed “${b.label}”?`)) {
-                            deleteBed({ variables: { id: b.id, hospitalId } });
-                          }
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4 text-clay-error" />
-                      </ClayButton>
+                      <>
+                        <ClayButton
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          aria-label={`Rename ${b.label}`}
+                          onClick={() => {
+                            const label = window.prompt('Bed label', b.label);
+                            if (!label?.trim()) return;
+                            updateBed({
+                              variables: {
+                                id: b.id,
+                                hospitalId,
+                                input: { label: label.trim() },
+                              },
+                            });
+                          }}
+                        >
+                          <Pencil className="h-4 w-4 text-clay-primary" />
+                        </ClayButton>
+                        <ClayButton
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          aria-label={`Delete ${b.label}`}
+                          onClick={() => {
+                            if (confirm(`Delete bed “${b.label}”?`)) {
+                              deleteBed({ variables: { id: b.id, hospitalId } });
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 text-clay-error" />
+                        </ClayButton>
+                      </>
                     ) : null}
                   </div>
                 </div>

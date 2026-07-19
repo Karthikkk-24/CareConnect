@@ -15,6 +15,7 @@ import {
 } from '../database/entities';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
+import { UploadsService } from '../uploads/uploads.service';
 import { PatientsService } from './patients.service';
 
 describe('PatientsService', () => {
@@ -84,6 +85,7 @@ describe('PatientsService', () => {
         },
         { provide: getRepositoryToken(User), useValue: usersRepo },
         { provide: AuditService, useValue: audit },
+        { provide: UploadsService, useValue: { unlinkStoredFile: jest.fn() } },
       ],
     }).compile();
 

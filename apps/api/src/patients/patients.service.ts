@@ -21,6 +21,7 @@ import {
 } from '../database/entities';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
+import { UploadsService } from '../uploads/uploads.service';
 import {
   BulkPatientRowInput,
   CreatePatientInput,
@@ -65,6 +66,7 @@ export class PatientsService {
     @InjectRepository(User)
     private readonly usersRepo: Repository<User>,
     private readonly audit: AuditService,
+    private readonly uploadsService: UploadsService,
   ) {}
 
   assertHospitalAccess(user: AuthenticatedUser, hospitalId: string) {
@@ -425,7 +427,9 @@ export class PatientsService {
     });
     if (!document) throw new NotFoundException('Patient document not found');
 
+    const fileUrl = document.fileUrl;
     await this.documentsRepo.remove(document);
+    await this.uploadsService.unlinkStoredFile(fileUrl);
 
     await this.audit.log({
       actorId: actor.id,
@@ -433,7 +437,7 @@ export class PatientsService {
       action: 'delete_document',
       resource: 'patient_document',
       resourceId: document.id,
-      metadata: { patientId, name: document.name },
+      metadata: { patientId },
     });
 
     return true;
@@ -455,6 +459,7 @@ export class PatientsService {
     if (!targetUserId && lookupEmail) {
       const portalUser = await this.usersRepo.findOne({
         where: { email: lookupEmail },
+        relations: ['userRoles', 'userRoles.role'],
       });
       if (!portalUser) {
         throw new NotFoundException(
@@ -470,7 +475,59 @@ export class PatientsService {
       );
     }
 
+    if (targetUserId === actor.id && !actor.roles.includes('patient')) {
+      throw new BadRequestException(
+        'Cannot link the current staff account as the patient portal user',
+      );
+    }
+
+    const targetUser = await this.usersRepo.findOne({
+      where: { id: targetUserId },
+      relations: ['userRoles', 'userRoles.role'],
+    });
+    if (!targetUser) {
+      throw new NotFoundException('Portal user not found');
+    }
+
+    const roleSlugs = (targetUser.userRoles ?? []).map((ur) => ur.role?.slug);
+    const isPatientRole = roleSlugs.includes('patient');
+    const isStaffRole = roleSlugs.some(
+      (slug) => slug && slug !== 'patient' && slug !== 'super_admin',
+    );
+    if (isStaffRole && !isPatientRole) {
+      throw new BadRequestException(
+        'Target user is a staff account. Link a patient portal user instead.',
+      );
+    }
+
+    const alreadyLinked = await this.patientsRepo.findOne({
+      where: { userId: targetUserId },
+    });
+    if (alreadyLinked && alreadyLinked.id !== patient.id) {
+      if (alreadyLinked.hospitalId !== hospitalId) {
+        throw new ConflictException(
+          'This user is already linked to a patient at another hospital',
+        );
+      }
+      throw new ConflictException(
+        'This user is already linked to another patient at this hospital',
+      );
+    }
+
+    if (
+      targetUser.hospitalId &&
+      targetUser.hospitalId !== hospitalId &&
+      !actor.roles.includes('super_admin')
+    ) {
+      throw new ForbiddenException(
+        'Portal user belongs to a different hospital',
+      );
+    }
+
     patient.userId = targetUserId;
+    if (!targetUser.hospitalId) {
+      await this.usersRepo.update(targetUserId, { hospitalId });
+    }
     const saved = await this.patientsRepo.save(patient);
 
     await this.audit.log({
@@ -479,7 +536,7 @@ export class PatientsService {
       action: 'link_account',
       resource: 'patient',
       resourceId: saved.id,
-      metadata: { userId: targetUserId, email: lookupEmail },
+      metadata: { userId: targetUserId },
     });
 
     return this.toPatientType(saved);
