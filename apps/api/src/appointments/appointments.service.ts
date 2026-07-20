@@ -14,6 +14,7 @@ import {
   AppointmentType,
   CancelAppointmentInput,
   CreateAppointmentInput,
+  RescheduleAppointmentInput,
 } from './appointments.types';
 
 @Injectable()
@@ -241,17 +242,58 @@ export class AppointmentsService {
     return this.toAppointmentType(saved);
   }
 
+  async reschedule(
+    hospitalId: string,
+    input: RescheduleAppointmentInput,
+    actor: AuthenticatedUser,
+  ): Promise<AppointmentType> {
+    const appointment = await this.findAppointmentOrThrow(input.id, hospitalId);
+    if (appointment.status === 'cancelled' || appointment.status === 'completed') {
+      throw new BadRequestException(
+        `Cannot reschedule a ${appointment.status} appointment`,
+      );
+    }
+
+    appointment.scheduledAt = new Date(input.scheduledAt);
+    if (input.reason) {
+      appointment.reason = input.reason;
+    }
+
+    const saved = await this.appointmentsRepo.save(appointment);
+
+    await this.audit.log({
+      actorId: actor.id,
+      hospitalId,
+      action: 'reschedule',
+      resource: 'appointment',
+      resourceId: saved.id,
+      metadata: { scheduledAt: input.scheduledAt },
+    });
+
+    return this.toAppointmentType(
+      await this.findAppointmentOrThrow(saved.id, hospitalId),
+    );
+  }
+
   async countAppointmentsToday(hospitalId: string): Promise<number> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
+    return this.countAppointmentsInRange(hospitalId, today, tomorrow);
+  }
+
+  async countAppointmentsInRange(
+    hospitalId: string,
+    start: Date,
+    end: Date,
+  ): Promise<number> {
     return this.appointmentsRepo
       .createQueryBuilder('a')
       .where('a.hospital_id = :hospitalId', { hospitalId })
-      .andWhere('a.scheduled_at >= :start', { start: today })
-      .andWhere('a.scheduled_at < :end', { end: tomorrow })
+      .andWhere('a.scheduled_at >= :start', { start })
+      .andWhere('a.scheduled_at < :end', { end })
       .andWhere('a.status NOT IN (:...excluded)', { excluded: ['cancelled'] })
       .getCount();
   }

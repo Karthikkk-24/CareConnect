@@ -112,4 +112,20 @@ export class CancelAppointmentInput {
   reason?: string;
 }
 
+@InputType()
+export class RescheduleAppointmentInput {
+  @Field()
+  @IsUUID()
+  id: string;
+
+  @Field()
+  @IsDateString()
+  scheduledAt: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}
+
 export { APPOINTMENT_STATUSES };

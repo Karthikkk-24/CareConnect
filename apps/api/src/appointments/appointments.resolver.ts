@@ -11,6 +11,7 @@ import {
   AppointmentType,
   CancelAppointmentInput,
   CreateAppointmentInput,
+  RescheduleAppointmentInput,
 } from './appointments.types';
 
 @Resolver()
@@ -85,5 +86,19 @@ export class AppointmentsResolver {
       hospitalId,
     );
     return this.appointmentsService.cancel(resolvedHospitalId, input, user);
+  }
+
+  @Mutation(() => AppointmentType)
+  @Permissions(PERMISSIONS.APPOINTMENTS_WRITE)
+  async rescheduleAppointment(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('input') input: RescheduleAppointmentInput,
+    @Args('hospitalId', { nullable: true }) hospitalId?: string,
+  ): Promise<AppointmentType> {
+    const resolvedHospitalId = this.appointmentsService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.appointmentsService.reschedule(resolvedHospitalId, input, user);
   }
 }
