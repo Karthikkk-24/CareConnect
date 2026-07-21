@@ -10,6 +10,7 @@ import { InventoryService } from './inventory.service';
 import {
   CreateInventoryItemInput,
   InventoryItemType,
+  UpdateInventoryItemInput,
   UpdateInventoryQuantityInput,
 } from './inventory.types';
 
@@ -19,7 +20,7 @@ export class InventoryResolver {
   constructor(private readonly inventoryService: InventoryService) {}
 
   @Query(() => [InventoryItemType])
-  @Permissions(PERMISSIONS.HOSPITALS_READ)
+  @Permissions(PERMISSIONS.PATIENTS_READ)
   async inventoryItems(
     @CurrentUser() user: AuthenticatedUser,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
@@ -32,7 +33,7 @@ export class InventoryResolver {
   }
 
   @Mutation(() => InventoryItemType)
-  @Permissions(PERMISSIONS.HOSPITALS_WRITE)
+  @Permissions(PERMISSIONS.PATIENTS_WRITE)
   async createInventoryItem(
     @CurrentUser() user: AuthenticatedUser,
     @Args('input') input: CreateInventoryItemInput,
@@ -50,7 +51,7 @@ export class InventoryResolver {
   }
 
   @Mutation(() => InventoryItemType)
-  @Permissions(PERMISSIONS.HOSPITALS_WRITE)
+  @Permissions(PERMISSIONS.PATIENTS_WRITE)
   async updateInventoryQuantity(
     @CurrentUser() user: AuthenticatedUser,
     @Args('input') input: UpdateInventoryQuantityInput,
@@ -63,6 +64,42 @@ export class InventoryResolver {
     return this.inventoryService.updateInventoryQuantity(
       resolvedHospitalId,
       input,
+      user,
+    );
+  }
+
+  @Mutation(() => InventoryItemType)
+  @Permissions(PERMISSIONS.PATIENTS_WRITE)
+  async updateInventoryItem(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('input') input: UpdateInventoryItemInput,
+    @Args('hospitalId', { nullable: true }) hospitalId?: string,
+  ): Promise<InventoryItemType> {
+    const resolvedHospitalId = this.inventoryService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.inventoryService.updateInventoryItem(
+      resolvedHospitalId,
+      input,
+      user,
+    );
+  }
+
+  @Mutation(() => Boolean)
+  @Permissions(PERMISSIONS.PATIENTS_WRITE)
+  async deleteInventoryItem(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('id') id: string,
+    @Args('hospitalId', { nullable: true }) hospitalId?: string,
+  ): Promise<boolean> {
+    const resolvedHospitalId = this.inventoryService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.inventoryService.deleteInventoryItem(
+      resolvedHospitalId,
+      id,
       user,
     );
   }

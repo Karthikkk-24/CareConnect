@@ -79,3 +79,32 @@ export class UpdateInventoryQuantityInput {
   @Min(0)
   quantity: number;
 }
+
+@InputType()
+export class UpdateInventoryItemInput {
+  @Field()
+  @IsUUID()
+  id: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  name?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  sku?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  unit?: string;
+
+  @Field(() => Float, { nullable: true })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  reorderLevel?: number;
+}

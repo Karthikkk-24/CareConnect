@@ -11,6 +11,7 @@ import { AuditService } from '../audit/audit.service';
 import {
   CreateInventoryItemInput,
   InventoryItemType,
+  UpdateInventoryItemInput,
   UpdateInventoryQuantityInput,
 } from './inventory.types';
 
@@ -115,5 +116,54 @@ export class InventoryService {
     });
 
     return this.toInventoryItemType(saved);
+  }
+
+  async updateInventoryItem(
+    hospitalId: string,
+    input: UpdateInventoryItemInput,
+    actor: AuthenticatedUser,
+  ): Promise<InventoryItemType> {
+    const item = await this.inventoryRepo.findOne({
+      where: { id: input.id, hospitalId },
+    });
+    if (!item) throw new NotFoundException('Inventory item not found');
+
+    if (input.name !== undefined) item.name = input.name;
+    if (input.sku !== undefined) item.sku = input.sku;
+    if (input.unit !== undefined) item.unit = input.unit;
+    if (input.reorderLevel !== undefined) {
+      item.reorderLevel = input.reorderLevel.toFixed(2);
+    }
+
+    const saved = await this.inventoryRepo.save(item);
+    await this.audit.log({
+      actorId: actor.id,
+      hospitalId,
+      action: 'update',
+      resource: 'inventory_item',
+      resourceId: item.id,
+      metadata: { name: item.name, sku: item.sku },
+    });
+    return this.toInventoryItemType(saved);
+  }
+
+  async deleteInventoryItem(
+    hospitalId: string,
+    id: string,
+    actor: AuthenticatedUser,
+  ): Promise<boolean> {
+    const item = await this.inventoryRepo.findOne({
+      where: { id, hospitalId },
+    });
+    if (!item) throw new NotFoundException('Inventory item not found');
+    await this.inventoryRepo.remove(item);
+    await this.audit.log({
+      actorId: actor.id,
+      hospitalId,
+      action: 'delete',
+      resource: 'inventory_item',
+      resourceId: id,
+    });
+    return true;
   }
 }
