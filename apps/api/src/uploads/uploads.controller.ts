@@ -70,7 +70,7 @@ export class UploadsController {
       },
     }),
   )
-  uploadPatientDocument(
+  async uploadPatientDocument(
     @UploadedFile() file: Express.Multer.File,
     @Req() req: AuthedRequest,
   ) {
@@ -98,6 +98,14 @@ export class UploadsController {
     if (expectedExt && currentExt !== expectedExt) {
       finalName = `${randomUUID()}${expectedExt}`;
       renameSync(file.path, join(UPLOAD_DIR, finalName));
+    }
+
+    if (user.hospitalId) {
+      await this.uploadsService.recordUploadMeta(
+        finalName,
+        user.hospitalId,
+        user.id,
+      );
     }
 
     const base =

@@ -19,11 +19,13 @@ export class ReportsResolver {
   async hospitalReports(
     @CurrentUser() user: AuthenticatedUser,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
+    @Args('from', { nullable: true }) from?: string,
+    @Args('to', { nullable: true }) to?: string,
   ): Promise<HospitalReportsType> {
     const resolvedHospitalId = this.reportsService.resolveHospitalId(
       user,
       hospitalId,
     );
-    return this.reportsService.getHospitalReports(resolvedHospitalId);
+    return this.reportsService.getHospitalReports(resolvedHospitalId, from, to);
   }
 }

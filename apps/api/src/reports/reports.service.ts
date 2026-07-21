@@ -39,7 +39,19 @@ export class ReportsService {
     return id;
   }
 
-  async getHospitalReports(hospitalId: string): Promise<HospitalReportsType> {
+  async getHospitalReports(
+    hospitalId: string,
+    from?: string,
+    to?: string,
+  ): Promise<HospitalReportsType> {
+    const rangeStart = from ? new Date(from) : undefined;
+    const rangeEnd = to ? new Date(to) : undefined;
+    if (rangeEnd) {
+      rangeEnd.setHours(23, 59, 59, 999);
+    }
+
+    const useRange = Boolean(rangeStart && rangeEnd);
+
     const [
       patientCount,
       staffCount,
@@ -49,9 +61,21 @@ export class ReportsService {
     ] = await Promise.all([
       this.patientsRepo.count({ where: { hospitalId } }),
       this.staffRepo.count({ where: { hospitalId, isActive: true } }),
-      this.appointmentsService.countAppointmentsToday(hospitalId),
+      useRange && rangeStart && rangeEnd
+        ? this.appointmentsService.countAppointmentsInRange(
+            hospitalId,
+            rangeStart,
+            new Date(rangeEnd.getTime() + 1),
+          )
+        : this.appointmentsService.countAppointmentsToday(hospitalId),
       this.admissionsService.countActive(hospitalId),
-      this.billingService.sumRevenue(hospitalId),
+      useRange && rangeStart && rangeEnd
+        ? this.billingService.sumRevenueInRange(
+            hospitalId,
+            rangeStart,
+            new Date(rangeEnd.getTime() + 1),
+          )
+        : this.billingService.sumRevenue(hospitalId),
     ]);
 
     return {
