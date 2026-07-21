@@ -12,6 +12,7 @@ import {
   PatientMedicalHistory,
   PatientMedication,
   User,
+  Admission,
 } from '../database/entities';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
@@ -37,6 +38,10 @@ describe('PatientsService', () => {
   };
 
   const usersRepo = {
+    findOne: jest.fn(),
+  };
+
+  const admissionsRepo = {
     findOne: jest.fn(),
   };
 
@@ -84,8 +89,16 @@ describe('PatientsService', () => {
           useValue: relatedRepo,
         },
         { provide: getRepositoryToken(User), useValue: usersRepo },
+        { provide: getRepositoryToken(Admission), useValue: admissionsRepo },
         { provide: AuditService, useValue: audit },
-        { provide: UploadsService, useValue: { unlinkStoredFile: jest.fn() } },
+        {
+          provide: UploadsService,
+          useValue: {
+            unlinkStoredFile: jest.fn(),
+            assertFileUrlAttachable: jest.fn(),
+            cleanupOrphanUpload: jest.fn(),
+          },
+        },
       ],
     }).compile();
 

@@ -11,6 +11,7 @@ import {
   PatientMedicalHistory,
   PatientMedication,
   User,
+  Admission,
 } from '../database/entities';
 import { PatientsResolver } from './patients.resolver';
 import { PatientsService } from './patients.service';
@@ -29,6 +30,7 @@ import { UploadsModule } from '../uploads/uploads.module';
       PatientConsent,
       PatientImportJob,
       User,
+      Admission,
     ]),
     UploadsModule,
   ],

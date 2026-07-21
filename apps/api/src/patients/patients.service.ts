@@ -18,6 +18,7 @@ import {
   PatientMedicalHistory,
   PatientMedication,
   User,
+  Admission,
 } from '../database/entities';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
@@ -65,6 +66,8 @@ export class PatientsService {
     private readonly importJobsRepo: Repository<PatientImportJob>,
     @InjectRepository(User)
     private readonly usersRepo: Repository<User>,
+    @InjectRepository(Admission)
+    private readonly admissionsRepo: Repository<Admission>,
     private readonly audit: AuditService,
     private readonly uploadsService: UploadsService,
   ) {}
@@ -399,6 +402,18 @@ export class PatientsService {
     }
 
     const patient = await this.findPatientOrThrow(id, hospitalId);
+
+    if (status === 'admitted') {
+      const active = await this.admissionsRepo.findOne({
+        where: { patientId: id, hospitalId, status: 'active' },
+      });
+      if (!active) {
+        throw new BadRequestException(
+          'Cannot set status to admitted without an active admission. Use Admit Patient first.',
+        );
+      }
+    }
+
     patient.status = status;
     const saved = await this.patientsRepo.save(patient);
 
@@ -803,15 +818,22 @@ export class PatientsService {
     });
     if (!patient) throw new NotFoundException('Patient not found');
 
-    return this.documentsRepo.save(
-      this.documentsRepo.create({
-        patientId,
-        name: input.name,
-        fileUrl: input.fileUrl,
-        fileType: input.fileType,
-        documentType: input.documentType,
-        uploadedById,
-      }),
-    );
+    await this.uploadsService.assertFileUrlAttachable(input.fileUrl, hospitalId);
+
+    try {
+      return await this.documentsRepo.save(
+        this.documentsRepo.create({
+          patientId,
+          name: input.name,
+          fileUrl: input.fileUrl,
+          fileType: input.fileType,
+          documentType: input.documentType,
+          uploadedById,
+        }),
+      );
+    } catch (err) {
+      await this.uploadsService.cleanupOrphanUpload(input.fileUrl);
+      throw err;
+    }
   }
 }
