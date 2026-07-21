@@ -93,4 +93,11 @@ export class DispensePrescriptionInput {
   @Field()
   @IsUUID()
   prescriptionId: string;
+
+  /** Units to decrement from stock per prescription line item (default 1). */
+  @Field(() => Float, { nullable: true })
+  @IsOptional()
+  @IsNumber()
+  @Min(0.01)
+  unitsPerItem?: number;
 }

@@ -80,4 +80,22 @@ export class PharmacyResolver {
       user,
     );
   }
+
+  @Mutation(() => Boolean)
+  @Permissions(PERMISSIONS.PATIENTS_WRITE)
+  async deletePharmacyStock(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('id') id: string,
+    @Args('hospitalId', { nullable: true }) hospitalId?: string,
+  ): Promise<boolean> {
+    const resolvedHospitalId = this.pharmacyService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.pharmacyService.deletePharmacyStock(
+      resolvedHospitalId,
+      id,
+      user,
+    );
+  }
 }

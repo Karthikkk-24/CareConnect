@@ -190,14 +190,15 @@ export class PharmacyService {
           );
         }
 
+        const units = input.unitsPerItem ?? 1;
         const available = this.toNumber(stock.quantity);
-        if (available < 1) {
+        if (available < units) {
           throw new BadRequestException(
-            `Insufficient stock for "${item.drugName}" (available: ${available})`,
+            `Insufficient stock for "${item.drugName}" (available: ${available}, needed: ${units})`,
           );
         }
 
-        stock.quantity = String(available - 1);
+        stock.quantity = String(available - units);
         await stockRepo.save(stock);
       }
 
@@ -213,10 +214,31 @@ export class PharmacyService {
         metadata: {
           status: 'dispensed',
           itemCount: items.length,
+          unitsPerItem: input.unitsPerItem ?? 1,
         },
       });
 
       return this.toPendingPrescriptionType(saved);
     });
+  }
+
+  async deletePharmacyStock(
+    hospitalId: string,
+    id: string,
+    actor: AuthenticatedUser,
+  ): Promise<boolean> {
+    const stock = await this.pharmacyStockRepo.findOne({
+      where: { id, hospitalId },
+    });
+    if (!stock) throw new NotFoundException('Pharmacy stock not found');
+    await this.pharmacyStockRepo.remove(stock);
+    await this.audit.log({
+      actorId: actor.id,
+      hospitalId,
+      action: 'delete',
+      resource: 'pharmacy_stock',
+      resourceId: id,
+    });
+    return true;
   }
 }
