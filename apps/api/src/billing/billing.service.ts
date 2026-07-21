@@ -21,6 +21,7 @@ import {
   InvoiceType,
   PaymentType,
   RecordPaymentInput,
+  RefundPaymentInput,
 } from './billing.types';
 
 @Injectable()
@@ -268,6 +269,74 @@ export class BillingService {
     return this.toInvoiceType(invoice);
   }
 
+  async refundPayment(
+    hospitalId: string,
+    input: RefundPaymentInput,
+    actor: AuthenticatedUser,
+  ): Promise<InvoiceType> {
+    const invoice = await this.invoicesRepo.findOne({
+      where: { id: input.invoiceId, hospitalId },
+      relations: ['items', 'payments', 'patient'],
+    });
+    if (!invoice) throw new NotFoundException('Invoice not found');
+    if (invoice.status === 'void') {
+      throw new BadRequestException('Cannot refund a void invoice');
+    }
+
+    const currentPaid = (invoice.payments ?? []).reduce(
+      (sum, p) => sum + this.toNumber(p.amount),
+      0,
+    );
+    if (input.amount > currentPaid + 0.001) {
+      throw new BadRequestException(
+        `Refund exceeds paid amount of ${currentPaid.toFixed(2)}`,
+      );
+    }
+
+    const payment = await this.paymentsRepo.save(
+      this.paymentsRepo.create({
+        invoiceId: invoice.id,
+        hospitalId,
+        amount: (-Math.abs(input.amount)).toFixed(2),
+        method: input.method ?? 'refund',
+        paidAt: new Date(),
+        recordedById: actor.id,
+      }),
+    );
+
+    invoice.payments = [...(invoice.payments ?? []), payment];
+    const paidTotal = invoice.payments.reduce(
+      (sum, p) => sum + this.toNumber(p.amount),
+      0,
+    );
+    const invoiceTotal = this.toNumber(invoice.totalAmount);
+
+    if (paidTotal <= 0.001) {
+      invoice.status = invoice.issuedAt ? 'issued' : 'draft';
+    } else if (paidTotal < invoiceTotal) {
+      invoice.status = 'issued';
+    } else {
+      invoice.status = 'paid';
+    }
+
+    await this.invoicesRepo.save(invoice);
+
+    await this.audit.log({
+      actorId: actor.id,
+      hospitalId,
+      action: 'refund',
+      resource: 'payment',
+      resourceId: payment.id,
+      metadata: {
+        invoiceId: invoice.id,
+        amount: input.amount,
+        notes: input.notes,
+      },
+    });
+
+    return this.toInvoiceType(invoice);
+  }
+
   async voidInvoice(
     hospitalId: string,
     id: string,
@@ -294,12 +363,25 @@ export class BillingService {
   }
 
   async sumRevenue(hospitalId: string): Promise<number> {
-    const result = await this.paymentsRepo
+    return this.sumRevenueInRange(hospitalId);
+  }
+
+  async sumRevenueInRange(
+    hospitalId: string,
+    from?: Date,
+    to?: Date,
+  ): Promise<number> {
+    const qb = this.paymentsRepo
       .createQueryBuilder('payment')
       .select('COALESCE(SUM(payment.amount), 0)', 'total')
-      .where('payment.hospital_id = :hospitalId', { hospitalId })
-      .getRawOne<{ total: string }>();
-
+      .where('payment.hospital_id = :hospitalId', { hospitalId });
+    if (from) {
+      qb.andWhere('payment.paid_at >= :from', { from });
+    }
+    if (to) {
+      qb.andWhere('payment.paid_at < :to', { to });
+    }
+    const result = await qb.getRawOne<{ total: string }>();
     return this.toNumber(result?.total);
   }
 }

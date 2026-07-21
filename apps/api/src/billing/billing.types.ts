@@ -147,3 +147,25 @@ export class RecordPaymentInput {
   @MinLength(1)
   method: string;
 }
+
+@InputType()
+export class RefundPaymentInput {
+  @Field()
+  @IsUUID()
+  invoiceId: string;
+
+  @Field(() => Float)
+  @IsNumber()
+  @Min(0.01)
+  amount: number;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  method?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}

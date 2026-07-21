@@ -11,6 +11,7 @@ import {
   CreateInvoiceInput,
   InvoiceType,
   RecordPaymentInput,
+  RefundPaymentInput,
 } from './billing.types';
 
 @Resolver()
@@ -85,5 +86,19 @@ export class BillingResolver {
       hospitalId,
     );
     return this.billingService.voidInvoice(resolvedHospitalId, id, user);
+  }
+
+  @Mutation(() => InvoiceType)
+  @Permissions(PERMISSIONS.BILLING_WRITE)
+  async refundPayment(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('input') input: RefundPaymentInput,
+    @Args('hospitalId', { nullable: true }) hospitalId?: string,
+  ): Promise<InvoiceType> {
+    const resolvedHospitalId = this.billingService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.billingService.refundPayment(resolvedHospitalId, input, user);
   }
 }
