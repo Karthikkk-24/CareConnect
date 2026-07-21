@@ -1,4 +1,11 @@
-import { Field, ID, ObjectType } from '@nestjs/graphql';
+import { Field, ID, InputType, ObjectType } from '@nestjs/graphql';
+import {
+  IsDateString,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MinLength,
+} from 'class-validator';
 import { AppointmentType } from '../appointments/appointments.types';
 import { PrescriptionType } from '../clinical/clinical.types';
 
@@ -69,4 +76,34 @@ export class PortalPatientRecordsType {
 
   @Field(() => [PortalLabResultType])
   labResults: PortalLabResultType[];
+}
+
+@InputType()
+export class PortalBookAppointmentInput {
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsUUID()
+  doctorId?: string;
+
+  @Field()
+  @IsDateString()
+  scheduledAt: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}
+
+@InputType()
+export class PortalCancelAppointmentInput {
+  @Field()
+  @IsUUID()
+  id: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  reason?: string;
 }

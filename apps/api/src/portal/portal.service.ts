@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -12,10 +12,13 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 import { AppointmentsService } from '../appointments/appointments.service';
 import { ClinicalService } from '../clinical/clinical.service';
 import {
+  PortalBookAppointmentInput,
+  PortalCancelAppointmentInput,
   PortalLabResultType,
   PortalPatientProfileType,
   PortalPatientRecordsType,
 } from './portal.types';
+import { AppointmentType } from '../appointments/appointments.types';
 
 @Injectable()
 export class PortalService {
@@ -139,5 +142,51 @@ export class PortalService {
       ),
       labResults,
     };
+  }
+
+  async portalBookAppointment(
+    user: AuthenticatedUser,
+    input: PortalBookAppointmentInput,
+  ): Promise<AppointmentType> {
+    this.assertPatientRole(user);
+    const patient = await this.findLinkedPatient(user);
+    if (!patient) {
+      throw new NotFoundException('No linked patient record found');
+    }
+
+    return this.appointmentsService.create(
+      patient.hospitalId,
+      {
+        patientId: patient.id,
+        doctorId: input.doctorId,
+        scheduledAt: input.scheduledAt,
+        reason: input.reason,
+      },
+      user,
+    );
+  }
+
+  async portalCancelAppointment(
+    user: AuthenticatedUser,
+    input: PortalCancelAppointmentInput,
+  ): Promise<AppointmentType> {
+    this.assertPatientRole(user);
+    const patient = await this.findLinkedPatient(user);
+    if (!patient) {
+      throw new NotFoundException('No linked patient record found');
+    }
+
+    const appointment = await this.appointmentsRepo.findOne({
+      where: { id: input.id, patientId: patient.id, hospitalId: patient.hospitalId },
+    });
+    if (!appointment) {
+      throw new ForbiddenException('Appointment not found for your account');
+    }
+
+    return this.appointmentsService.cancel(
+      patient.hospitalId,
+      { id: input.id, reason: input.reason },
+      user,
+    );
   }
 }
