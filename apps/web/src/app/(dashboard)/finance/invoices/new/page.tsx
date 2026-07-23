@@ -6,6 +6,7 @@ import { useMutation, useQuery } from '@apollo/client';
 import { ClayButton, ClayCard, ClayInput } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
 import {
+  ACTIVE_ADMISSIONS_QUERY,
   CREATE_INVOICE_MUTATION,
   ME_QUERY,
   PATIENTS_QUERY,
@@ -20,6 +21,7 @@ type LineItem = {
 export default function NewInvoicePage() {
   const router = useRouter();
   const [patientId, setPatientId] = useState('');
+  const [admissionId, setAdmissionId] = useState('');
   const [patientSearch, setPatientSearch] = useState('');
   const [status, setStatus] = useState('draft');
   const [items, setItems] = useState<LineItem[]>([
@@ -34,6 +36,16 @@ export default function NewInvoicePage() {
     variables: { search: patientSearch, limit: 8, hospitalId },
     skip: !hospitalId || patientSearch.length < 2,
   });
+
+  const { data: admissionsData } = useQuery(ACTIVE_ADMISSIONS_QUERY, {
+    variables: { hospitalId },
+    skip: !hospitalId || !patientId,
+  });
+
+  const patientAdmissions = (admissionsData?.activeAdmissions ?? []).filter(
+    (a: { patientId?: string; patient?: { id: string } }) =>
+      a.patientId === patientId || a.patient?.id === patientId,
+  );
 
   const [createInvoice, { loading }] = useMutation(CREATE_INVOICE_MUTATION, {
     onCompleted: () => router.push('/finance/invoices'),
@@ -78,6 +90,7 @@ export default function NewInvoicePage() {
           hospitalId,
           input: {
             patientId: patientId.trim(),
+            admissionId: admissionId || undefined,
             status,
             items: validItems.map((item) => ({
               description: item.description.trim(),
@@ -117,6 +130,7 @@ export default function NewInvoicePage() {
                   onClick={() => {
                     setPatientId(p.id);
                     setPatientSearch(p.fullName);
+                    setAdmissionId('');
                   }}
                   className="block w-full rounded-xl px-3 py-2 text-left text-sm text-clay-text hover:bg-clay-primary-light/50"
                 >
@@ -129,9 +143,41 @@ export default function NewInvoicePage() {
             label="Patient ID *"
             placeholder="UUID"
             value={patientId}
-            onChange={(e) => setPatientId(e.target.value)}
+            onChange={(e) => {
+              setPatientId(e.target.value);
+              setAdmissionId('');
+            }}
             required
           />
+
+          {patientAdmissions.length ? (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-clay-text">
+                Link admission (optional)
+              </label>
+              <select
+                value={admissionId}
+                onChange={(e) => setAdmissionId(e.target.value)}
+                className="w-full rounded-2xl border-0 bg-clay-primary-light/50 px-4 py-3 text-sm text-clay-text shadow-clay-inset focus:outline-none focus:ring-2 focus:ring-clay-primary/30"
+              >
+                <option value="">No admission</option>
+                {patientAdmissions.map(
+                  (a: {
+                    id: string;
+                    ward?: { name: string };
+                    bed?: { label: string };
+                    admittedAt: string;
+                  }) => (
+                    <option key={a.id} value={a.id}>
+                      {[a.ward?.name, a.bed?.label].filter(Boolean).join(' · ') ||
+                        'Admission'}{' '}
+                      · {new Date(a.admittedAt).toLocaleDateString()}
+                    </option>
+                  ),
+                )}
+              </select>
+            </div>
+          ) : null}
 
           <div>
             <label className="mb-1 block text-sm font-medium text-clay-text">Status</label>

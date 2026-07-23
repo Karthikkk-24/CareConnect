@@ -6,7 +6,7 @@ import { useMutation, useQuery } from '@apollo/client';
 import { useState } from 'react';
 import { ClayBadge, ClayButton, ClayCard, ClayInput } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
-import { INVOICE_QUERY, ME_QUERY, RECORD_PAYMENT_MUTATION, VOID_INVOICE_MUTATION } from '@/lib/graphql/queries';
+import { INVOICE_QUERY, ME_QUERY, RECORD_PAYMENT_MUTATION, REFUND_PAYMENT_MUTATION, VOID_INVOICE_MUTATION } from '@/lib/graphql/queries';
 
 export default function InvoiceDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -17,11 +17,19 @@ export default function InvoiceDetailPage() {
     skip: !id || !hospitalId,
   });
   const [amount, setAmount] = useState('');
+  const [refundAmount, setRefundAmount] = useState('');
   const [method, setMethod] = useState('cash');
   const [error, setError] = useState('');
   const [recordPayment, { loading: paying }] = useMutation(RECORD_PAYMENT_MUTATION, {
     onCompleted: () => {
       setAmount('');
+      refetch();
+    },
+    onError: (err) => setError(err.message),
+  });
+  const [refundPayment, { loading: refunding }] = useMutation(REFUND_PAYMENT_MUTATION, {
+    onCompleted: () => {
+      setRefundAmount('');
       refetch();
     },
     onError: (err) => setError(err.message),
@@ -46,7 +54,7 @@ export default function InvoiceDetailPage() {
     <div>
       <DashboardHeader
         title={`Invoice · ${invoice.patient?.fullName ?? 'Patient'}`}
-        subtitle={`Status: ${invoice.status}`}
+        subtitle={`Status: ${invoice.status}${invoice.admissionId ? ` · Admission ${invoice.admissionId.slice(0, 8)}…` : ''}`}
       />
       <div className="mb-4">
         <Link href="/finance/invoices" className="text-sm text-clay-primary hover:underline">
@@ -157,6 +165,39 @@ export default function InvoiceDetailPage() {
               {error ? <p className="text-sm text-clay-error">{error}</p> : null}
               <ClayButton type="submit" isLoading={paying} className="w-full">
                 Record payment
+              </ClayButton>
+            </form>
+          ) : null}
+          {paid > 0 && invoice.status !== 'void' ? (
+            <form
+              className="space-y-3 border-t border-white/40 pt-4"
+              onSubmit={(e) => {
+                e.preventDefault();
+                setError('');
+                refundPayment({
+                  variables: {
+                    hospitalId,
+                    input: {
+                      invoiceId: id,
+                      amount: Number(refundAmount),
+                      method: 'refund',
+                    },
+                  },
+                });
+              }}
+            >
+              <ClayInput
+                label="Refund amount"
+                type="number"
+                step="0.01"
+                min="0.01"
+                max={paid}
+                value={refundAmount}
+                onChange={(e) => setRefundAmount(e.target.value)}
+                required
+              />
+              <ClayButton type="submit" variant="secondary" isLoading={refunding} className="w-full">
+                Issue refund
               </ClayButton>
             </form>
           ) : null}

@@ -71,7 +71,13 @@ function patientToFormValues(patient: PatientDetail): Partial<CreatePatientInput
       ? patient.allergies.map((a) => ({ allergen: a }))
       : [{ allergen: '' }],
     medications: patient.medications?.length
-      ? patient.medications.map((m) => ({ name: m }))
+      ? patient.medications.map((m) => {
+          const match = m.match(/^(.*?)\s*\((.*)\)\s*$/);
+          if (match) {
+            return { name: match[1].trim(), dosage: match[2].trim() };
+          }
+          return { name: m };
+        })
       : [{ name: '' }],
     medicalHistory: patient.medicalHistory?.length
       ? patient.medicalHistory.map((h) => ({

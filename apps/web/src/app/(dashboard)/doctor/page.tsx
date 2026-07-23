@@ -1,11 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { useQuery } from '@apollo/client';
-import { Calendar, Clock, FileText, Pill, FlaskConical, Users } from 'lucide-react';
+import { useQuery, useMutation } from '@apollo/client';
+import { Calendar, Clock, FileText, Users } from 'lucide-react';
 import { ClayBadge, ClayButton, ClayCard } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
-import { APPOINTMENTS_QUERY, ME_QUERY } from '@/lib/graphql/queries';
+import {
+  APPOINTMENTS_QUERY,
+  ME_QUERY,
+  UPDATE_APPOINTMENT_STATUS_MUTATION,
+} from '@/lib/graphql/queries';
+import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 
 function todayDateString() {
   return new Date().toISOString().slice(0, 10);
@@ -19,10 +24,15 @@ export default function DoctorDashboardPage() {
   const today = todayDateString();
   const { data: meData } = useQuery(ME_QUERY);
   const hospitalId = meData?.me?.hospitalId;
+  const permissions: string[] = meData?.me?.permissions ?? [];
 
-  const { data, loading } = useQuery(APPOINTMENTS_QUERY, {
+  const { data, loading, refetch } = useQuery(APPOINTMENTS_QUERY, {
     variables: { hospitalId, date: today, doctorId: meData?.me?.id },
     skip: !hospitalId || !meData?.me?.id,
+  });
+
+  const [updateStatus] = useMutation(UPDATE_APPOINTMENT_STATUS_MUTATION, {
+    onCompleted: () => refetch(),
   });
 
   const appointments = data?.appointments ?? [];
@@ -31,13 +41,31 @@ export default function DoctorDashboardPage() {
   );
 
   const quickLinks = [
-    { label: 'All Appointments', href: '/appointments', icon: Calendar },
-    { label: 'New Appointment', href: '/appointments/new', icon: Calendar },
-    { label: 'Patients', href: '/patients', icon: Users },
-    { label: 'Admissions', href: '/admissions', icon: FileText },
-    { label: 'Order Lab', href: '/lab', icon: FlaskConical },
-    { label: 'Pharmacy Queue', href: '/pharmacy', icon: Pill },
-  ];
+    {
+      label: 'All Appointments',
+      href: '/appointments',
+      icon: Calendar,
+      show: hasPermission(permissions, PERMISSIONS.APPOINTMENTS_READ),
+    },
+    {
+      label: 'New Appointment',
+      href: '/appointments/new',
+      icon: Calendar,
+      show: hasPermission(permissions, PERMISSIONS.APPOINTMENTS_WRITE),
+    },
+    {
+      label: 'Patients',
+      href: '/patients',
+      icon: Users,
+      show: hasPermission(permissions, PERMISSIONS.PATIENTS_READ),
+    },
+    {
+      label: 'Admissions',
+      href: '/admissions',
+      icon: FileText,
+      show: hasPermission(permissions, PERMISSIONS.PATIENTS_READ),
+    },
+  ].filter((l) => l.show);
 
   return (
     <div>
@@ -57,7 +85,9 @@ export default function DoctorDashboardPage() {
         </ClayCard>
         <ClayCard className="text-center">
           <p className="text-3xl font-bold text-clay-success">
-            {loading ? '—' : appointments.filter((a: { status: string }) => a.status === 'completed').length}
+            {loading
+              ? '—'
+              : appointments.filter((a: { status: string }) => a.status === 'completed').length}
           </p>
           <p className="text-sm text-clay-text-muted">Completed</p>
         </ClayCard>
@@ -82,7 +112,7 @@ export default function DoctorDashboardPage() {
                 }) => (
                   <div
                     key={appt.id}
-                    className="flex items-center gap-3 rounded-2xl bg-clay-primary-light/30 p-3"
+                    className="flex flex-wrap items-center gap-3 rounded-2xl bg-clay-primary-light/30 p-3"
                   >
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-clay-surface shadow-clay-inset">
                       <Clock className="h-4 w-4 text-clay-primary" />
@@ -91,9 +121,37 @@ export default function DoctorDashboardPage() {
                       <p className="text-sm font-medium text-clay-text">
                         {formatTime(appt.scheduledAt)} — {appt.patient?.fullName}
                       </p>
-                      <p className="truncate text-xs text-clay-text-muted">{appt.reason ?? 'No reason'}</p>
+                      <p className="truncate text-xs text-clay-text-muted">
+                        {appt.reason ?? 'No reason'}
+                      </p>
                     </div>
                     <ClayBadge>{appt.status.replace(/_/g, ' ')}</ClayBadge>
+                    {appt.status === 'scheduled' &&
+                    hasPermission(permissions, PERMISSIONS.APPOINTMENTS_WRITE) ? (
+                      <ClayButton
+                        size="sm"
+                        onClick={() =>
+                          updateStatus({
+                            variables: { id: appt.id, status: 'checked_in', hospitalId },
+                          })
+                        }
+                      >
+                        Check In
+                      </ClayButton>
+                    ) : null}
+                    {appt.status === 'checked_in' &&
+                    hasPermission(permissions, PERMISSIONS.APPOINTMENTS_WRITE) ? (
+                      <ClayButton
+                        size="sm"
+                        onClick={() =>
+                          updateStatus({
+                            variables: { id: appt.id, status: 'completed', hospitalId },
+                          })
+                        }
+                      >
+                        Complete
+                      </ClayButton>
+                    ) : null}
                     {appt.patient?.id ? (
                       <Link href={`/patients/${appt.patient.id}`}>
                         <ClayButton size="sm" variant="secondary">

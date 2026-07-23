@@ -7,8 +7,10 @@ import { ClayBadge, ClayButton, ClayCard, ClayInput } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
 import {
   CREATE_INVENTORY_ITEM_MUTATION,
+  DELETE_INVENTORY_ITEM_MUTATION,
   INVENTORY_ITEMS_QUERY,
   ME_QUERY,
+  UPDATE_INVENTORY_ITEM_MUTATION,
   UPDATE_INVENTORY_QUANTITY_MUTATION,
 } from '@/lib/graphql/queries';
 
@@ -20,6 +22,9 @@ export default function InventoryPage() {
   const [unit, setUnit] = useState('each');
   const [reorderLevel, setReorderLevel] = useState('10');
   const [error, setError] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editSku, setEditSku] = useState('');
 
   const { data: meData } = useQuery(ME_QUERY);
   const hospitalId = meData?.me?.hospitalId;
@@ -42,6 +47,15 @@ export default function InventoryPage() {
   });
 
   const [updateQuantity, { loading: updating }] = useMutation(UPDATE_INVENTORY_QUANTITY_MUTATION, {
+    onCompleted: () => refetch(),
+  });
+  const [updateItem] = useMutation(UPDATE_INVENTORY_ITEM_MUTATION, {
+    onCompleted: () => {
+      setEditingId(null);
+      refetch();
+    },
+  });
+  const [deleteItem] = useMutation(DELETE_INVENTORY_ITEM_MUTATION, {
     onCompleted: () => refetch(),
   });
 
@@ -197,6 +211,31 @@ export default function InventoryPage() {
                       >
                         +
                       </ClayButton>
+                      <ClayButton
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setEditingId(item.id);
+                          setEditName(item.name);
+                          setEditSku(item.sku ?? '');
+                        }}
+                      >
+                        Edit
+                      </ClayButton>
+                      <ClayButton
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          if (confirm(`Delete “${item.name}”?`)) {
+                            void deleteItem({ variables: { id: item.id, hospitalId } }).catch(
+                              (err: unknown) =>
+                                setError(err instanceof Error ? err.message : 'Delete failed'),
+                            );
+                          }
+                        }}
+                      >
+                        Delete
+                      </ClayButton>
                     </div>
                   </div>
                 );
@@ -205,6 +244,39 @@ export default function InventoryPage() {
           </div>
         )}
       </ClayCard>
+
+      {editingId ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <ClayCard className="w-full max-w-md space-y-3">
+            <h2 className="text-lg font-semibold text-clay-text">Edit item</h2>
+            <ClayInput label="Name" value={editName} onChange={(e) => setEditName(e.target.value)} />
+            <ClayInput label="SKU" value={editSku} onChange={(e) => setEditSku(e.target.value)} />
+            <div className="flex justify-end gap-2">
+              <ClayButton variant="ghost" onClick={() => setEditingId(null)}>
+                Cancel
+              </ClayButton>
+              <ClayButton
+                onClick={() =>
+                  void updateItem({
+                    variables: {
+                      hospitalId,
+                      input: {
+                        id: editingId,
+                        name: editName.trim(),
+                        sku: editSku.trim() || undefined,
+                      },
+                    },
+                  }).catch((err: unknown) =>
+                    setError(err instanceof Error ? err.message : 'Update failed'),
+                  )
+                }
+              >
+                Save
+              </ClayButton>
+            </div>
+          </ClayCard>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -55,6 +55,12 @@ export default function FacilitySettingsPage() {
   const [bedLabel, setBedLabel] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [renameTarget, setRenameTarget] = useState<
+    | { kind: 'department'; id: string; name: string; description: string }
+    | { kind: 'ward'; id: string; name: string; floor: string }
+    | { kind: 'bed'; id: string; label: string }
+    | null
+  >(null);
 
   const departmentsQuery = useQuery(DEPARTMENTS_QUERY, {
     variables: { hospitalId },
@@ -291,22 +297,14 @@ export default function FacilitySettingsPage() {
                       size="sm"
                       variant="ghost"
                       aria-label={`Rename ${d.name}`}
-                      onClick={() => {
-                        const name = window.prompt('Department name', d.name);
-                        if (!name?.trim()) return;
-                        const description =
-                          window.prompt('Description (optional)', d.description ?? '') ?? undefined;
-                        updateDepartment({
-                          variables: {
-                            id: d.id,
-                            hospitalId,
-                            input: {
-                              name: name.trim(),
-                              description: description?.trim() || undefined,
-                            },
-                          },
-                        });
-                      }}
+                      onClick={() =>
+                        setRenameTarget({
+                          kind: 'department',
+                          id: d.id,
+                          name: d.name,
+                          description: d.description ?? '',
+                        })
+                      }
                     >
                       <Pencil className="h-4 w-4 text-clay-primary" />
                     </ClayButton>
@@ -406,22 +404,14 @@ export default function FacilitySettingsPage() {
                       size="sm"
                       variant="ghost"
                       aria-label={`Rename ${w.name}`}
-                      onClick={() => {
-                        const name = window.prompt('Ward name', w.name);
-                        if (!name?.trim()) return;
-                        const floor =
-                          window.prompt('Floor (optional)', w.floor ?? '') ?? undefined;
-                        updateWard({
-                          variables: {
-                            id: w.id,
-                            hospitalId,
-                            input: {
-                              name: name.trim(),
-                              floor: floor?.trim() || undefined,
-                            },
-                          },
-                        });
-                      }}
+                      onClick={() =>
+                        setRenameTarget({
+                          kind: 'ward',
+                          id: w.id,
+                          name: w.name,
+                          floor: w.floor ?? '',
+                        })
+                      }
                     >
                       <Pencil className="h-4 w-4 text-clay-primary" />
                     </ClayButton>
@@ -507,17 +497,13 @@ export default function FacilitySettingsPage() {
                           size="sm"
                           variant="ghost"
                           aria-label={`Rename ${b.label}`}
-                          onClick={() => {
-                            const label = window.prompt('Bed label', b.label);
-                            if (!label?.trim()) return;
-                            updateBed({
-                              variables: {
-                                id: b.id,
-                                hospitalId,
-                                input: { label: label.trim() },
-                              },
-                            });
-                          }}
+                          onClick={() =>
+                            setRenameTarget({
+                              kind: 'bed',
+                              id: b.id,
+                              label: b.label,
+                            })
+                          }
                         >
                           <Pencil className="h-4 w-4 text-clay-primary" />
                         </ClayButton>
@@ -543,6 +529,118 @@ export default function FacilitySettingsPage() {
           </div>
         </ClayCard>
       </div>
+
+      {renameTarget ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Rename facility item"
+        >
+          <ClayCard className="w-full max-w-md">
+            <h2 className="mb-4 text-lg font-semibold text-clay-text">
+              {renameTarget.kind === 'department'
+                ? 'Rename department'
+                : renameTarget.kind === 'ward'
+                  ? 'Rename ward'
+                  : 'Rename bed'}
+            </h2>
+            {renameTarget.kind === 'department' ? (
+              <div className="space-y-3">
+                <ClayInput
+                  label="Name *"
+                  value={renameTarget.name}
+                  onChange={(e) =>
+                    setRenameTarget({ ...renameTarget, name: e.target.value })
+                  }
+                />
+                <ClayInput
+                  label="Description"
+                  value={renameTarget.description}
+                  onChange={(e) =>
+                    setRenameTarget({ ...renameTarget, description: e.target.value })
+                  }
+                />
+              </div>
+            ) : null}
+            {renameTarget.kind === 'ward' ? (
+              <div className="space-y-3">
+                <ClayInput
+                  label="Name *"
+                  value={renameTarget.name}
+                  onChange={(e) =>
+                    setRenameTarget({ ...renameTarget, name: e.target.value })
+                  }
+                />
+                <ClayInput
+                  label="Floor"
+                  value={renameTarget.floor}
+                  onChange={(e) =>
+                    setRenameTarget({ ...renameTarget, floor: e.target.value })
+                  }
+                />
+              </div>
+            ) : null}
+            {renameTarget.kind === 'bed' ? (
+              <ClayInput
+                label="Label *"
+                value={renameTarget.label}
+                onChange={(e) =>
+                  setRenameTarget({ ...renameTarget, label: e.target.value })
+                }
+              />
+            ) : null}
+            <div className="mt-4 flex justify-end gap-2">
+              <ClayButton type="button" variant="ghost" onClick={() => setRenameTarget(null)}>
+                Cancel
+              </ClayButton>
+              <ClayButton
+                type="button"
+                onClick={() => {
+                  if (!hospitalId || !renameTarget) return;
+                  if (renameTarget.kind === 'department') {
+                    if (!renameTarget.name.trim()) return;
+                    updateDepartment({
+                      variables: {
+                        id: renameTarget.id,
+                        hospitalId,
+                        input: {
+                          name: renameTarget.name.trim(),
+                          description: renameTarget.description.trim() || undefined,
+                        },
+                      },
+                    });
+                  } else if (renameTarget.kind === 'ward') {
+                    if (!renameTarget.name.trim()) return;
+                    updateWard({
+                      variables: {
+                        id: renameTarget.id,
+                        hospitalId,
+                        input: {
+                          name: renameTarget.name.trim(),
+                          floor: renameTarget.floor.trim() || undefined,
+                        },
+                      },
+                    });
+                  } else {
+                    if (!renameTarget.label.trim()) return;
+                    updateBed({
+                      variables: {
+                        id: renameTarget.id,
+                        hospitalId,
+                        input: { label: renameTarget.label.trim() },
+                      },
+                    });
+                  }
+                  setRenameTarget(null);
+                }}
+              >
+                Save
+              </ClayButton>
+            </div>
+          </ClayCard>
+        </div>
+      ) : null}
     </div>
   );
 }

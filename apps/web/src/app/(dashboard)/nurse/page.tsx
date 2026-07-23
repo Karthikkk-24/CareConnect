@@ -19,7 +19,7 @@ export default function NurseDashboardPage() {
   const admissions = data?.activeAdmissions ?? [];
 
   const quickLinks = [
-    { label: 'Record Vitals', href: '/patients', icon: HeartPulse },
+    { label: 'Record Vitals', href: admissions[0]?.patient?.id ? `/patients/${admissions[0].patient.id}?action=vitals` : '/patients', icon: HeartPulse },
     { label: 'All Admissions', href: '/admissions', icon: Activity },
     { label: 'Bed Occupancy', href: '/admissions/occupancy', icon: BedDouble },
     { label: 'Patients', href: '/patients', icon: Users },
@@ -82,7 +82,7 @@ export default function NurseDashboardPage() {
                     </div>
                     <ClayBadge variant="success">active</ClayBadge>
                     {adm.patient?.id ? (
-                      <Link href={`/patients/${adm.patient.id}`}>
+                      <Link href={`/patients/${adm.patient.id}?action=vitals`}>
                         <ClayButton size="sm">
                           <HeartPulse className="h-4 w-4" />
                           Vitals

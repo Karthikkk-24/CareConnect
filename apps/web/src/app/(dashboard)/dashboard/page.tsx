@@ -13,6 +13,7 @@ import {
   PATIENTS_QUERY,
   STAFF_MEMBERS_QUERY,
 } from '@/lib/graphql/queries';
+import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 
 function todayDateString() {
   return new Date().toISOString().slice(0, 10);
@@ -22,6 +23,7 @@ export default function DashboardPage() {
   const today = todayDateString();
   const { data: meData } = useQuery(ME_QUERY);
   const hospitalId = meData?.me?.hospitalId;
+  const permissions: string[] = meData?.me?.permissions ?? [];
 
   const { data: staffData } = useQuery(STAFF_MEMBERS_QUERY, {
     variables: { hospitalId },
@@ -92,15 +94,44 @@ export default function DashboardPage() {
           <h2 className="mb-4 text-lg font-semibold text-clay-text">Quick Actions</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             {[
-              { label: 'Register Patient', href: '/patients/new' },
-              { label: 'Bulk Import Patients', href: '/patients/import' },
-              { label: 'New Appointment', href: '/appointments/new' },
-              { label: 'View Appointments', href: '/appointments' },
-              { label: 'Admit Patient', href: '/admissions' },
-              { label: 'Add Staff Member', href: '/staff/new' },
-              { label: 'View Staff Directory', href: '/staff' },
-              { label: 'Lab Queue', href: '/lab' },
-            ].map((action) => (
+              {
+                label: 'Register Patient',
+                href: '/patients/new',
+                show: hasPermission(permissions, PERMISSIONS.PATIENTS_WRITE),
+              },
+              {
+                label: 'Bulk Import Patients',
+                href: '/patients/import',
+                show: hasPermission(permissions, PERMISSIONS.PATIENTS_WRITE),
+              },
+              {
+                label: 'New Appointment',
+                href: '/appointments/new',
+                show: hasPermission(permissions, PERMISSIONS.APPOINTMENTS_WRITE),
+              },
+              {
+                label: 'View Appointments',
+                href: '/appointments',
+                show: hasPermission(permissions, PERMISSIONS.APPOINTMENTS_READ),
+              },
+              {
+                label: 'Admit Patient',
+                href: '/admissions',
+                show: hasPermission(permissions, PERMISSIONS.PATIENTS_WRITE),
+              },
+              {
+                label: 'Add Staff Member',
+                href: '/staff/new',
+                show: hasPermission(permissions, PERMISSIONS.STAFF_WRITE),
+              },
+              {
+                label: 'View Staff Directory',
+                href: '/staff',
+                show: hasPermission(permissions, PERMISSIONS.STAFF_READ),
+              },
+            ]
+              .filter((a) => a.show)
+              .map((action) => (
               <Link
                 key={action.label}
                 href={action.href}

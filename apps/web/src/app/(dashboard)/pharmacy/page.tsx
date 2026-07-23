@@ -6,6 +6,7 @@ import { Pill } from 'lucide-react';
 import { ClayBadge, ClayButton, ClayCard, ClayInput } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
 import {
+  DELETE_PHARMACY_STOCK_MUTATION,
   DISPENSE_PRESCRIPTION_MUTATION,
   ME_QUERY,
   PENDING_PRESCRIPTIONS_QUERY,
@@ -17,6 +18,7 @@ export default function PharmacyPage() {
   const [drugName, setDrugName] = useState('');
   const [quantity, setQuantity] = useState('');
   const [unit, setUnit] = useState('each');
+  const [unitsPerItem, setUnitsPerItem] = useState('1');
   const [error, setError] = useState('');
 
   const { data: meData } = useQuery(ME_QUERY);
@@ -45,6 +47,10 @@ export default function PharmacyPage() {
     },
   });
 
+  const [deleteStock] = useMutation(DELETE_PHARMACY_STOCK_MUTATION, {
+    onCompleted: () => refetchStock(),
+  });
+
   const prescriptions = rxData?.pendingPrescriptions ?? [];
   const stock = stockData?.pharmacyStock ?? [];
 
@@ -52,7 +58,13 @@ export default function PharmacyPage() {
     setError('');
     try {
       await dispense({
-        variables: { hospitalId, input: { prescriptionId } },
+        variables: {
+          hospitalId,
+          input: {
+            prescriptionId,
+            unitsPerItem: Number(unitsPerItem) || 1,
+          },
+        },
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to dispense prescription');
@@ -95,6 +107,16 @@ export default function PharmacyPage() {
           <div className="border-b border-white/40 bg-clay-primary-light/30 px-6 py-4">
             <h2 className="text-lg font-semibold text-clay-text">Pending Prescriptions</h2>
             <p className="text-sm text-clay-text-muted">{prescriptions.length} awaiting dispense</p>
+            <div className="mt-3 max-w-xs">
+              <ClayInput
+                label="Units per line item"
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={unitsPerItem}
+                onChange={(e) => setUnitsPerItem(e.target.value)}
+              />
+            </div>
           </div>
           {rxLoading ? (
             <p className="px-6 py-8 text-center text-clay-text-muted">Loading...</p>
@@ -194,6 +216,20 @@ export default function PharmacyPage() {
                       <ClayBadge variant={item.quantity <= 10 ? 'warning' : 'success'}>
                         {item.quantity} {item.unit}
                       </ClayBadge>
+                      <ClayButton
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          if (confirm(`Delete stock for “${item.drugName}”?`)) {
+                            void deleteStock({ variables: { id: item.id, hospitalId } }).catch(
+                              (err: unknown) =>
+                                setError(err instanceof Error ? err.message : 'Delete failed'),
+                            );
+                          }
+                        }}
+                      >
+                        Delete
+                      </ClayButton>
                     </div>
                   ),
                 )}

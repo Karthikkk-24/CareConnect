@@ -10,6 +10,8 @@ import { DashboardHeader } from '@/components/layout/dashboard-header';
 import { ADD_PATIENT_DOCUMENT_MUTATION, DELETE_PATIENT_DOCUMENT, DELETE_PATIENT_MUTATION, DISCHARGES_QUERY, LINK_PATIENT_ACCOUNT, ME_QUERY, PATIENT_DIAGNOSES_QUERY, PATIENT_NOTES_QUERY, PATIENT_PRESCRIPTIONS_QUERY, PATIENT_QUERY, PATIENT_VITALS_QUERY, UPDATE_PATIENT_STATUS } from '@/lib/graphql/queries';
 import { PatientClinicalActions } from '@/components/clinical/patient-clinical-actions';
 import { useAuth } from '@clerk/nextjs';
+import { openAuthenticatedUpload } from '@/lib/open-authenticated-upload';
+import { useSearchParams } from 'next/navigation';
 
 const DOCUMENT_TYPES = [
   { value: 'identification', label: 'Identification' },
@@ -21,6 +23,18 @@ const DOCUMENT_TYPES = [
 
 export default function PatientDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
+  const clinicalAction = searchParams.get('action');
+  const initialAction =
+    clinicalAction === 'vitals' ||
+    clinicalAction === 'appointment' ||
+    clinicalAction === 'admit' ||
+    clinicalAction === 'soap' ||
+    clinicalAction === 'diagnosis' ||
+    clinicalAction === 'prescription' ||
+    clinicalAction === 'lab'
+      ? clinicalAction
+      : null;
   const { getToken } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
@@ -96,18 +110,23 @@ export default function PatientDetailPage() {
       }
       const uploaded = (await uploadRes.json()) as { url: string; fileType?: string };
 
-      await addDocument({
-        variables: {
-          patientId: id,
-          hospitalId: meData?.me?.hospitalId,
-          input: {
-            name: file.name,
-            fileUrl: uploaded.url,
-            fileType: uploaded.fileType || file.type,
-            documentType,
+      try {
+        await addDocument({
+          variables: {
+            patientId: id,
+            hospitalId: meData?.me?.hospitalId,
+            input: {
+              name: file.name,
+              fileUrl: uploaded.url,
+              fileType: uploaded.fileType || file.type,
+              documentType,
+            },
           },
-        },
-      });
+        });
+      } catch (docErr) {
+        // Server also cleans orphans; surface the GraphQL failure
+        throw docErr;
+      }
       refetch();
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : 'Upload failed');
@@ -156,7 +175,13 @@ export default function PatientDetailPage() {
             })
           }
         >
-          {['registered', 'checked_in', 'admitted', 'discharged', 'inactive'].map((s) => (
+          {[
+            'registered',
+            'checked_in',
+            ...(patient.status === 'admitted' ? ['admitted'] : []),
+            'discharged',
+            'inactive',
+          ].map((s) => (
             <option key={s} value={s}>
               {s.replace(/_/g, ' ')}
             </option>
@@ -339,15 +364,21 @@ export default function PatientDetailPage() {
                   key={d.id}
                   className="flex items-center gap-3 rounded-2xl bg-clay-primary-light/30 p-3"
                 >
-                  <a
-                    href={d.fileUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex min-w-0 flex-1 items-center gap-3 hover:opacity-80"
+                  <button
+                    type="button"
+                    className="flex min-w-0 flex-1 items-center gap-3 text-left hover:opacity-80"
+                    onClick={() => {
+                      void openAuthenticatedUpload(d.fileUrl, getToken).catch(
+                        (err: unknown) =>
+                          setUploadError(
+                            err instanceof Error ? err.message : 'Download failed',
+                          ),
+                      );
+                    }}
                   >
                     <FileText className="h-5 w-5 shrink-0 text-clay-primary" />
                     <span className="truncate text-sm text-clay-text">{d.name}</span>
-                  </a>
+                  </button>
                   <ClayButton
                     size="sm"
                     variant="ghost"
@@ -499,7 +530,11 @@ export default function PatientDetailPage() {
           </div>
         </ClayCard>
 
-        <PatientClinicalActions patientId={id} hospitalId={meData?.me?.hospitalId} />
+        <PatientClinicalActions
+          patientId={id}
+          hospitalId={meData?.me?.hospitalId}
+          initialAction={initialAction}
+        />
       </div>
     </div>
   );
