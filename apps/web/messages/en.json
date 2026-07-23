@@ -36,6 +36,8 @@
     "facility": "Facility",
     "hospitalProfile": "Hospital Profile",
     "signOut": "Sign Out",
+    "receptionist": "Front Desk",
+    "brandSubtitleReceptionist": "Front Desk",
     "brandSubtitle": "Care workspace",
     "brandSubtitleAdmin": "Hospital Admin",
     "brandSubtitleDoctor": "Doctor",
