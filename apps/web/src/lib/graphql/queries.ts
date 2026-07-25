@@ -198,6 +198,17 @@ export const CANCEL_APPOINTMENT_MUTATION = gql`
   }
 `;
 
+export const RESCHEDULE_APPOINTMENT_MUTATION = gql`
+  mutation RescheduleAppointment($input: RescheduleAppointmentInput!, $hospitalId: String) {
+    rescheduleAppointment(input: $input, hospitalId: $hospitalId) {
+      id
+      scheduledAt
+      reason
+      status
+    }
+  }
+`;
+
 export const UPDATE_STAFF_MUTATION = gql`
   mutation UpdateStaffMember($id: String!, $input: UpdateStaffInput!) {
     updateStaffMember(id: $id, input: $input) {
@@ -849,6 +860,7 @@ export const INVOICE_QUERY = gql`
     invoice(id: $id, hospitalId: $hospitalId) {
       id
       patientId
+      admissionId
       patient {
         id
         fullName
@@ -937,6 +949,24 @@ export const UPDATE_INVENTORY_QUANTITY_MUTATION = gql`
   }
 `;
 
+export const UPDATE_INVENTORY_ITEM_MUTATION = gql`
+  mutation UpdateInventoryItem($input: UpdateInventoryItemInput!, $hospitalId: String) {
+    updateInventoryItem(input: $input, hospitalId: $hospitalId) {
+      id
+      name
+      sku
+      unit
+      reorderLevel
+    }
+  }
+`;
+
+export const DELETE_INVENTORY_ITEM_MUTATION = gql`
+  mutation DeleteInventoryItem($id: String!, $hospitalId: String) {
+    deleteInventoryItem(id: $id, hospitalId: $hospitalId)
+  }
+`;
+
 export const PHARMACY_STOCK_QUERY = gql`
   query PharmacyStock($hospitalId: String) {
     pharmacyStock(hospitalId: $hospitalId) {
@@ -993,14 +1023,56 @@ export const DISPENSE_PRESCRIPTION_MUTATION = gql`
   }
 `;
 
+export const DELETE_PHARMACY_STOCK_MUTATION = gql`
+  mutation DeletePharmacyStock($id: String!, $hospitalId: String) {
+    deletePharmacyStock(id: $id, hospitalId: $hospitalId)
+  }
+`;
+
 export const HOSPITAL_REPORTS_QUERY = gql`
-  query HospitalReports($hospitalId: String) {
-    hospitalReports(hospitalId: $hospitalId) {
+  query HospitalReports($hospitalId: String, $from: String, $to: String) {
+    hospitalReports(hospitalId: $hospitalId, from: $from, to: $to) {
       patientCount
       staffCount
       appointmentsToday
       activeAdmissions
       revenueTotal
+    }
+  }
+`;
+
+export const REFUND_PAYMENT_MUTATION = gql`
+  mutation RefundPayment($input: RefundPaymentInput!, $hospitalId: String) {
+    refundPayment(input: $input, hospitalId: $hospitalId) {
+      id
+      status
+      totalAmount
+      payments {
+        id
+        amount
+        method
+        paidAt
+      }
+    }
+  }
+`;
+
+export const PORTAL_BOOK_APPOINTMENT_MUTATION = gql`
+  mutation PortalBookAppointment($input: PortalBookAppointmentInput!) {
+    portalBookAppointment(input: $input) {
+      id
+      scheduledAt
+      status
+      reason
+    }
+  }
+`;
+
+export const PORTAL_CANCEL_APPOINTMENT_MUTATION = gql`
+  mutation PortalCancelAppointment($input: PortalCancelAppointmentInput!) {
+    portalCancelAppointment(input: $input) {
+      id
+      status
     }
   }
 `;

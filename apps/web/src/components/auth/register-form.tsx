@@ -10,6 +10,7 @@ import { useMutation } from '@apollo/client';
 import { registerSchema, type RegisterInput } from '@careconnect/types';
 import { ClayButton, ClayCard, ClayInput } from '@careconnect/ui';
 import { COMPLETE_PATIENT_ONBOARDING } from '@/lib/graphql/queries';
+import { safeInternalPath } from '@/lib/safe-redirect';
 
 export function RegisterForm() {
   const router = useRouter();
@@ -21,7 +22,7 @@ export function RegisterForm() {
   const [code, setCode] = useState('');
   const [completePatientOnboarding] = useMutation(COMPLETE_PATIENT_ONBOARDING);
 
-  const redirectTo = searchParams.get('redirect') ?? '/onboarding';
+  const redirectTo = safeInternalPath(searchParams.get('redirect'), '/onboarding');
 
   const {
     register,

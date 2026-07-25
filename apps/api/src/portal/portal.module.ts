@@ -5,6 +5,7 @@ import {
   LabOrder,
   LabResult,
   Patient,
+  PatientDocument,
   Prescription,
 } from '../database/entities';
 import { AppointmentsModule } from '../appointments/appointments.module';
@@ -20,6 +21,7 @@ import { PortalService } from './portal.service';
       Prescription,
       LabOrder,
       LabResult,
+      PatientDocument,
     ]),
     AppointmentsModule,
     ClinicalModule,

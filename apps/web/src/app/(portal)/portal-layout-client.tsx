@@ -39,7 +39,7 @@ export function PortalLayoutClient({ children }: { children: React.ReactNode }) 
   }, [searchParams, data?.me, user, completePatientOnboarding, refetch]);
 
   return (
-    <div className="flex min-h-screen gap-6 bg-clay-bg p-6">
+    <div className="flex min-h-screen gap-6 bg-clay-bg p-6 pt-16 lg:pt-6">
       <a
         href="#portal-main"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-xl focus:bg-clay-surface focus:px-4 focus:py-2"

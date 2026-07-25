@@ -22,7 +22,7 @@ const features = [
   {
     icon: ClipboardList,
     title: 'Clinical Workflows',
-    description: 'Admissions, vitals, notes, prescriptions, nursing tasks, and discharge summaries.',
+    description: 'Admissions, vitals, notes, prescriptions, and discharge summaries.',
   },
   {
     icon: FlaskConical,

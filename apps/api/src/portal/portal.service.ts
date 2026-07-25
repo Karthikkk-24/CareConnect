@@ -6,6 +6,7 @@ import {
   LabOrder,
   LabResult,
   Patient,
+  PatientDocument,
   Prescription,
 } from '../database/entities';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -14,6 +15,7 @@ import { ClinicalService } from '../clinical/clinical.service';
 import {
   PortalBookAppointmentInput,
   PortalCancelAppointmentInput,
+  PortalDocumentType,
   PortalLabResultType,
   PortalPatientProfileType,
   PortalPatientRecordsType,
@@ -33,6 +35,8 @@ export class PortalService {
     private readonly labOrdersRepo: Repository<LabOrder>,
     @InjectRepository(LabResult)
     private readonly labResultsRepo: Repository<LabResult>,
+    @InjectRepository(PatientDocument)
+    private readonly documentsRepo: Repository<PatientDocument>,
     private readonly appointmentsService: AppointmentsService,
     private readonly clinicalService: ClinicalService,
   ) {}
@@ -92,6 +96,7 @@ export class PortalService {
         appointments: [],
         prescriptions: [],
         labResults: [],
+        documents: [],
       };
     }
 
@@ -108,6 +113,11 @@ export class PortalService {
 
     const labOrders = await this.labOrdersRepo.find({
       where: { patientId: patient.id, hospitalId: patient.hospitalId },
+      order: { createdAt: 'DESC' },
+    });
+
+    const documents = await this.documentsRepo.find({
+      where: { patientId: patient.id },
       order: { createdAt: 'DESC' },
     });
 
@@ -132,6 +142,15 @@ export class PortalService {
       }
     }
 
+    const portalDocuments: PortalDocumentType[] = documents.map((d) => ({
+      id: d.id,
+      name: d.name,
+      fileUrl: d.fileUrl,
+      fileType: d.fileType,
+      documentType: d.documentType,
+      createdAt: d.createdAt,
+    }));
+
     return {
       patient: this.toProfile(patient),
       appointments: appointments.map((a) =>
@@ -141,6 +160,7 @@ export class PortalService {
         this.clinicalService.toPrescriptionType(p),
       ),
       labResults,
+      documents: portalDocuments,
     };
   }
 

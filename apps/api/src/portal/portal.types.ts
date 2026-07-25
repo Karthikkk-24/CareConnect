@@ -64,6 +64,27 @@ export class PortalPatientProfileType {
 }
 
 @ObjectType()
+export class PortalDocumentType {
+  @Field(() => ID)
+  id: string;
+
+  @Field()
+  name: string;
+
+  @Field()
+  fileUrl: string;
+
+  @Field({ nullable: true })
+  fileType?: string;
+
+  @Field({ nullable: true })
+  documentType?: string;
+
+  @Field()
+  createdAt: Date;
+}
+
+@ObjectType()
 export class PortalPatientRecordsType {
   @Field(() => PortalPatientProfileType, { nullable: true })
   patient?: PortalPatientProfileType;
@@ -76,6 +97,9 @@ export class PortalPatientRecordsType {
 
   @Field(() => [PortalLabResultType])
   labResults: PortalLabResultType[];
+
+  @Field(() => [PortalDocumentType])
+  documents: PortalDocumentType[];
 }
 
 @InputType()

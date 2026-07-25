@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useState } from 'react';
 import {
   LayoutDashboard,
   Calendar,
@@ -10,6 +11,8 @@ import {
   FlaskConical,
   User,
   LogOut,
+  Menu,
+  X,
 } from 'lucide-react';
 import { useClerk } from '@clerk/nextjs';
 import { cn } from '@careconnect/ui';
@@ -27,6 +30,7 @@ export function PortalSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const clerk = useClerk();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const handleLogout = async () => {
     await clerk.signOut();
@@ -34,19 +38,29 @@ export function PortalSidebar() {
     router.refresh();
   };
 
-  return (
-    <aside className="flex h-full w-64 flex-col rounded-3xl bg-clay-surface p-4 shadow-clay">
-      <div className="mb-8 flex items-center gap-2 px-2">
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-clay-primary-light to-clay-primary text-sm font-bold text-white shadow-clay-sm">
-          CC
+  const nav = (
+    <>
+      <div className="mb-8 flex items-center justify-between gap-2 px-2">
+        <div className="flex items-center gap-2">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-clay-primary-light to-clay-primary text-sm font-bold text-white shadow-clay-sm">
+            CC
+          </div>
+          <div>
+            <p className="font-bold text-clay-text">CareConnect</p>
+            <p className="text-xs text-clay-text-muted">Patient Portal</p>
+          </div>
         </div>
-        <div>
-          <p className="font-bold text-clay-text">CareConnect</p>
-          <p className="text-xs text-clay-text-muted">Patient Portal</p>
-        </div>
+        <button
+          type="button"
+          className="rounded-xl p-2 text-clay-text-muted lg:hidden"
+          aria-label="Close menu"
+          onClick={() => setMobileOpen(false)}
+        >
+          <X className="h-5 w-5" />
+        </button>
       </div>
 
-      <nav className="flex flex-1 flex-col gap-1">
+      <nav className="flex flex-1 flex-col gap-1" aria-label="Portal navigation">
         {navItems.map((item) => {
           const isActive =
             item.href === '/portal'
@@ -58,6 +72,7 @@ export function PortalSidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={() => setMobileOpen(false)}
               className={cn(
                 'flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition-all',
                 isActive
@@ -74,6 +89,7 @@ export function PortalSidebar() {
 
       <div className="mt-auto border-t border-white/40 pt-4">
         <button
+          type="button"
           onClick={handleLogout}
           className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm text-clay-error hover:bg-red-50"
         >
@@ -81,6 +97,37 @@ export function PortalSidebar() {
           Sign Out
         </button>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      <button
+        type="button"
+        className="fixed left-4 top-4 z-40 flex h-11 w-11 items-center justify-center rounded-2xl bg-clay-surface shadow-clay lg:hidden"
+        aria-label="Open menu"
+        onClick={() => setMobileOpen(true)}
+      >
+        <Menu className="h-5 w-5 text-clay-text" />
+      </button>
+
+      {mobileOpen ? (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          role="presentation"
+          onClick={() => setMobileOpen(false)}
+        />
+      ) : null}
+
+      <aside
+        className={cn(
+          'z-50 flex h-full w-64 flex-col rounded-3xl bg-clay-surface p-4 shadow-clay',
+          'fixed inset-y-4 left-4 lg:static lg:inset-auto',
+          mobileOpen ? 'flex' : 'hidden lg:flex',
+        )}
+      >
+        {nav}
+      </aside>
+    </>
   );
 }

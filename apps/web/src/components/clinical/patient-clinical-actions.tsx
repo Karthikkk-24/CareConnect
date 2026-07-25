@@ -29,11 +29,6 @@ import {
   WARDS_QUERY,
 } from '@/lib/graphql/queries';
 
-interface PatientClinicalActionsProps {
-  patientId: string;
-  hospitalId?: string;
-}
-
 type ActionKey =
   | 'appointment'
   | 'admit'
@@ -42,6 +37,12 @@ type ActionKey =
   | 'diagnosis'
   | 'prescription'
   | 'lab';
+
+interface PatientClinicalActionsProps {
+  patientId: string;
+  hospitalId?: string;
+  initialAction?: ActionKey | null;
+}
 
 const actions: { key: ActionKey; label: string; icon: typeof Calendar }[] = [
   { key: 'appointment', label: 'Book Appointment', icon: Calendar },
@@ -53,8 +54,12 @@ const actions: { key: ActionKey; label: string; icon: typeof Calendar }[] = [
   { key: 'lab', label: 'Order Lab Test', icon: FlaskConical },
 ];
 
-export function PatientClinicalActions({ patientId, hospitalId }: PatientClinicalActionsProps) {
-  const [expanded, setExpanded] = useState<ActionKey | null>(null);
+export function PatientClinicalActions({
+  patientId,
+  hospitalId,
+  initialAction = null,
+}: PatientClinicalActionsProps) {
+  const [expanded, setExpanded] = useState<ActionKey | null>(initialAction);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [admitWardId, setAdmitWardId] = useState('');
@@ -104,7 +109,7 @@ export function PatientClinicalActions({ patientId, hospitalId }: PatientClinica
           input: {
             patientId,
             doctorId: (form.get('doctorId') as string) || undefined,
-            scheduledAt: form.get('scheduledAt') as string,
+            scheduledAt: new Date(form.get('scheduledAt') as string).toISOString(),
             reason: form.get('reason') as string,
           },
         },
