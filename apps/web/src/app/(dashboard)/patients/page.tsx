@@ -12,7 +12,7 @@ export default function PatientsPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const { data: meData } = useQuery(ME_QUERY);
-  const { data, loading } = useQuery(PATIENTS_QUERY, {
+  const { data, loading, error } = useQuery(PATIENTS_QUERY, {
     variables: {
       page,
       limit: 20,
@@ -28,6 +28,12 @@ export default function PatientsPage() {
   return (
     <div>
       <DashboardHeader title="Patients" subtitle={`${total} patients registered`} />
+
+      {error ? (
+        <p className="mb-4 rounded-2xl bg-red-50 px-4 py-2 text-sm text-clay-error">
+          {error.message}
+        </p>
+      ) : null}
 
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div className="relative flex-1 max-w-md">

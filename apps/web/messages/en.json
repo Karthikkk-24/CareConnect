@@ -16,7 +16,10 @@
     "signUp": "Sign up",
     "hasAccount": "Already have an account?",
     "signInLink": "Sign in",
-    "continueWithGoogle": "Continue with Google"
+    "continueWithGoogle": "Continue with Google",
+    "skipToContent": "Skip to main content",
+    "verificationCode": "Verification code",
+    "verify": "Verify"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -44,7 +47,9 @@
     "brandSubtitleNurse": "Nurse",
     "brandSubtitlePatient": "Patient Portal",
     "mainNav": "Main navigation",
-    "skipToContent": "Skip to main content"
+    "skipToContent": "Skip to main content",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu"
   },
   "common": {
     "loading": "Loading...",
@@ -53,7 +58,10 @@
     "delete": "Delete",
     "edit": "Edit",
     "error": "Something went wrong",
-    "noResults": "No results found"
+    "noResults": "No results found",
+    "back": "Back",
+    "search": "Search",
+    "confirm": "Confirm"
   },
   "settings": {
     "title": "Settings",

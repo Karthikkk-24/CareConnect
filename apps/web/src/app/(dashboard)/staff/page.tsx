@@ -14,7 +14,7 @@ import {
 
 export default function StaffPage() {
   const { data: meData } = useQuery(ME_QUERY);
-  const { data, loading, refetch } = useQuery(STAFF_MEMBERS_QUERY, {
+  const { data, loading, refetch, error } = useQuery(STAFF_MEMBERS_QUERY, {
     variables: { hospitalId: meData?.me?.hospitalId },
     skip: !meData?.me?.hospitalId,
   });
@@ -41,6 +41,12 @@ export default function StaffPage() {
   return (
     <div>
       <DashboardHeader title="Staff Management" subtitle="Manage your hospital team" />
+
+      {error ? (
+        <p className="mb-4 rounded-2xl bg-red-50 px-4 py-2 text-sm text-clay-error">
+          {error.message}
+        </p>
+      ) : null}
 
       <div className="mb-6 flex justify-end">
         <Link href="/staff/new">
