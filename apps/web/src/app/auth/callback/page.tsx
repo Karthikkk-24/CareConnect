@@ -3,6 +3,7 @@
 import { AuthenticateWithRedirectCallback } from '@clerk/nextjs';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
+import { safeInternalPath } from '@/lib/safe-redirect';
 
 /**
  * Landing page for Clerk OAuth (Google, SSO, …) round-trips.
@@ -11,11 +12,8 @@ import { Suspense } from 'react';
  */
 function AuthCallbackInner() {
   const searchParams = useSearchParams();
-  const inviteRedirect = searchParams.get('redirect');
-  const signUpFallback =
-    inviteRedirect && inviteRedirect.startsWith('/invite')
-      ? inviteRedirect
-      : '/onboarding';
+  const redirect = safeInternalPath(searchParams.get('redirect'), '/onboarding');
+  const signUpFallback = redirect.startsWith('/invite') ? redirect : '/onboarding';
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-clay-bg px-6">

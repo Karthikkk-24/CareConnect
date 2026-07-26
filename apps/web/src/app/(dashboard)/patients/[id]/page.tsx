@@ -38,6 +38,7 @@ export default function PatientDetailPage() {
   const { getToken } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [statusError, setStatusError] = useState('');
   const [documentType, setDocumentType] = useState('identification');
   const [linkEmail, setLinkEmail] = useState('');
   const [linkMessage, setLinkMessage] = useState('');
@@ -50,7 +51,13 @@ export default function PatientDetailPage() {
   });
   const [addDocument] = useMutation(ADD_PATIENT_DOCUMENT_MUTATION);
   const [deleteDocument] = useMutation(DELETE_PATIENT_DOCUMENT, { onCompleted: () => refetch() });
-  const [updateStatus] = useMutation(UPDATE_PATIENT_STATUS, { onCompleted: () => refetch() });
+  const [updateStatus] = useMutation(UPDATE_PATIENT_STATUS, {
+    onCompleted: () => {
+      setStatusError('');
+      refetch();
+    },
+    onError: (err) => setStatusError(err.message),
+  });
   const [deletePatient] = useMutation(DELETE_PATIENT_MUTATION);
   const [linkAccount, { loading: linking }] = useMutation(LINK_PATIENT_ACCOUNT, {
     onCompleted: () => {
@@ -169,11 +176,12 @@ export default function PatientDetailPage() {
           aria-label="Update patient status"
           className="rounded-2xl border border-white/60 bg-clay-surface px-3 py-2 text-sm shadow-clay-inset"
           value={patient.status}
-          onChange={(e) =>
+          onChange={(e) => {
+            setStatusError('');
             updateStatus({
               variables: { id, status: e.target.value, hospitalId: meData?.me?.hospitalId },
-            })
-          }
+            });
+          }}
         >
           {[
             'registered',
@@ -213,6 +221,10 @@ export default function PatientDetailPage() {
           Delete
         </ClayButton>
       </div>
+
+      {statusError ? (
+        <p className="mb-4 rounded-2xl bg-red-50 px-4 py-2 text-sm text-clay-error">{statusError}</p>
+      ) : null}
 
       {showLinkForm ? (
         <ClayCard className="mb-6 max-w-lg">

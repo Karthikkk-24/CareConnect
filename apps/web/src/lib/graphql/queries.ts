@@ -323,6 +323,12 @@ export const PATIENT_QUERY = gql`
       insurancePolicyNumber
       allergies
       medications
+      medicationDetails {
+        name
+        dosage
+        frequency
+        prescriber
+      }
       medicalHistory {
         id
         type

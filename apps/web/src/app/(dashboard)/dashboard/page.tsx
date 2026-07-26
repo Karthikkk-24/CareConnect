@@ -67,6 +67,44 @@ export default function DashboardPage() {
 
   const hasAppointments = typeof appointmentsToday === 'number' && appointmentsToday > 0;
 
+  const quickActions = [
+    {
+      label: 'Register Patient',
+      href: '/patients/new',
+      show: hasPermission(permissions, PERMISSIONS.PATIENTS_WRITE),
+    },
+    {
+      label: 'Bulk Import Patients',
+      href: '/patients/import',
+      show: hasPermission(permissions, PERMISSIONS.PATIENTS_WRITE),
+    },
+    {
+      label: 'New Appointment',
+      href: '/appointments/new',
+      show: hasPermission(permissions, PERMISSIONS.APPOINTMENTS_WRITE),
+    },
+    {
+      label: 'View Appointments',
+      href: '/appointments',
+      show: hasPermission(permissions, PERMISSIONS.APPOINTMENTS_READ),
+    },
+    {
+      label: 'Admit Patient',
+      href: '/admissions',
+      show: hasPermission(permissions, PERMISSIONS.PATIENTS_WRITE),
+    },
+    {
+      label: 'Add Staff Member',
+      href: '/staff/new',
+      show: hasPermission(permissions, PERMISSIONS.STAFF_WRITE),
+    },
+    {
+      label: 'View Staff Directory',
+      href: '/staff',
+      show: hasPermission(permissions, PERMISSIONS.STAFF_READ),
+    },
+  ].filter((a) => a.show);
+
   return (
     <div>
       <DashboardHeader
@@ -92,55 +130,23 @@ export default function DashboardPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <ClayCard>
           <h2 className="mb-4 text-lg font-semibold text-clay-text">Quick Actions</h2>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {[
-              {
-                label: 'Register Patient',
-                href: '/patients/new',
-                show: hasPermission(permissions, PERMISSIONS.PATIENTS_WRITE),
-              },
-              {
-                label: 'Bulk Import Patients',
-                href: '/patients/import',
-                show: hasPermission(permissions, PERMISSIONS.PATIENTS_WRITE),
-              },
-              {
-                label: 'New Appointment',
-                href: '/appointments/new',
-                show: hasPermission(permissions, PERMISSIONS.APPOINTMENTS_WRITE),
-              },
-              {
-                label: 'View Appointments',
-                href: '/appointments',
-                show: hasPermission(permissions, PERMISSIONS.APPOINTMENTS_READ),
-              },
-              {
-                label: 'Admit Patient',
-                href: '/admissions',
-                show: hasPermission(permissions, PERMISSIONS.PATIENTS_WRITE),
-              },
-              {
-                label: 'Add Staff Member',
-                href: '/staff/new',
-                show: hasPermission(permissions, PERMISSIONS.STAFF_WRITE),
-              },
-              {
-                label: 'View Staff Directory',
-                href: '/staff',
-                show: hasPermission(permissions, PERMISSIONS.STAFF_READ),
-              },
-            ]
-              .filter((a) => a.show)
-              .map((action) => (
-              <Link
-                key={action.label}
-                href={action.href}
-                className="rounded-2xl bg-clay-primary-light px-4 py-3 text-sm font-medium text-clay-primary shadow-clay-inset transition hover:bg-clay-primary/10"
-              >
-                {action.label}
-              </Link>
-            ))}
-          </div>
+          {quickActions.length === 0 ? (
+            <p className="text-sm text-clay-text-muted">
+              No quick actions available for your permissions.
+            </p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {quickActions.map((action) => (
+                <Link
+                  key={action.label}
+                  href={action.href}
+                  className="rounded-2xl bg-clay-primary-light px-4 py-3 text-sm font-medium text-clay-primary shadow-clay-inset transition hover:bg-clay-primary/10"
+                >
+                  {action.label}
+                </Link>
+              ))}
+            </div>
+          )}
         </ClayCard>
 
         <ClayCard>

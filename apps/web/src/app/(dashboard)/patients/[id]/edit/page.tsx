@@ -29,6 +29,12 @@ type PatientDetail = {
   insurancePolicyNumber?: string;
   allergies?: string[];
   medications?: string[];
+  medicationDetails?: {
+    name: string;
+    dosage?: string;
+    frequency?: string;
+    prescriber?: string;
+  }[];
   medicalHistory?: {
     type: string;
     condition: string;
@@ -70,15 +76,22 @@ function patientToFormValues(patient: PatientDetail): Partial<CreatePatientInput
     allergies: patient.allergies?.length
       ? patient.allergies.map((a) => ({ allergen: a }))
       : [{ allergen: '' }],
-    medications: patient.medications?.length
-      ? patient.medications.map((m) => {
-          const match = m.match(/^(.*?)\s*\((.*)\)\s*$/);
-          if (match) {
-            return { name: match[1].trim(), dosage: match[2].trim() };
-          }
-          return { name: m };
-        })
-      : [{ name: '' }],
+    medications: patient.medicationDetails?.length
+      ? patient.medicationDetails.map((m) => ({
+          name: m.name,
+          dosage: m.dosage,
+          frequency: m.frequency,
+          prescriber: m.prescriber,
+        }))
+      : patient.medications?.length
+        ? patient.medications.map((m) => {
+            const match = m.match(/^(.*?)\s*\((.*)\)\s*$/);
+            if (match) {
+              return { name: match[1].trim(), dosage: match[2].trim() };
+            }
+            return { name: m };
+          })
+        : [{ name: '' }],
     medicalHistory: patient.medicalHistory?.length
       ? patient.medicalHistory.map((h) => ({
           type: h.type as 'past' | 'family' | 'surgical',

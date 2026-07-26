@@ -180,6 +180,9 @@ export class PatientDetailType extends PatientType {
   @Field(() => [String])
   medications: string[];
 
+  @Field(() => [PatientMedicationType])
+  medicationDetails: PatientMedicationType[];
+
   @Field(() => [MedicalHistoryType])
   medicalHistory: MedicalHistoryType[];
 
@@ -311,6 +314,21 @@ export class PatientMedicationInput {
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
+  prescriber?: string;
+}
+
+@ObjectType()
+export class PatientMedicationType {
+  @Field()
+  name: string;
+
+  @Field({ nullable: true })
+  dosage?: string;
+
+  @Field({ nullable: true })
+  frequency?: string;
+
+  @Field({ nullable: true })
   prescriber?: string;
 }
 

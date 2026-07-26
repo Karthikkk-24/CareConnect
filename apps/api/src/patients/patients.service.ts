@@ -174,6 +174,13 @@ export class PatientsService {
         patient.medications?.map(
           (m) => `${m.name}${m.dosage ? ` (${m.dosage})` : ''}`,
         ) ?? [],
+      medicationDetails:
+        patient.medications?.map((m) => ({
+          name: m.name,
+          dosage: m.dosage,
+          frequency: m.frequency,
+          prescriber: m.prescriber,
+        })) ?? [],
       medicalHistory: (patient.medicalHistory ?? []).map((h) => ({
         id: h.id,
         type: h.type,

@@ -19,7 +19,13 @@ export default function NurseDashboardPage() {
   const admissions = data?.activeAdmissions ?? [];
 
   const quickLinks = [
-    { label: 'Record Vitals', href: admissions[0]?.patient?.id ? `/patients/${admissions[0].patient.id}?action=vitals` : '/patients', icon: HeartPulse },
+    {
+      label: admissions[0]?.patient?.id ? 'Record Vitals' : 'Choose patient for vitals',
+      href: admissions[0]?.patient?.id
+        ? `/patients/${admissions[0].patient.id}?action=vitals`
+        : '/patients',
+      icon: HeartPulse,
+    },
     { label: 'All Admissions', href: '/admissions', icon: Activity },
     { label: 'Bed Occupancy', href: '/admissions/occupancy', icon: BedDouble },
     { label: 'Patients', href: '/patients', icon: Users },

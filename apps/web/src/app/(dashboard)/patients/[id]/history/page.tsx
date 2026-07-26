@@ -8,6 +8,7 @@ import { ClayBadge, ClayCard } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
 import {
   DISCHARGES_QUERY,
+  LAB_ORDERS_QUERY,
   ME_QUERY,
   PATIENT_DIAGNOSES_QUERY,
   PATIENT_NOTES_QUERY,
@@ -55,6 +56,10 @@ export default function PatientHistoryPage() {
     skip: !id || !hospitalId,
   });
   const admissionsQuery = useQuery(ACTIVE_ADMISSIONS_QUERY, {
+    variables: { hospitalId },
+    skip: !hospitalId,
+  });
+  const labOrdersQuery = useQuery(LAB_ORDERS_QUERY, {
     variables: { hospitalId },
     skip: !hospitalId,
   });
@@ -141,6 +146,17 @@ export default function PatientHistoryPage() {
       title: 'Active admission',
       detail: [a.ward?.name, a.bed?.label, a.reason].filter(Boolean).join(' · ') || undefined,
       at: a.admittedAt,
+    });
+  }
+
+  for (const order of labOrdersQuery.data?.labOrders ?? []) {
+    if (order.patientId !== id && order.patient?.id !== id) continue;
+    items.push({
+      id: `lab-${order.id}`,
+      kind: 'lab',
+      title: order.testName ?? 'Lab order',
+      detail: order.status,
+      at: order.createdAt,
     });
   }
 

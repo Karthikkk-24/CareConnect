@@ -61,6 +61,12 @@ export default function FacilitySettingsPage() {
     | { kind: 'bed'; id: string; label: string }
     | null
   >(null);
+  const [deleteTarget, setDeleteTarget] = useState<
+    | { kind: 'department'; id: string; name: string }
+    | { kind: 'ward'; id: string; name: string }
+    | { kind: 'bed'; id: string; name: string }
+    | null
+  >(null);
 
   const departmentsQuery = useQuery(DEPARTMENTS_QUERY, {
     variables: { hospitalId },
@@ -313,11 +319,9 @@ export default function FacilitySettingsPage() {
                       size="sm"
                       variant="ghost"
                       aria-label={`Delete ${d.name}`}
-                      onClick={() => {
-                        if (confirm(`Delete department “${d.name}”?`)) {
-                          deleteDepartment({ variables: { id: d.id, hospitalId } });
-                        }
-                      }}
+                      onClick={() =>
+                        setDeleteTarget({ kind: 'department', id: d.id, name: d.name })
+                      }
                     >
                       <Trash2 className="h-4 w-4 text-clay-error" />
                     </ClayButton>
@@ -420,11 +424,9 @@ export default function FacilitySettingsPage() {
                       size="sm"
                       variant="ghost"
                       aria-label={`Delete ${w.name}`}
-                      onClick={() => {
-                        if (confirm(`Delete ward “${w.name}”? Beds in this ward must be removed first.`)) {
-                          deleteWard({ variables: { id: w.id, hospitalId } });
-                        }
-                      }}
+                      onClick={() =>
+                        setDeleteTarget({ kind: 'ward', id: w.id, name: w.name })
+                      }
                     >
                       <Trash2 className="h-4 w-4 text-clay-error" />
                     </ClayButton>
@@ -512,11 +514,9 @@ export default function FacilitySettingsPage() {
                           size="sm"
                           variant="ghost"
                           aria-label={`Delete ${b.label}`}
-                          onClick={() => {
-                            if (confirm(`Delete bed “${b.label}”?`)) {
-                              deleteBed({ variables: { id: b.id, hospitalId } });
-                            }
-                          }}
+                          onClick={() =>
+                            setDeleteTarget({ kind: 'bed', id: b.id, name: b.label })
+                          }
                         >
                           <Trash2 className="h-4 w-4 text-clay-error" />
                         </ClayButton>
@@ -636,6 +636,49 @@ export default function FacilitySettingsPage() {
                 }}
               >
                 Save
+              </ClayButton>
+            </div>
+          </ClayCard>
+        </div>
+      ) : null}
+
+      {deleteTarget ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Confirm delete"
+        >
+          <ClayCard className="w-full max-w-md">
+            <h2 className="mb-2 text-lg font-semibold text-clay-text">
+              Delete {deleteTarget.kind}?
+            </h2>
+            <p className="text-sm text-clay-text-muted">
+              {deleteTarget.kind === 'ward'
+                ? `Delete ward “${deleteTarget.name}”? Beds in this ward must be removed first.`
+                : `Delete “${deleteTarget.name}”? This cannot be undone.`}
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <ClayButton type="button" variant="ghost" onClick={() => setDeleteTarget(null)}>
+                Cancel
+              </ClayButton>
+              <ClayButton
+                type="button"
+                onClick={() => {
+                  if (!hospitalId || !deleteTarget) return;
+                  if (deleteTarget.kind === 'department') {
+                    deleteDepartment({
+                      variables: { id: deleteTarget.id, hospitalId },
+                    });
+                  } else if (deleteTarget.kind === 'ward') {
+                    deleteWard({ variables: { id: deleteTarget.id, hospitalId } });
+                  } else {
+                    deleteBed({ variables: { id: deleteTarget.id, hospitalId } });
+                  }
+                  setDeleteTarget(null);
+                }}
+              >
+                Delete
               </ClayButton>
             </div>
           </ClayCard>

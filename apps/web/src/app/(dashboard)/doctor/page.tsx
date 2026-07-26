@@ -168,18 +168,24 @@ export default function DoctorDashboardPage() {
 
         <ClayCard>
           <h2 className="mb-4 text-lg font-semibold text-clay-text">Quick Links</h2>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {quickLinks.map(({ label, href, icon: Icon }) => (
-              <Link
-                key={label}
-                href={href}
-                className="flex items-center gap-3 rounded-2xl bg-clay-primary-light px-4 py-3 text-sm font-medium text-clay-primary shadow-clay-inset transition hover:bg-clay-primary/10"
-              >
-                <Icon className="h-4 w-4" />
-                {label}
-              </Link>
-            ))}
-          </div>
+          {quickLinks.length === 0 ? (
+            <p className="text-sm text-clay-text-muted">
+              No quick links available for your permissions.
+            </p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {quickLinks.map(({ label, href, icon: Icon }) => (
+                <Link
+                  key={label}
+                  href={href}
+                  className="flex items-center gap-3 rounded-2xl bg-clay-primary-light px-4 py-3 text-sm font-medium text-clay-primary shadow-clay-inset transition hover:bg-clay-primary/10"
+                >
+                  <Icon className="h-4 w-4" />
+                  {label}
+                </Link>
+              ))}
+            </div>
+          )}
         </ClayCard>
       </div>
     </div>
