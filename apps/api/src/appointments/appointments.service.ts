@@ -9,6 +9,7 @@ import { Between, Repository } from 'typeorm';
 import { Appointment, Department, Patient } from '../database/entities';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
+import { HospitalDoctorValidator } from '../common/hospital-doctor.validator';
 import {
   APPOINTMENT_STATUSES,
   AppointmentType,
@@ -51,6 +52,7 @@ export class AppointmentsService {
     @InjectRepository(Department)
     private readonly departmentsRepo: Repository<Department>,
     private readonly audit: AuditService,
+    private readonly doctorValidator: HospitalDoctorValidator,
   ) {}
 
   assertHospitalAccess(user: AuthenticatedUser, hospitalId: string) {
@@ -135,6 +137,12 @@ export class AppointmentsService {
       });
       if (!department) throw new NotFoundException('Department not found');
     }
+
+    await this.doctorValidator.assertHospitalDoctor(
+      hospitalId,
+      input.doctorId,
+      'Doctor',
+    );
 
     const saved = await this.appointmentsRepo.save(
       this.appointmentsRepo.create({

@@ -4,6 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Appointment, Department, Patient } from '../database/entities';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
+import { HospitalDoctorValidator } from '../common/hospital-doctor.validator';
 import { AppointmentsService } from './appointments.service';
 
 describe('AppointmentsService status machine', () => {
@@ -19,6 +20,9 @@ describe('AppointmentsService status machine', () => {
   const patientsRepo = { findOne: jest.fn() };
   const departmentsRepo = { findOne: jest.fn() };
   const audit = { log: jest.fn() };
+  const doctorValidator = {
+    assertHospitalDoctor: jest.fn().mockResolvedValue(undefined),
+  };
 
   const actor: AuthenticatedUser = {
     id: 'user-1',
@@ -43,6 +47,7 @@ describe('AppointmentsService status machine', () => {
         { provide: getRepositoryToken(Patient), useValue: patientsRepo },
         { provide: getRepositoryToken(Department), useValue: departmentsRepo },
         { provide: AuditService, useValue: audit },
+        { provide: HospitalDoctorValidator, useValue: doctorValidator },
       ],
     }).compile();
     service = module.get(AppointmentsService);
