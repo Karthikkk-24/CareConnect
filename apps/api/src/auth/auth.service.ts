@@ -5,9 +5,16 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import { Hospital, Role, User, UserRole } from '../database/entities';
 import type { AuthenticatedUser } from './auth.types';
+
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    error instanceof QueryFailedError &&
+    (error as QueryFailedError & { code?: string }).code === '23505'
+  );
+}
 
 @Injectable()
 export class AuthService {
@@ -149,22 +156,69 @@ export class AuthService {
           'Hospital membership requires a staff invite or hospital registration',
         );
       }
+    }
 
-      if (!user.hospitalId && assignHospitalAdmin && !isSuperAdmin) {
-        const adminRole = await this.rolesRepo.findOne({
-          where: { slug: 'hospital_admin' },
-        });
-        if (adminRole) {
-          const existingAdmins = await this.userRolesRepo.count({
-            where: { roleId: adminRole.id, hospitalId },
+    // Bootstrap hospital_admin under a transaction + advisory lock so two
+    // concurrent registrants cannot both observe zero admins and both win.
+    if (hospitalId && assignHospitalAdmin) {
+      try {
+        await this.usersRepo.manager.transaction(async (manager) => {
+          await manager.query(
+            `SELECT pg_advisory_xact_lock(hashtext($1::text))`,
+            [`hospital-admin-bootstrap:${hospitalId}`],
+          );
+
+          const adminRole = await manager.findOne(Role, {
+            where: { slug: 'hospital_admin' },
           });
-          if (existingAdmins > 0) {
-            throw new ForbiddenException(
-              'Hospital already has an administrator; join via staff invite',
+          if (!adminRole) {
+            await manager.update(User, user.id, {
+              fullName,
+              hospitalId,
+              onboardingCompleted: true,
+            });
+            return;
+          }
+
+          if (!isSuperAdmin) {
+            const existingAdmins = await manager.count(UserRole, {
+              where: { roleId: adminRole.id, hospitalId },
+            });
+            if (existingAdmins > 0) {
+              throw new ForbiddenException(
+                'Hospital already has an administrator; join via staff invite',
+              );
+            }
+          }
+
+          await manager.update(User, user.id, {
+            fullName,
+            hospitalId,
+            onboardingCompleted: true,
+          });
+
+          const existingRoles = await manager.find(UserRole, {
+            where: { userId: user.id },
+          });
+          if (existingRoles.length === 0) {
+            await manager.save(
+              manager.create(UserRole, {
+                userId: user.id,
+                roleId: adminRole.id,
+                hospitalId,
+              }),
             );
           }
+        });
+      } catch (error) {
+        if (isUniqueViolation(error)) {
+          throw new ForbiddenException(
+            'Hospital already has an administrator; join via staff invite',
+          );
         }
+        throw error;
       }
+      return;
     }
 
     await this.usersRepo.update(user.id, {
@@ -172,27 +226,6 @@ export class AuthService {
       hospitalId: hospitalId ?? user.hospitalId,
       onboardingCompleted: true,
     });
-
-    if (hospitalId && assignHospitalAdmin) {
-      const existingRoles = await this.userRolesRepo.find({
-        where: { userId: user.id },
-      });
-      if (existingRoles.length === 0) {
-        const adminRole = await this.rolesRepo.findOne({
-          where: { slug: 'hospital_admin' },
-        });
-
-        if (adminRole) {
-          await this.userRolesRepo.save(
-            this.userRolesRepo.create({
-              userId: user.id,
-              roleId: adminRole.id,
-              hospitalId,
-            }),
-          );
-        }
-      }
-    }
   }
 
   /** Patient portal path: assign patient role and mark onboarding complete. */
