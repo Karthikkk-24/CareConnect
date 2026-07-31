@@ -126,7 +126,10 @@ describe('StaffService', () => {
 
   describe('create — cross-hospital invite', () => {
     it('rejects inviting a user who already belongs to another hospital', async () => {
-      rolesRepo.findOne.mockResolvedValue({ id: 'role-doctor', slug: 'doctor' });
+      rolesRepo.findOne.mockResolvedValue({
+        id: 'role-doctor',
+        slug: 'doctor',
+      });
       usersRepo.findOne.mockResolvedValue({
         id: 'user-1',
         email: 'doc@example.com',

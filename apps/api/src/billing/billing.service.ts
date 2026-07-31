@@ -262,7 +262,7 @@ export class BillingService {
         }
 
         await manager.save(invoice);
-        return payment.id as string;
+        return payment.id;
       },
     );
 
