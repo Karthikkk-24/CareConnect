@@ -3,9 +3,12 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { existsSync, unlinkSync } from 'fs';
+import { basename, join } from 'path';
 import { ILike, Repository } from 'typeorm';
 import {
   Patient,
@@ -43,6 +46,8 @@ type PatientRelatedInput = Pick<
 
 @Injectable()
 export class PatientsService {
+  private readonly logger = new Logger(PatientsService.name);
+
   constructor(
     @InjectRepository(Patient)
     private readonly patientsRepo: Repository<Patient>,
@@ -425,7 +430,9 @@ export class PatientsService {
     });
     if (!document) throw new NotFoundException('Patient document not found');
 
+    const fileUrl = document.fileUrl;
     await this.documentsRepo.remove(document);
+    this.unlinkStoredUpload(fileUrl);
 
     await this.audit.log({
       actorId: actor.id,
@@ -437,6 +444,29 @@ export class PatientsService {
     });
 
     return true;
+  }
+
+  /** Remove PHI file from local uploads/ when the document row is deleted. */
+  private unlinkStoredUpload(fileUrl: string | undefined) {
+    if (!fileUrl) return;
+    try {
+      const marker = '/uploads/';
+      const idx = fileUrl.lastIndexOf(marker);
+      const rawName =
+        idx >= 0 ? fileUrl.slice(idx + marker.length) : basename(fileUrl);
+      const safe = basename(rawName.split('?')[0] ?? '');
+      if (!safe || safe.includes('..')) return;
+      const path = join(process.cwd(), 'uploads', safe);
+      if (existsSync(path)) {
+        unlinkSync(path);
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Failed to delete upload file for ${fileUrl}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
   }
 
   async linkPatientAccount(
