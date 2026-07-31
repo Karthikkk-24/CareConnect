@@ -1,4 +1,8 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import {
@@ -40,7 +44,10 @@ describe('StaffService', () => {
     create: jest.fn(),
     findOne: jest.fn(),
   };
-  const clerkAdmin = { isConfigured: jest.fn(), inviteStaffByEmail: jest.fn() };
+  const clerkAdmin = {
+    isConfigured: jest.fn().mockReturnValue(false),
+    inviteStaffByEmail: jest.fn(),
+  };
   const audit = { log: jest.fn() };
 
   beforeEach(async () => {
@@ -114,6 +121,34 @@ describe('StaffService', () => {
       expect(() =>
         service.resolveHospitalId({ ...hospitalAdmin, hospitalId: undefined }),
       ).toThrow(NotFoundException);
+    });
+  });
+
+  describe('create — cross-hospital invite', () => {
+    it('rejects inviting a user who already belongs to another hospital', async () => {
+      rolesRepo.findOne.mockResolvedValue({ id: 'role-doctor', slug: 'doctor' });
+      usersRepo.findOne.mockResolvedValue({
+        id: 'user-1',
+        email: 'doc@example.com',
+        hospitalId: 'hospital-b',
+        fullName: 'Existing Doc',
+        authId: 'auth-1',
+      });
+
+      await expect(
+        service.create(
+          'hospital-a',
+          {
+            email: 'doc@example.com',
+            fullName: 'Existing Doc',
+            roleSlug: 'doctor',
+          },
+          hospitalAdmin,
+        ),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(userRolesRepo.save).not.toHaveBeenCalled();
+      expect(staffRepo.save).not.toHaveBeenCalled();
     });
   });
 });
