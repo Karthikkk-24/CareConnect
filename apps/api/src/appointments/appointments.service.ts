@@ -16,6 +16,31 @@ import {
   CreateAppointmentInput,
 } from './appointments.types';
 
+/**
+ * Appointment status machine:
+ *   scheduled → checked_in → completed
+ *            ↘ cancelled / no_show
+ *   checked_in → completed / cancelled / no_show
+ * Terminal: completed, cancelled, no_show (immutable)
+ */
+const ALLOWED_TRANSITIONS: Record<string, readonly string[]> = {
+  scheduled: ['checked_in', 'cancelled', 'no_show', 'completed'],
+  checked_in: ['completed', 'cancelled', 'no_show'],
+  completed: [],
+  cancelled: [],
+  no_show: [],
+};
+
+function assertTransition(from: string, to: string) {
+  if (from === to) return;
+  const allowed = ALLOWED_TRANSITIONS[from] ?? [];
+  if (!allowed.includes(to)) {
+    throw new BadRequestException(
+      `Cannot transition appointment from "${from}" to "${to}"`,
+    );
+  }
+}
+
 @Injectable()
 export class AppointmentsService {
   constructor(
@@ -194,6 +219,7 @@ export class AppointmentsService {
     }
 
     const appointment = await this.findAppointmentOrThrow(id, hospitalId);
+    assertTransition(appointment.status, status);
     appointment.status = status;
     const saved = await this.appointmentsRepo.save(appointment);
 
@@ -216,9 +242,7 @@ export class AppointmentsService {
   ): Promise<AppointmentType> {
     const appointment = await this.findAppointmentOrThrow(input.id, hospitalId);
 
-    if (appointment.status === 'cancelled') {
-      throw new BadRequestException('Appointment is already cancelled');
-    }
+    assertTransition(appointment.status, 'cancelled');
 
     appointment.status = 'cancelled';
     if (input.reason) {
