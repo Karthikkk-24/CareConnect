@@ -1,17 +1,33 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Role, User, UserRole, Hospital } from '../database/entities';
+import type { AuthenticatedUser } from './auth.types';
 import { AuthService } from './auth.service';
 
 describe('AuthService', () => {
   let service: AuthService;
+
+  const manager = {
+    query: jest.fn().mockResolvedValue(undefined),
+    findOne: jest.fn(),
+    count: jest.fn(),
+    find: jest.fn(),
+    update: jest.fn(),
+    save: jest.fn(),
+    create: jest.fn((_entity: unknown, data: Record<string, unknown>) => data),
+  };
 
   const usersRepo = {
     findOne: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
     update: jest.fn(),
+    manager: {
+      transaction: jest.fn((cb: (m: typeof manager) => unknown) =>
+        Promise.resolve(cb(manager)),
+      ),
+    },
   };
 
   const userRolesRepo = {
@@ -31,6 +47,7 @@ describe('AuthService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    manager.query.mockResolvedValue(undefined);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -44,6 +61,16 @@ describe('AuthService', () => {
 
     service = module.get(AuthService);
   });
+
+  const actor: AuthenticatedUser = {
+    id: 'user-1',
+    authId: 'auth-1',
+    email: 'founder@hospital.com',
+    fullName: 'Founder',
+    roles: [],
+    permissions: [],
+    onboardingCompleted: false,
+  };
 
   describe('syncAndGetUser', () => {
     it('rejects inactive users', async () => {
@@ -166,6 +193,56 @@ describe('AuthService', () => {
 
       expect(result.roles).toEqual(['super_admin']);
       expect(result.permissions).toEqual(['hospitals:write']);
+    });
+  });
+
+  describe('completeOnboarding bootstrap', () => {
+    it('takes an advisory lock and assigns hospital_admin when none exist', async () => {
+      usersRepo.findOne.mockResolvedValue({
+        id: 'user-1',
+        hospitalId: undefined,
+      });
+      hospitalsRepo.findOne.mockResolvedValue({ id: 'hospital-a' });
+      manager.findOne.mockResolvedValue({
+        id: 'role-admin',
+        slug: 'hospital_admin',
+      });
+      manager.count.mockResolvedValue(0);
+      manager.find.mockResolvedValue([]);
+
+      await service.completeOnboarding(actor, 'Founder', 'hospital-a', true);
+
+      expect(manager.query).toHaveBeenCalledWith(
+        `SELECT pg_advisory_xact_lock(hashtext($1::text))`,
+        ['hospital-admin-bootstrap:hospital-a'],
+      );
+      expect(manager.save).toHaveBeenCalled();
+      expect(manager.update).toHaveBeenCalledWith(
+        User,
+        'user-1',
+        expect.objectContaining({
+          hospitalId: 'hospital-a',
+          onboardingCompleted: true,
+        }),
+      );
+    });
+
+    it('rejects bootstrap when an admin already exists under the lock', async () => {
+      usersRepo.findOne.mockResolvedValue({
+        id: 'user-1',
+        hospitalId: undefined,
+      });
+      hospitalsRepo.findOne.mockResolvedValue({ id: 'hospital-a' });
+      manager.findOne.mockResolvedValue({
+        id: 'role-admin',
+        slug: 'hospital_admin',
+      });
+      manager.count.mockResolvedValue(1);
+
+      await expect(
+        service.completeOnboarding(actor, 'Founder', 'hospital-a', true),
+      ).rejects.toThrow(ForbiddenException);
+      expect(manager.save).not.toHaveBeenCalled();
     });
   });
 });
