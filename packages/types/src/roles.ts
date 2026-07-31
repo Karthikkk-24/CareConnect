@@ -26,6 +26,7 @@ export const PERMISSIONS = {
   BILLING_WRITE: 'billing:write',
   REPORTS_READ: 'reports:read',
   ROLES_MANAGE: 'roles:manage',
+  LAB_WRITE: 'lab:write',
 } as const;
 
 export type PermissionSlug = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
