@@ -120,12 +120,21 @@ export class BillingService {
     return patient;
   }
 
-  private async assertAdmission(hospitalId: string, admissionId?: string) {
+  private async assertAdmission(
+    hospitalId: string,
+    patientId: string,
+    admissionId?: string,
+  ) {
     if (!admissionId) return;
     const admission = await this.admissionsRepo.findOne({
       where: { id: admissionId, hospitalId },
     });
     if (!admission) throw new NotFoundException('Admission not found');
+    if (admission.patientId !== patientId) {
+      throw new BadRequestException(
+        'Admission does not belong to the given patient',
+      );
+    }
   }
 
   async createInvoice(
@@ -138,7 +147,7 @@ export class BillingService {
     }
 
     await this.assertPatient(hospitalId, input.patientId);
-    await this.assertAdmission(hospitalId, input.admissionId);
+    await this.assertAdmission(hospitalId, input.patientId, input.admissionId);
 
     const status = input.status ?? 'draft';
     const totalAmount = input.items.reduce(
