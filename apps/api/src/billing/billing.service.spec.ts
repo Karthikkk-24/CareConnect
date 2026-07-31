@@ -143,4 +143,30 @@ describe('BillingService', () => {
       ).rejects.toThrow(NotFoundException);
     });
   });
+
+  describe('createInvoice admission binding', () => {
+    it('rejects when admission belongs to a different patient', async () => {
+      patientsRepo.findOne.mockResolvedValue({
+        id: 'patient-1',
+        hospitalId: 'hospital-a',
+      });
+      admissionsRepo.findOne.mockResolvedValue({
+        id: 'adm-1',
+        hospitalId: 'hospital-a',
+        patientId: 'patient-other',
+      });
+
+      await expect(
+        service.createInvoice(
+          'hospital-a',
+          {
+            patientId: 'patient-1',
+            admissionId: 'adm-1',
+            items: [{ description: 'Consult', quantity: 1, unitPrice: 50 }],
+          },
+          actor,
+        ),
+      ).rejects.toThrow('Admission does not belong to the given patient');
+    });
+  });
 });

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -83,12 +84,21 @@ export class ClinicalService {
     return patient;
   }
 
-  private async assertAdmission(hospitalId: string, admissionId?: string) {
+  private async assertAdmission(
+    hospitalId: string,
+    patientId: string,
+    admissionId?: string,
+  ) {
     if (!admissionId) return;
     const admission = await this.admissionsRepo.findOne({
       where: { id: admissionId, hospitalId },
     });
     if (!admission) throw new NotFoundException('Admission not found');
+    if (admission.patientId !== patientId) {
+      throw new BadRequestException(
+        'Admission does not belong to the given patient',
+      );
+    }
   }
 
   toVitalType(vital: VitalSign): VitalSignType {
@@ -219,7 +229,7 @@ export class ClinicalService {
     actor: AuthenticatedUser,
   ): Promise<VitalSignType> {
     await this.assertPatient(hospitalId, input.patientId);
-    await this.assertAdmission(hospitalId, input.admissionId);
+    await this.assertAdmission(hospitalId, input.patientId, input.admissionId);
 
     const vital = await this.vitalsRepo.save(
       this.vitalsRepo.create({
@@ -256,7 +266,7 @@ export class ClinicalService {
     actor: AuthenticatedUser,
   ): Promise<DiagnosisType> {
     await this.assertPatient(hospitalId, input.patientId);
-    await this.assertAdmission(hospitalId, input.admissionId);
+    await this.assertAdmission(hospitalId, input.patientId, input.admissionId);
 
     const diagnosis = await this.diagnosesRepo.save(
       this.diagnosesRepo.create({
@@ -289,7 +299,7 @@ export class ClinicalService {
     actor: AuthenticatedUser,
   ): Promise<ClinicalNoteType> {
     await this.assertPatient(hospitalId, input.patientId);
-    await this.assertAdmission(hospitalId, input.admissionId);
+    await this.assertAdmission(hospitalId, input.patientId, input.admissionId);
 
     const note = await this.notesRepo.save(
       this.notesRepo.create({
@@ -322,7 +332,7 @@ export class ClinicalService {
     actor: AuthenticatedUser,
   ): Promise<PrescriptionType> {
     await this.assertPatient(hospitalId, input.patientId);
-    await this.assertAdmission(hospitalId, input.admissionId);
+    await this.assertAdmission(hospitalId, input.patientId, input.admissionId);
 
     const prescription = await this.prescriptionsRepo.save(
       this.prescriptionsRepo.create({
@@ -368,7 +378,7 @@ export class ClinicalService {
     actor: AuthenticatedUser,
   ): Promise<LabOrderType> {
     await this.assertPatient(hospitalId, input.patientId);
-    await this.assertAdmission(hospitalId, input.admissionId);
+    await this.assertAdmission(hospitalId, input.patientId, input.admissionId);
 
     const order = await this.labOrdersRepo.save(
       this.labOrdersRepo.create({
