@@ -59,16 +59,31 @@ export default function PatientDetailPage() {
 
   const patient = data?.patient;
 
+  const apiBase = (
+    process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/graphql'
+  ).replace(/\/graphql\/?$/, '');
+
+  const handleOpenDocument = async (fileUrl: string) => {
+    const token = await getToken();
+    const res = await fetch(fileUrl, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) {
+      setUploadError('Unable to open document');
+      return;
+    }
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    window.open(objectUrl, '_blank', 'noopener,noreferrer');
+    // Revoke after the browser has a chance to load the tab
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+  };
+
   const handleUpload = async (file: File) => {
     setUploading(true);
     setUploadError('');
     try {
       const token = await getToken();
-      const apiBase =
-        (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/graphql').replace(
-          /\/graphql\/?$/,
-          '',
-        );
       const form = new FormData();
       form.append('file', file);
       const uploadRes = await fetch(`${apiBase}/uploads/patient-documents`, {
@@ -286,15 +301,14 @@ export default function PatientDetailPage() {
                   key={d.id}
                   className="flex items-center gap-3 rounded-2xl bg-clay-primary-light/30 p-3"
                 >
-                  <a
-                    href={d.fileUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex min-w-0 flex-1 items-center gap-3 hover:opacity-80"
+                  <button
+                    type="button"
+                    onClick={() => handleOpenDocument(d.fileUrl)}
+                    className="flex min-w-0 flex-1 items-center gap-3 text-left hover:opacity-80"
                   >
                     <FileText className="h-5 w-5 shrink-0 text-clay-primary" />
                     <span className="truncate text-sm text-clay-text">{d.name}</span>
-                  </a>
+                  </button>
                   <ClayButton
                     size="sm"
                     variant="ghost"
