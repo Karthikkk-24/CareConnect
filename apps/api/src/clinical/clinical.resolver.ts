@@ -186,7 +186,7 @@ export class ClinicalResolver {
   }
 
   @Mutation(() => LabResultType)
-  @Permissions(PERMISSIONS.PATIENTS_WRITE)
+  @Permissions(PERMISSIONS.LAB_WRITE)
   async completeLabResult(
     @CurrentUser() user: AuthenticatedUser,
     @Args('input') input: CompleteLabResultInput,
