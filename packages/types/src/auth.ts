@@ -13,7 +13,7 @@ export const registerSchema = z
     password: z.string().min(8, 'Password must be at least 8 characters'),
     confirmPassword: z.string(),
     hospitalName: z.string().optional(),
-    accountType: z.enum(['hospital', 'staff', 'patient']),
+    accountType: z.enum(['hospital', 'patient']),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: 'Passwords do not match',

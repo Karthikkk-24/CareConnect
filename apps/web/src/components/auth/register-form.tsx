@@ -44,8 +44,6 @@ export function RegisterForm() {
         // User row may still be syncing; portal will surface errors if role missing
       }
       router.push('/portal');
-    } else if (type === 'staff') {
-      router.push(redirectTo.startsWith('/invite') ? redirectTo : '/login');
     } else {
       router.push(redirectTo === '/onboarding' ? '/onboarding' : redirectTo);
     }
@@ -120,9 +118,7 @@ export function RegisterForm() {
       const dest =
         type === 'patient'
           ? '/portal?completePatient=1'
-          : type === 'staff'
-            ? '/login'
-            : '/onboarding';
+          : '/onboarding';
       await signUp.authenticateWithRedirect({
         strategy: 'oauth_google',
         redirectUrl: '/auth/callback',
@@ -171,9 +167,12 @@ export function RegisterForm() {
             {...register('accountType')}
           >
             <option value="hospital">Hospital Administrator</option>
-            <option value="staff">Staff Member</option>
             <option value="patient">Patient</option>
           </select>
+          <p className="text-xs text-clay-text-muted">
+            Hospital staff join with an invite link from your administrator — not via public
+            signup.
+          </p>
         </div>
 
         <ClayInput
