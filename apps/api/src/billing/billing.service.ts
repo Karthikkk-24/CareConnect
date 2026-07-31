@@ -150,6 +150,11 @@ export class BillingService {
     await this.assertAdmission(hospitalId, input.patientId, input.admissionId);
 
     const status = input.status ?? 'draft';
+    if (status !== 'draft' && status !== 'issued') {
+      throw new BadRequestException(
+        'New invoices may only be draft or issued; mark paid via payments',
+      );
+    }
     const totalAmount = input.items.reduce(
       (sum, item) => sum + item.quantity * item.unitPrice,
       0,
@@ -297,8 +302,17 @@ export class BillingService {
       relations: ['items', 'payments', 'patient'],
     });
     if (!invoice) throw new NotFoundException('Invoice not found');
+    if (invoice.status === 'void') {
+      throw new BadRequestException('Invoice is already void');
+    }
     if (invoice.status === 'paid') {
       throw new BadRequestException('Cannot void a paid invoice');
+    }
+    const paymentCount = (invoice.payments ?? []).length;
+    if (paymentCount > 0) {
+      throw new BadRequestException(
+        'Cannot void an invoice that has recorded payments',
+      );
     }
     invoice.status = 'void';
     await this.invoicesRepo.save(invoice);
