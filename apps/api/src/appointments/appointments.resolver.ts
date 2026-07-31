@@ -5,7 +5,9 @@ import { GqlAuthGuard } from '../auth/gql-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { Permissions } from '../rbac/permissions.decorator';
+import { Roles } from '../rbac/roles.decorator';
 import { RolesGuard } from '../rbac/roles.guard';
+import { STAFF_ROLES } from '../rbac/staff-roles';
 import { AppointmentsService } from './appointments.service';
 import {
   AppointmentType,
@@ -19,6 +21,7 @@ export class AppointmentsResolver {
   constructor(private readonly appointmentsService: AppointmentsService) {}
 
   @Query(() => [AppointmentType])
+  @Roles(...STAFF_ROLES)
   @Permissions(PERMISSIONS.APPOINTMENTS_READ)
   async appointments(
     @CurrentUser() user: AuthenticatedUser,
@@ -40,6 +43,7 @@ export class AppointmentsResolver {
   }
 
   @Mutation(() => AppointmentType)
+  @Roles(...STAFF_ROLES)
   @Permissions(PERMISSIONS.APPOINTMENTS_WRITE)
   async createAppointment(
     @CurrentUser() user: AuthenticatedUser,
@@ -54,6 +58,7 @@ export class AppointmentsResolver {
   }
 
   @Mutation(() => AppointmentType)
+  @Roles(...STAFF_ROLES)
   @Permissions(PERMISSIONS.APPOINTMENTS_WRITE)
   async updateAppointmentStatus(
     @CurrentUser() user: AuthenticatedUser,
@@ -74,6 +79,7 @@ export class AppointmentsResolver {
   }
 
   @Mutation(() => AppointmentType)
+  @Roles(...STAFF_ROLES)
   @Permissions(PERMISSIONS.APPOINTMENTS_WRITE)
   async cancelAppointment(
     @CurrentUser() user: AuthenticatedUser,
