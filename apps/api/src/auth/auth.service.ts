@@ -80,12 +80,25 @@ export class AuthService {
   }
 
   toAuthenticatedUser(user: User): AuthenticatedUser {
-    const roles = user.userRoles?.map((ur) => ur.role.slug) ?? [];
+    const activeHospitalId = user.hospitalId;
+    const PLATFORM_ROLE_SLUGS = new Set(['super_admin', 'patient']);
+
+    const scopedRoles =
+      user.userRoles?.filter((ur) => {
+        const slug = ur.role?.slug;
+        if (slug && PLATFORM_ROLE_SLUGS.has(slug)) return true;
+        // Global grants (no hospital on the assignment)
+        if (!ur.hospitalId) return true;
+        // Hospital-scoped grants only apply for the user's active hospital
+        return !!activeHospitalId && ur.hospitalId === activeHospitalId;
+      }) ?? [];
+
+    const roles = scopedRoles.map((ur) => ur.role.slug);
     const permissions = [
       ...new Set(
-        user.userRoles?.flatMap(
+        scopedRoles.flatMap(
           (ur) => ur.role.permissions?.map((p) => p.slug) ?? [],
-        ) ?? [],
+        ),
       ),
     ];
 
