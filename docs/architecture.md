@@ -51,6 +51,15 @@ Authorization is enforced in Nest (not Postgres RLS). Migrations are Neon-compat
 - Platform roles (`super_admin`) and patient portal accounts may have a null hospital membership.
 - Role/permission grants on `user_roles` are hospital-scoped; effective permissions should only include the active hospital (plus platform roles).
 
+### Soft-delete / PHI retention
+
+- **Patients**: `deletePatient` soft-deletes the patient row (`deleted_at`). Linked
+  `patient_documents` rows are hard-removed and their files under `uploads/` are unlinked.
+  Active admissions must be discharged first.
+- **Document delete**: removing a document always unlinks the filesystem object.
+- **Hospitals / users**: `deleted_at` columns exist for future use; current APIs use
+  `isActive` flags rather than soft-delete mutations.
+
 ## Modules
 
 Hospitals, users/RBAC, staff (+ invites), patients, facility, appointments, admissions, clinical, discharge/follow-ups, portal, billing, pharmacy, inventory, reports, uploads.

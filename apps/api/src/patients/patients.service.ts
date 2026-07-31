@@ -378,6 +378,28 @@ export class PatientsService {
     actor: AuthenticatedUser,
   ): Promise<boolean> {
     const patient = await this.findPatientOrThrow(id, hospitalId);
+
+    const activeAdmission = await this.admissionsRepo.findOne({
+      where: { patientId: id, hospitalId, status: 'active' },
+    });
+    if (activeAdmission) {
+      throw new BadRequestException(
+        'Cannot delete a patient with an active admission; discharge first',
+      );
+    }
+
+    // Soft-delete policy: soft-remove the patient row; hard-remove linked
+    // document metadata and unlink PHI files from disk. Other related rows
+    // remain for audit but are unreachable via patient queries.
+    const documents = await this.documentsRepo.find({
+      where: { patientId: id },
+    });
+    for (const document of documents) {
+      const fileUrl = document.fileUrl;
+      await this.documentsRepo.remove(document);
+      this.unlinkStoredUpload(fileUrl);
+    }
+
     await this.patientsRepo.softRemove(patient);
 
     await this.audit.log({
@@ -386,7 +408,10 @@ export class PatientsService {
       action: 'delete',
       resource: 'patient',
       resourceId: patient.id,
-      metadata: { fullName: patient.fullName },
+      metadata: {
+        fullName: patient.fullName,
+        documentsRemoved: documents.length,
+      },
     });
 
     return true;
