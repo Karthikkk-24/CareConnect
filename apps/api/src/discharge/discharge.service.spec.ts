@@ -1,7 +1,6 @@
-import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Admission, Discharge, FollowUp, Patient } from '../database/entities';
+import { Discharge, FollowUp, Patient } from '../database/entities';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
 import { DischargeService } from './discharge.service';
