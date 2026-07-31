@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import { Admission, Bed, Patient, Ward } from '../database/entities';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
@@ -15,6 +15,14 @@ import {
   DischargeAdmissionInput,
   WardOccupancyType,
 } from './admissions.types';
+
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    error instanceof QueryFailedError &&
+    typeof (error as QueryFailedError & { code?: string }).code === 'string' &&
+    (error as QueryFailedError & { code?: string }).code === '23505'
+  );
+}
 
 @Injectable()
 export class AdmissionsService {
@@ -119,62 +127,88 @@ export class AdmissionsService {
     input: AdmitPatientInput,
     actor: AuthenticatedUser,
   ): Promise<AdmissionType> {
-    const patient = await this.patientsRepo.findOne({
-      where: { id: input.patientId, hospitalId },
-    });
-    if (!patient) throw new NotFoundException('Patient not found');
+    try {
+      const savedId = await this.admissionsRepo.manager.transaction(
+        async (manager) => {
+          const patient = await manager.findOne(Patient, {
+            where: { id: input.patientId, hospitalId },
+          });
+          if (!patient) throw new NotFoundException('Patient not found');
 
-    const ward = await this.wardsRepo.findOne({
-      where: { id: input.wardId, hospitalId },
-    });
-    if (!ward) throw new NotFoundException('Ward not found');
+          const ward = await manager.findOne(Ward, {
+            where: { id: input.wardId, hospitalId },
+          });
+          if (!ward) throw new NotFoundException('Ward not found');
 
-    const bed = await this.bedsRepo.findOne({
-      where: { id: input.bedId, wardId: input.wardId, hospitalId },
-    });
-    if (!bed) throw new NotFoundException('Bed not found');
-    if (bed.status !== 'available') {
-      throw new BadRequestException('Bed is not available');
-    }
+          // Lock the bed row so concurrent admits serialize on the same bed
+          const bed = await manager
+            .createQueryBuilder(Bed, 'bed')
+            .setLock('pessimistic_write')
+            .where('bed.id = :id', { id: input.bedId })
+            .andWhere('bed.ward_id = :wardId', { wardId: input.wardId })
+            .andWhere('bed.hospital_id = :hospitalId', { hospitalId })
+            .getOne();
+          if (!bed) throw new NotFoundException('Bed not found');
+          if (bed.status !== 'available') {
+            throw new BadRequestException('Bed is not available');
+          }
 
-    const existingAdmission = await this.admissionsRepo.findOne({
-      where: { patientId: input.patientId, hospitalId, status: 'active' },
-    });
-    if (existingAdmission) {
-      throw new BadRequestException('Patient already has an active admission');
-    }
+          const existingAdmission = await manager.findOne(Admission, {
+            where: {
+              patientId: input.patientId,
+              hospitalId,
+              status: 'active',
+            },
+          });
+          if (existingAdmission) {
+            throw new BadRequestException(
+              'Patient already has an active admission',
+            );
+          }
 
-    bed.status = 'occupied';
-    await this.bedsRepo.save(bed);
+          bed.status = 'occupied';
+          await manager.save(bed);
 
-    const saved = await this.admissionsRepo.save(
-      this.admissionsRepo.create({
+          const saved = await manager.save(
+            manager.create(Admission, {
+              hospitalId,
+              patientId: input.patientId,
+              attendingDoctorId: input.attendingDoctorId,
+              wardId: input.wardId,
+              bedId: input.bedId,
+              reason: input.reason,
+              status: 'active',
+              admittedAt: new Date(),
+            }),
+          );
+
+          patient.status = 'admitted';
+          await manager.save(patient);
+
+          return saved.id;
+        },
+      );
+
+      const admission = await this.findAdmissionOrThrow(savedId, hospitalId);
+
+      await this.audit.log({
+        actorId: actor.id,
         hospitalId,
-        patientId: input.patientId,
-        attendingDoctorId: input.attendingDoctorId,
-        wardId: input.wardId,
-        bedId: input.bedId,
-        reason: input.reason,
-        status: 'active',
-        admittedAt: new Date(),
-      }),
-    );
+        action: 'admit',
+        resource: 'admission',
+        resourceId: admission.id,
+        metadata: { patientId: admission.patientId, bedId: admission.bedId },
+      });
 
-    patient.status = 'admitted';
-    await this.patientsRepo.save(patient);
-
-    const admission = await this.findAdmissionOrThrow(saved.id, hospitalId);
-
-    await this.audit.log({
-      actorId: actor.id,
-      hospitalId,
-      action: 'admit',
-      resource: 'admission',
-      resourceId: admission.id,
-      metadata: { patientId: admission.patientId, bedId: admission.bedId },
-    });
-
-    return this.toAdmissionType(admission);
+      return this.toAdmissionType(admission);
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new BadRequestException(
+          'Bed is not available or patient already has an active admission',
+        );
+      }
+      throw error;
+    }
   }
 
   async activeAdmissions(hospitalId: string): Promise<AdmissionType[]> {
