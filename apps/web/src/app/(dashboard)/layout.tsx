@@ -4,13 +4,21 @@ import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useQuery } from '@apollo/client';
 import { DashboardSidebar } from '@/components/layout/dashboard-sidebar';
+import { ForbiddenAccess } from '@/components/auth/forbidden-access';
 import { ME_QUERY } from '@/lib/graphql/queries';
+import { canAccessRoute } from '@/lib/route-access';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { data } = useQuery(ME_QUERY, { errorPolicy: 'all' });
+  const { data, loading } = useQuery(ME_QUERY, { errorPolicy: 'all' });
   const me = data?.me;
+
+  const roles: string[] = me?.roles ?? [];
+  const permissions: string[] = me?.permissions ?? [];
+  const allowed =
+    !me ||
+    canAccessRoute(pathname, { roles, permissions });
 
   useEffect(() => {
     if (!me) return;
@@ -33,7 +41,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </a>
       <DashboardSidebar />
       <main id="main-content" tabIndex={-1} className="flex-1 overflow-auto outline-none">
-        {children}
+        {loading && !me ? (
+          <p className="text-clay-text-muted">Loading...</p>
+        ) : !allowed ? (
+          <ForbiddenAccess />
+        ) : (
+          children
+        )}
       </main>
     </div>
   );

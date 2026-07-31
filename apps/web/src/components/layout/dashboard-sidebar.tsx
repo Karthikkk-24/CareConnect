@@ -25,30 +25,25 @@ import { useTranslations } from 'next-intl';
 import { useClerk } from '@clerk/nextjs';
 import { cn } from '@careconnect/ui';
 import { ME_QUERY } from '@/lib/graphql/queries';
+import { canSeeNavHref } from '@/lib/route-access';
 
 type NavItem = { href: string; key: string; icon: typeof LayoutDashboard };
 
-const baseNav: NavItem[] = [
+const allNav: NavItem[] = [
   { href: '/dashboard', key: 'dashboard', icon: LayoutDashboard },
   { href: '/staff', key: 'staff', icon: UserCog },
   { href: '/patients', key: 'patients', icon: Users },
   { href: '/appointments', key: 'appointments', icon: Calendar },
   { href: '/admissions', key: 'admissions', icon: BedDouble },
-  { href: '/follow-ups', key: 'followUps', icon: CalendarCheck },
-  { href: '/settings', key: 'settings', icon: Settings },
-];
-
-const clinicalNav: NavItem[] = [
   { href: '/doctor', key: 'doctor', icon: Stethoscope },
   { href: '/nurse', key: 'nurse', icon: HeartPulse },
   { href: '/lab', key: 'lab', icon: FlaskConical },
-];
-
-const adminNav: NavItem[] = [
+  { href: '/follow-ups', key: 'followUps', icon: CalendarCheck },
   { href: '/finance', key: 'finance', icon: DollarSign },
   { href: '/pharmacy', key: 'pharmacy', icon: Pill },
   { href: '/inventory', key: 'inventory', icon: Package },
   { href: '/reports', key: 'reports', icon: BarChart3 },
+  { href: '/settings', key: 'settings', icon: Settings },
 ];
 
 export function DashboardSidebar() {
@@ -59,41 +54,17 @@ export function DashboardSidebar() {
   const { data: meData } = useQuery(ME_QUERY);
 
   const roles: string[] = meData?.me?.roles ?? [];
+  const permissions: string[] = meData?.me?.permissions ?? [];
+  const access = { roles, permissions };
+
   const isHospitalAdmin =
     roles.includes('hospital_admin') ||
     roles.includes('hospital_manager') ||
     roles.includes('super_admin');
   const isDoctor = roles.includes('doctor');
   const isNurse = roles.includes('nurse');
-  const isLab = roles.includes('lab_technician');
-  const isPharmacist = roles.includes('pharmacist');
-  const isAccountant = roles.includes('accountant');
 
-  const navItems: NavItem[] = [...baseNav];
-  if (isDoctor) navItems.splice(5, 0, clinicalNav[0]);
-  if (isNurse) navItems.splice(5, 0, clinicalNav[1]);
-  if (isLab || isHospitalAdmin) navItems.splice(5, 0, clinicalNav[2]);
-  if (isHospitalAdmin || isAccountant) {
-    navItems.splice(navItems.length - 1, 0, ...adminNav.filter((n) => n.key === 'finance' || n.key === 'reports'));
-  }
-  if (isHospitalAdmin || isPharmacist) {
-    navItems.splice(navItems.length - 1, 0, ...adminNav.filter((n) => n.key === 'pharmacy' || n.key === 'inventory'));
-  }
-  if (isHospitalAdmin) {
-    for (const item of adminNav) {
-      if (!navItems.some((n) => n.href === item.href)) {
-        navItems.splice(navItems.length - 1, 0, item);
-      }
-    }
-  }
-
-  // Deduplicate by href
-  const seen = new Set<string>();
-  const uniqueNav = navItems.filter((item) => {
-    if (seen.has(item.href)) return false;
-    seen.add(item.href);
-    return true;
-  });
+  const uniqueNav = allNav.filter((item) => canSeeNavHref(item.href, access));
 
   const brandSubtitle = isHospitalAdmin
     ? t('brandSubtitleAdmin')
@@ -108,6 +79,8 @@ export function DashboardSidebar() {
     router.push('/login');
     router.refresh();
   };
+
+  const showFacility = canSeeNavHref('/settings', access);
 
   return (
     <aside
@@ -154,13 +127,15 @@ export function DashboardSidebar() {
       </nav>
 
       <div className="mt-auto space-y-1 border-t border-white/40 pt-4">
-        <Link
-          href="/settings/facility"
-          className="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm text-clay-text-muted hover:bg-clay-primary-light/50 hover:text-clay-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clay-primary"
-        >
-          <Building2 className="h-5 w-5" aria-hidden="true" />
-          {t('facility')}
-        </Link>
+        {showFacility ? (
+          <Link
+            href="/settings/facility"
+            className="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm text-clay-text-muted hover:bg-clay-primary-light/50 hover:text-clay-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clay-primary"
+          >
+            <Building2 className="h-5 w-5" aria-hidden="true" />
+            {t('facility')}
+          </Link>
+        ) : null}
         <button
           type="button"
           onClick={handleLogout}
