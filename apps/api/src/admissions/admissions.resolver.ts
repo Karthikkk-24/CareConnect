@@ -11,6 +11,8 @@ import {
   AdmissionType,
   AdmitPatientInput,
   DischargeAdmissionInput,
+  TransferAdmissionInput,
+  TransferOutAdmissionInput,
   WardOccupancyType,
 } from './admissions.types';
 
@@ -71,6 +73,42 @@ export class AdmissionsResolver {
       hospitalId,
     );
     return this.admissionsService.dischargeAdmission(
+      resolvedHospitalId,
+      input,
+      user,
+    );
+  }
+
+  @Mutation(() => AdmissionType)
+  @Permissions(PERMISSIONS.PATIENTS_WRITE)
+  async transferAdmission(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('input') input: TransferAdmissionInput,
+    @Args('hospitalId', { nullable: true }) hospitalId?: string,
+  ): Promise<AdmissionType> {
+    const resolvedHospitalId = this.admissionsService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.admissionsService.transferAdmission(
+      resolvedHospitalId,
+      input,
+      user,
+    );
+  }
+
+  @Mutation(() => AdmissionType)
+  @Permissions(PERMISSIONS.PATIENTS_WRITE)
+  async transferOutAdmission(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('input') input: TransferOutAdmissionInput,
+    @Args('hospitalId', { nullable: true }) hospitalId?: string,
+  ): Promise<AdmissionType> {
+    const resolvedHospitalId = this.admissionsService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.admissionsService.transferOutAdmission(
       resolvedHospitalId,
       input,
       user,

@@ -110,3 +110,30 @@ export class DischargeAdmissionInput {
   @MinLength(1)
   notes?: string;
 }
+
+@InputType()
+export class TransferAdmissionInput {
+  @Field()
+  @IsUUID()
+  admissionId: string;
+
+  @Field()
+  @IsUUID()
+  wardId: string;
+
+  @Field()
+  @IsUUID()
+  bedId: string;
+}
+
+@InputType()
+export class TransferOutAdmissionInput {
+  @Field()
+  @IsUUID()
+  admissionId: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}

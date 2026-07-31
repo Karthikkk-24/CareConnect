@@ -22,6 +22,7 @@ import { AuditService } from '../audit/audit.service';
 import {
   ClinicalNoteType,
   CompleteLabResultInput,
+  CancelPrescriptionInput,
   CreateClinicalNoteInput,
   CreateDiagnosisInput,
   CreateLabOrderInput,
@@ -31,8 +32,54 @@ import {
   LabOrderType,
   LabResultType,
   PrescriptionType,
+  UpdateLabOrderStatusInput,
   VitalSignType,
 } from './clinical.types';
+
+/**
+ * Lab order status machine:
+ *   ordered → collected → processing → completed
+ *          ↘ cancelled (from ordered/collected/processing)
+ * Terminal: completed, cancelled
+ */
+const LAB_ALLOWED_TRANSITIONS: Record<string, readonly string[]> = {
+  ordered: ['collected', 'processing', 'completed', 'cancelled'],
+  collected: ['processing', 'completed', 'cancelled'],
+  processing: ['completed', 'cancelled'],
+  completed: [],
+  cancelled: [],
+};
+
+/**
+ * Prescription status machine:
+ *   pending → dispensed | cancelled
+ * Terminal: dispensed, cancelled
+ */
+const PRESCRIPTION_ALLOWED_TRANSITIONS: Record<string, readonly string[]> = {
+  pending: ['dispensed', 'cancelled'],
+  dispensed: [],
+  cancelled: [],
+};
+
+function assertLabTransition(from: string, to: string) {
+  if (from === to) return;
+  const allowed = LAB_ALLOWED_TRANSITIONS[from] ?? [];
+  if (!allowed.includes(to)) {
+    throw new BadRequestException(
+      `Cannot transition lab order from "${from}" to "${to}"`,
+    );
+  }
+}
+
+function assertPrescriptionTransition(from: string, to: string) {
+  if (from === to) return;
+  const allowed = PRESCRIPTION_ALLOWED_TRANSITIONS[from] ?? [];
+  if (!allowed.includes(to)) {
+    throw new BadRequestException(
+      `Cannot transition prescription from "${from}" to "${to}"`,
+    );
+  }
+}
 
 @Injectable()
 export class ClinicalService {
@@ -414,6 +461,13 @@ export class ClinicalService {
     });
     if (!order) throw new NotFoundException('Lab order not found');
 
+    if (order.status === 'completed' || order.status === 'cancelled') {
+      throw new BadRequestException(
+        `Cannot complete lab order with status "${order.status}"`,
+      );
+    }
+    assertLabTransition(order.status, 'completed');
+
     const result = await this.labResultsRepo.save(
       this.labResultsRepo.create({
         labOrderId: order.id,
@@ -440,6 +494,67 @@ export class ClinicalService {
     });
 
     return this.toLabResultType(result);
+  }
+
+  async updateLabOrderStatus(
+    hospitalId: string,
+    input: UpdateLabOrderStatusInput,
+    actor: AuthenticatedUser,
+  ): Promise<LabOrderType> {
+    const order = await this.labOrdersRepo.findOne({
+      where: { id: input.labOrderId, hospitalId },
+      relations: ['patient', 'orderedBy'],
+    });
+    if (!order) throw new NotFoundException('Lab order not found');
+
+    assertLabTransition(order.status, input.status);
+    // Completing requires a lab result via completeLabResult
+    if (input.status === 'completed') {
+      throw new BadRequestException(
+        'Use completeLabResult to mark a lab order completed',
+      );
+    }
+
+    order.status = input.status;
+    await this.labOrdersRepo.save(order);
+
+    await this.audit.log({
+      actorId: actor.id,
+      hospitalId,
+      action: 'update',
+      resource: 'lab_order',
+      resourceId: order.id,
+      metadata: { status: order.status },
+    });
+
+    return this.toLabOrderType(order);
+  }
+
+  async cancelPrescription(
+    hospitalId: string,
+    input: CancelPrescriptionInput,
+    actor: AuthenticatedUser,
+  ): Promise<PrescriptionType> {
+    const prescription = await this.prescriptionsRepo.findOne({
+      where: { id: input.prescriptionId, hospitalId },
+      relations: ['items'],
+    });
+    if (!prescription) throw new NotFoundException('Prescription not found');
+
+    assertPrescriptionTransition(prescription.status, 'cancelled');
+    prescription.status = 'cancelled';
+    await this.prescriptionsRepo.save(prescription);
+
+    await this.audit.log({
+      actorId: actor.id,
+      hospitalId,
+      action: 'update',
+      resource: 'prescription',
+      resourceId: prescription.id,
+      metadata: { status: 'cancelled' },
+    });
+
+    return this.toPrescriptionType(prescription);
   }
 
   async listLabOrders(
