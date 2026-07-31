@@ -1,6 +1,7 @@
 import { Field, Float, ID, InputType, ObjectType } from '@nestjs/graphql';
 import {
   IsArray,
+  IsIn,
   IsNumber,
   IsOptional,
   IsString,
@@ -11,6 +12,8 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PatientType } from '../patients/patients.types';
+
+export const CREATE_INVOICE_STATUSES = ['draft', 'issued'] as const;
 
 @ObjectType()
 export class InvoiceItemType {
@@ -121,7 +124,7 @@ export class CreateInvoiceInput {
 
   @Field({ nullable: true })
   @IsOptional()
-  @IsString()
+  @IsIn([...CREATE_INVOICE_STATUSES])
   status?: string;
 
   @Field(() => [CreateInvoiceItemInput])
