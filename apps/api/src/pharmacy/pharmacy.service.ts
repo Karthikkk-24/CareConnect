@@ -158,19 +158,82 @@ export class PharmacyService {
     input: DispensePrescriptionInput,
     actor: AuthenticatedUser,
   ): Promise<PendingPrescriptionType> {
-    const prescription = await this.prescriptionsRepo.findOne({
-      where: { id: input.prescriptionId, hospitalId },
+    const savedId = await this.prescriptionsRepo.manager.transaction(
+      async (manager) => {
+        const prescription = await manager
+          .createQueryBuilder(Prescription, 'prescription')
+          .setLock('pessimistic_write')
+          .leftJoinAndSelect('prescription.items', 'items')
+          .leftJoinAndSelect('prescription.patient', 'patient')
+          .where('prescription.id = :id', { id: input.prescriptionId })
+          .andWhere('prescription.hospital_id = :hospitalId', { hospitalId })
+          .getOne();
+        if (!prescription)
+          throw new NotFoundException('Prescription not found');
+        if (prescription.status !== 'pending') {
+          throw new BadRequestException(
+            'Only pending prescriptions can be dispensed',
+          );
+        }
+
+        const items = prescription.items ?? [];
+        if (items.length === 0) {
+          throw new BadRequestException(
+            'Prescription has no items to dispense',
+          );
+        }
+
+        // Aggregate required units by normalized drug name (1 unit per line item)
+        const requiredByDrug = new Map<
+          string,
+          { label: string; qty: number }
+        >();
+        for (const item of items) {
+          const key = item.drugName.trim().toLowerCase();
+          const existing = requiredByDrug.get(key);
+          if (existing) {
+            existing.qty += 1;
+          } else {
+            requiredByDrug.set(key, { label: item.drugName.trim(), qty: 1 });
+          }
+        }
+
+        for (const [key, { label, qty }] of requiredByDrug) {
+          const stock = await manager
+            .createQueryBuilder(PharmacyStock, 'stock')
+            .setLock('pessimistic_write')
+            .where('stock.hospital_id = :hospitalId', { hospitalId })
+            .andWhere('LOWER(stock.drug_name) = :drugName', { drugName: key })
+            .getOne();
+
+          if (!stock) {
+            throw new BadRequestException(
+              `No pharmacy stock found for "${label}"`,
+            );
+          }
+
+          const available = this.toNumber(stock.quantity);
+          if (available < qty) {
+            throw new BadRequestException(
+              `Insufficient stock for "${label}": need ${qty}, have ${available}`,
+            );
+          }
+
+          stock.quantity = (available - qty).toFixed(2);
+          await manager.save(stock);
+        }
+
+        prescription.status = 'dispensed';
+        const saved = await manager.save(prescription);
+        return saved.id;
+      },
+    );
+
+    const saved = await this.prescriptionsRepo.findOne({
+      where: { id: savedId, hospitalId },
       relations: ['items', 'patient'],
     });
-    if (!prescription) throw new NotFoundException('Prescription not found');
-    if (prescription.status !== 'pending') {
-      throw new BadRequestException(
-        'Only pending prescriptions can be dispensed',
-      );
-    }
-
-    prescription.status = 'dispensed';
-    const saved = await this.prescriptionsRepo.save(prescription);
+    if (!saved) throw new NotFoundException('Prescription not found');
 
     await this.audit.log({
       actorId: actor.id,
@@ -178,7 +241,7 @@ export class PharmacyService {
       action: 'update',
       resource: 'prescription',
       resourceId: saved.id,
-      metadata: { status: 'dispensed' },
+      metadata: { status: 'dispensed', stockDecremented: true },
     });
 
     return this.toPendingPrescriptionType(saved);
