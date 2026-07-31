@@ -1,9 +1,10 @@
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { PERMISSIONS } from '@careconnect/types';
+import { PERMISSIONS, ROLES } from '@careconnect/types';
 import { GqlAuthGuard } from '../auth/gql-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { Permissions } from '../rbac/permissions.decorator';
+import { Roles } from '../rbac/roles.decorator';
 import { RolesGuard } from '../rbac/roles.guard';
 import { ClinicalService } from './clinical.service';
 import {
@@ -21,6 +22,12 @@ import {
   VitalSignType,
 } from './clinical.types';
 import { UseGuards } from '@nestjs/common';
+
+const CLINICIAN_ROLES = [
+  ROLES.DOCTOR,
+  ROLES.HOSPITAL_ADMIN,
+  ROLES.HOSPITAL_MANAGER,
+] as const;
 
 @Resolver()
 @UseGuards(GqlAuthGuard, RolesGuard)
@@ -118,6 +125,7 @@ export class ClinicalResolver {
   }
 
   @Mutation(() => DiagnosisType)
+  @Roles(...CLINICIAN_ROLES)
   @Permissions(PERMISSIONS.PATIENTS_WRITE)
   async createDiagnosis(
     @CurrentUser() user: AuthenticatedUser,
@@ -154,6 +162,7 @@ export class ClinicalResolver {
   }
 
   @Mutation(() => PrescriptionType)
+  @Roles(...CLINICIAN_ROLES)
   @Permissions(PERMISSIONS.PATIENTS_WRITE)
   async createPrescription(
     @CurrentUser() user: AuthenticatedUser,
