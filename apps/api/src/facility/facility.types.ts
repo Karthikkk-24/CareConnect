@@ -1,5 +1,8 @@
 import { Field, ID, InputType, ObjectType } from '@nestjs/graphql';
-import { IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+import { IsIn, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+
+/** Manual bed updates only allow available ↔ maintenance (occupied is admit/discharge). */
+export const MANUAL_BED_STATUSES = ['available', 'maintenance'] as const;
 
 @ObjectType()
 export class DepartmentType {
@@ -105,4 +108,15 @@ export class CreateBedInput {
   @IsString()
   @MinLength(1)
   label: string;
+}
+
+@InputType()
+export class UpdateBedStatusInput {
+  @Field()
+  @IsUUID()
+  bedId: string;
+
+  @Field()
+  @IsIn([...MANUAL_BED_STATUSES])
+  status: string;
 }

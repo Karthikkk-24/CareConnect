@@ -15,8 +15,32 @@ import {
   AdmissionType,
   AdmitPatientInput,
   DischargeAdmissionInput,
+  TransferAdmissionInput,
+  TransferOutAdmissionInput,
   WardOccupancyType,
 } from './admissions.types';
+
+/**
+ * Admission status machine:
+ *   active → discharged (via discharge) | transferred (via transferOut)
+ * Internal bed moves keep status active.
+ * Terminal: discharged, transferred
+ */
+const ADMISSION_ALLOWED_TRANSITIONS: Record<string, readonly string[]> = {
+  active: ['discharged', 'transferred'],
+  discharged: [],
+  transferred: [],
+};
+
+function assertAdmissionTransition(from: string, to: string) {
+  if (from === to) return;
+  const allowed = ADMISSION_ALLOWED_TRANSITIONS[from] ?? [];
+  if (!allowed.includes(to)) {
+    throw new BadRequestException(
+      `Cannot transition admission from "${from}" to "${to}"`,
+    );
+  }
+}
 
 function isUniqueViolation(error: unknown): boolean {
   return (
@@ -248,6 +272,160 @@ export class AdmissionsService {
     return this.toAdmissionType(
       await this.findAdmissionOrThrow(input.id, hospitalId),
     );
+  }
+
+  async transferAdmission(
+    hospitalId: string,
+    input: TransferAdmissionInput,
+    actor: AuthenticatedUser,
+  ): Promise<AdmissionType> {
+    try {
+      await this.admissionsRepo.manager.transaction(async (manager) => {
+        const admission = await manager
+          .createQueryBuilder(Admission, 'admission')
+          .setLock('pessimistic_write')
+          .where('admission.id = :id', { id: input.admissionId })
+          .andWhere('admission.hospital_id = :hospitalId', { hospitalId })
+          .getOne();
+        if (!admission) throw new NotFoundException('Admission not found');
+        if (admission.status !== 'active') {
+          throw new BadRequestException(
+            'Only active admissions can be transferred to another bed',
+          );
+        }
+
+        const ward = await manager.findOne(Ward, {
+          where: { id: input.wardId, hospitalId },
+        });
+        if (!ward) throw new NotFoundException('Ward not found');
+
+        const newBed = await manager
+          .createQueryBuilder(Bed, 'bed')
+          .setLock('pessimistic_write')
+          .where('bed.id = :id', { id: input.bedId })
+          .andWhere('bed.ward_id = :wardId', { wardId: input.wardId })
+          .andWhere('bed.hospital_id = :hospitalId', { hospitalId })
+          .getOne();
+        if (!newBed) throw new NotFoundException('Bed not found');
+        if (newBed.status !== 'available') {
+          throw new BadRequestException('Target bed is not available');
+        }
+
+        if (admission.bedId === newBed.id) {
+          throw new BadRequestException(
+            'Patient is already assigned to this bed',
+          );
+        }
+
+        if (admission.bedId) {
+          const oldBed = await manager
+            .createQueryBuilder(Bed, 'bed')
+            .setLock('pessimistic_write')
+            .where('bed.id = :id', { id: admission.bedId })
+            .andWhere('bed.hospital_id = :hospitalId', { hospitalId })
+            .getOne();
+          if (oldBed) {
+            oldBed.status = 'available';
+            await manager.save(oldBed);
+          }
+        }
+
+        newBed.status = 'occupied';
+        await manager.save(newBed);
+
+        admission.wardId = input.wardId;
+        admission.bedId = input.bedId;
+        await manager.save(admission);
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new BadRequestException('Target bed is not available');
+      }
+      throw error;
+    }
+
+    const admission = await this.findAdmissionOrThrow(
+      input.admissionId,
+      hospitalId,
+    );
+
+    await this.audit.log({
+      actorId: actor.id,
+      hospitalId,
+      action: 'transfer',
+      resource: 'admission',
+      resourceId: admission.id,
+      metadata: {
+        wardId: admission.wardId,
+        bedId: admission.bedId,
+      },
+    });
+
+    return this.toAdmissionType(admission);
+  }
+
+  async transferOutAdmission(
+    hospitalId: string,
+    input: TransferOutAdmissionInput,
+    actor: AuthenticatedUser,
+  ): Promise<AdmissionType> {
+    await this.admissionsRepo.manager.transaction(async (manager) => {
+      const admission = await manager
+        .createQueryBuilder(Admission, 'admission')
+        .setLock('pessimistic_write')
+        .where('admission.id = :id', { id: input.admissionId })
+        .andWhere('admission.hospital_id = :hospitalId', { hospitalId })
+        .getOne();
+      if (!admission) throw new NotFoundException('Admission not found');
+
+      assertAdmissionTransition(admission.status, 'transferred');
+
+      if (admission.bedId) {
+        const bed = await manager
+          .createQueryBuilder(Bed, 'bed')
+          .setLock('pessimistic_write')
+          .where('bed.id = :id', { id: admission.bedId })
+          .andWhere('bed.hospital_id = :hospitalId', { hospitalId })
+          .getOne();
+        if (bed) {
+          bed.status = 'available';
+          await manager.save(bed);
+        }
+      }
+
+      admission.status = 'transferred';
+      admission.dischargedAt = new Date();
+      if (input.notes) {
+        admission.reason = admission.reason
+          ? `${admission.reason}\nTransferred: ${input.notes}`
+          : `Transferred: ${input.notes}`;
+      }
+      await manager.save(admission);
+
+      const patient = await manager.findOne(Patient, {
+        where: { id: admission.patientId, hospitalId },
+      });
+      if (patient) {
+        patient.status = 'discharged';
+        await manager.save(patient);
+      }
+    });
+
+    const admission = await this.findAdmissionOrThrow(
+      input.admissionId,
+      hospitalId,
+    );
+
+    await this.audit.log({
+      actorId: actor.id,
+      hospitalId,
+      action: 'transfer_out',
+      resource: 'admission',
+      resourceId: admission.id,
+      metadata: { status: 'transferred', notes: input.notes },
+    });
+
+    return this.toAdmissionType(admission);
   }
 
   async wardOccupancy(hospitalId: string): Promise<WardOccupancyType[]> {

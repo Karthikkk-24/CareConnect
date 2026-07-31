@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -14,8 +15,30 @@ import {
   CreateDepartmentInput,
   CreateWardInput,
   DepartmentType,
+  UpdateBedStatusInput,
   WardType,
 } from './facility.types';
+
+/**
+ * Manual bed status machine (admit/discharge own occupied transitions):
+ *   available ↔ maintenance
+ * Occupied beds cannot be changed via this API.
+ */
+const MANUAL_BED_TRANSITIONS: Record<string, readonly string[]> = {
+  available: ['maintenance'],
+  maintenance: ['available'],
+  occupied: [],
+};
+
+function assertManualBedTransition(from: string, to: string) {
+  if (from === to) return;
+  const allowed = MANUAL_BED_TRANSITIONS[from] ?? [];
+  if (!allowed.includes(to)) {
+    throw new BadRequestException(
+      `Cannot transition bed from "${from}" to "${to}"`,
+    );
+  }
+}
 
 @Injectable()
 export class FacilityService {
@@ -260,5 +283,31 @@ export class FacilityService {
       resourceId: id,
     });
     return true;
+  }
+
+  async updateBedStatus(
+    hospitalId: string,
+    input: UpdateBedStatusInput,
+    actor: AuthenticatedUser,
+  ): Promise<BedType> {
+    const bed = await this.bedsRepo.findOne({
+      where: { id: input.bedId, hospitalId },
+    });
+    if (!bed) throw new NotFoundException('Bed not found');
+
+    assertManualBedTransition(bed.status, input.status);
+    bed.status = input.status;
+    await this.bedsRepo.save(bed);
+
+    await this.audit.log({
+      actorId: actor.id,
+      hospitalId,
+      action: 'update',
+      resource: 'bed',
+      resourceId: bed.id,
+      metadata: { status: bed.status },
+    });
+
+    return this.toBedType(bed);
   }
 }

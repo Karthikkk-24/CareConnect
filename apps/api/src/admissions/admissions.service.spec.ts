@@ -157,4 +157,79 @@ describe('AdmissionsService', () => {
       ).rejects.toThrow(NotFoundException);
     });
   });
+
+  describe('transferOutAdmission', () => {
+    it('marks active admission as transferred and frees bed', async () => {
+      const admission = {
+        id: 'adm-1',
+        hospitalId: 'hospital-a',
+        patientId: 'patient-1',
+        bedId: 'bed-1',
+        status: 'active',
+        reason: 'fever',
+      };
+      const bed = { id: 'bed-1', hospitalId: 'hospital-a', status: 'occupied' };
+      const patient = {
+        id: 'patient-1',
+        hospitalId: 'hospital-a',
+        status: 'admitted',
+      };
+
+      const admissionQb = {
+        setLock: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(admission),
+      };
+      const bedQb = {
+        setLock: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(bed),
+      };
+      manager.createQueryBuilder
+        .mockReturnValueOnce(admissionQb)
+        .mockReturnValueOnce(bedQb);
+      manager.findOne.mockResolvedValue(patient);
+      manager.save.mockImplementation((row: unknown) =>
+        Promise.resolve(row),
+      );
+
+      admissionsRepo.findOne.mockResolvedValue({
+        ...admission,
+        status: 'transferred',
+        patient,
+      });
+
+      const result = await service.transferOutAdmission(
+        'hospital-a',
+        { admissionId: 'adm-1', notes: 'to City Hospital' },
+        actor,
+      );
+      expect(result.status).toBe('transferred');
+      expect(bed.status).toBe('available');
+      expect(patient.status).toBe('discharged');
+    });
+
+    it('rejects transfer-out of discharged admission', async () => {
+      const admissionQb = {
+        setLock: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue({
+          id: 'adm-1',
+          status: 'discharged',
+        }),
+      };
+      manager.createQueryBuilder.mockReturnValue(admissionQb);
+
+      await expect(
+        service.transferOutAdmission(
+          'hospital-a',
+          { admissionId: 'adm-1' },
+          actor,
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
 });

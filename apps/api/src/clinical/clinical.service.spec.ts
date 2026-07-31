@@ -26,6 +26,7 @@ describe('ClinicalService', () => {
     save: jest.fn(),
     create: jest.fn(),
     find: jest.fn(),
+    findOne: jest.fn(),
   };
   const prescriptionItemsRepo = { save: jest.fn(), create: jest.fn() };
   const labOrdersRepo = {
@@ -111,6 +112,106 @@ describe('ClinicalService', () => {
         ),
       ).rejects.toThrow('Admission does not belong to the given patient');
       expect(vitalsRepo.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('lab order status machine', () => {
+    it('rejects re-completing a completed lab order', async () => {
+      labOrdersRepo.findOne.mockResolvedValue({
+        id: 'lab-1',
+        hospitalId: 'hospital-a',
+        status: 'completed',
+      });
+
+      await expect(
+        service.completeLabResult(
+          'hospital-a',
+          { labOrderId: 'lab-1', resultValue: '5.0' },
+          actor,
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(labResultsRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('advances ordered → collected', async () => {
+      const order = {
+        id: 'lab-1',
+        hospitalId: 'hospital-a',
+        status: 'ordered',
+        patientId: 'p1',
+        testName: 'CBC',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      labOrdersRepo.findOne.mockResolvedValue(order);
+      labOrdersRepo.save.mockImplementation((row: typeof order) =>
+        Promise.resolve(row),
+      );
+
+      const result = await service.updateLabOrderStatus(
+        'hospital-a',
+        { labOrderId: 'lab-1', status: 'collected' },
+        actor,
+      );
+      expect(result.status).toBe('collected');
+    });
+
+    it('rejects completing via updateLabOrderStatus', async () => {
+      labOrdersRepo.findOne.mockResolvedValue({
+        id: 'lab-1',
+        hospitalId: 'hospital-a',
+        status: 'ordered',
+      });
+
+      await expect(
+        service.updateLabOrderStatus(
+          'hospital-a',
+          { labOrderId: 'lab-1', status: 'completed' },
+          actor,
+        ),
+      ).rejects.toThrow('Use completeLabResult');
+    });
+  });
+
+  describe('prescription cancel', () => {
+    it('cancels a pending prescription', async () => {
+      const rx = {
+        id: 'rx-1',
+        hospitalId: 'hospital-a',
+        status: 'pending',
+        patientId: 'p1',
+        items: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      prescriptionsRepo.findOne.mockResolvedValue(rx);
+      prescriptionsRepo.save.mockImplementation((row: typeof rx) =>
+        Promise.resolve(row),
+      );
+
+      const result = await service.cancelPrescription(
+        'hospital-a',
+        { prescriptionId: 'rx-1' },
+        actor,
+      );
+      expect(result.status).toBe('cancelled');
+    });
+
+    it('rejects cancelling a dispensed prescription', async () => {
+      prescriptionsRepo.findOne.mockResolvedValue({
+        id: 'rx-1',
+        hospitalId: 'hospital-a',
+        status: 'dispensed',
+        items: [],
+      });
+
+      await expect(
+        service.cancelPrescription(
+          'hospital-a',
+          { prescriptionId: 'rx-1' },
+          actor,
+        ),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });

@@ -10,6 +10,7 @@ import { ClinicalService } from './clinical.service';
 import {
   ClinicalNoteType,
   CompleteLabResultInput,
+  CancelPrescriptionInput,
   CreateClinicalNoteInput,
   CreateDiagnosisInput,
   CreateLabOrderInput,
@@ -19,6 +20,7 @@ import {
   LabOrderType,
   LabResultType,
   PrescriptionType,
+  UpdateLabOrderStatusInput,
   VitalSignType,
 } from './clinical.types';
 import { UseGuards } from '@nestjs/common';
@@ -206,6 +208,43 @@ export class ClinicalResolver {
       hospitalId,
     );
     return this.clinicalService.completeLabResult(
+      resolvedHospitalId,
+      input,
+      user,
+    );
+  }
+
+  @Mutation(() => LabOrderType)
+  @Permissions(PERMISSIONS.LAB_WRITE)
+  async updateLabOrderStatus(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('input') input: UpdateLabOrderStatusInput,
+    @Args('hospitalId', { nullable: true }) hospitalId?: string,
+  ): Promise<LabOrderType> {
+    const resolvedHospitalId = this.clinicalService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.clinicalService.updateLabOrderStatus(
+      resolvedHospitalId,
+      input,
+      user,
+    );
+  }
+
+  @Mutation(() => PrescriptionType)
+  @Roles(...CLINICIAN_ROLES)
+  @Permissions(PERMISSIONS.PATIENTS_WRITE)
+  async cancelPrescription(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('input') input: CancelPrescriptionInput,
+    @Args('hospitalId', { nullable: true }) hospitalId?: string,
+  ): Promise<PrescriptionType> {
+    const resolvedHospitalId = this.clinicalService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.clinicalService.cancelPrescription(
       resolvedHospitalId,
       input,
       user,

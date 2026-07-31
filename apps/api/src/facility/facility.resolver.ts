@@ -13,6 +13,7 @@ import {
   CreateDepartmentInput,
   CreateWardInput,
   DepartmentType,
+  UpdateBedStatusInput,
   WardType,
 } from './facility.types';
 
@@ -148,5 +149,23 @@ export class FacilityResolver {
       hospitalId,
     );
     return this.facilityService.deleteBed(resolvedHospitalId, id, user);
+  }
+
+  @Mutation(() => BedType)
+  @Permissions(PERMISSIONS.HOSPITALS_WRITE)
+  async updateBedStatus(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('input') input: UpdateBedStatusInput,
+    @Args('hospitalId', { nullable: true }) hospitalId?: string,
+  ): Promise<BedType> {
+    const resolvedHospitalId = this.facilityService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.facilityService.updateBedStatus(
+      resolvedHospitalId,
+      input,
+      user,
+    );
   }
 }

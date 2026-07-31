@@ -2,6 +2,7 @@ import { Field, Float, ID, InputType, Int, ObjectType } from '@nestjs/graphql';
 import {
   IsArray,
   IsBoolean,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -12,6 +13,9 @@ import {
 import { Type } from 'class-transformer';
 import { PatientType } from '../patients/patients.types';
 import { UserSummaryType } from '../users/users.types';
+import { LAB_ORDER_STATUSES } from '../database/entities/lab-order.entity';
+
+export const LAB_ORDER_STATUS_VALUES = LAB_ORDER_STATUSES;
 
 @ObjectType()
 export class VitalSignType {
@@ -445,4 +449,22 @@ export class CompleteLabResultInput {
   @IsOptional()
   @IsString()
   resultFileUrl?: string;
+}
+
+@InputType()
+export class UpdateLabOrderStatusInput {
+  @Field()
+  @IsUUID()
+  labOrderId: string;
+
+  @Field()
+  @IsIn([...LAB_ORDER_STATUS_VALUES])
+  status: string;
+}
+
+@InputType()
+export class CancelPrescriptionInput {
+  @Field()
+  @IsUUID()
+  prescriptionId: string;
 }
