@@ -2,6 +2,7 @@ import { ConflictException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import {
+  Admission,
   Patient,
   PatientAllergy,
   PatientConsent,
@@ -36,6 +37,10 @@ describe('PatientsService', () => {
   };
 
   const usersRepo = {
+    findOne: jest.fn(),
+  };
+
+  const admissionsRepo = {
     findOne: jest.fn(),
   };
 
@@ -83,6 +88,7 @@ describe('PatientsService', () => {
           useValue: relatedRepo,
         },
         { provide: getRepositoryToken(User), useValue: usersRepo },
+        { provide: getRepositoryToken(Admission), useValue: admissionsRepo },
         { provide: AuditService, useValue: audit },
       ],
     }).compile();
