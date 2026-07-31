@@ -68,8 +68,6 @@ SELECT r.id, p.id FROM roles r, permissions p
 WHERE r.slug = 'receptionist'
   AND p.slug IN ('patients:read', 'patients:write', 'appointments:read', 'appointments:write');
 
--- Patient permissions
-INSERT INTO role_permissions (role_id, permission_id)
-SELECT r.id, p.id FROM roles r, permissions p
-WHERE r.slug = 'patient'
-  AND p.slug IN ('appointments:read', 'billing:read');
+-- Patient: no hospital-wide GraphQL permissions.
+-- Portal access is enforced via @Roles('patient') on portal resolvers.
+-- (intentionally no role_permissions rows for patient)

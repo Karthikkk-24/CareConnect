@@ -119,4 +119,38 @@ describe('RolesGuard', () => {
     user.permissions.push('patients:write');
     expect(guard.canActivate(createContext(user))).toBe(true);
   });
+
+  it('denies patient role on staff-only hospital list endpoints', () => {
+    jest
+      .spyOn(reflector, 'getAllAndOverride')
+      .mockImplementation((key: string) => {
+        if (key === ROLES_KEY) {
+          return [
+            'hospital_admin',
+            'hospital_manager',
+            'doctor',
+            'nurse',
+            'receptionist',
+            'lab_technician',
+            'pharmacist',
+            'accountant',
+          ];
+        }
+        if (key === PERMISSIONS_KEY) return ['billing:read'];
+        return undefined;
+      });
+
+    const patient: AuthenticatedUser = {
+      id: '4',
+      authId: 'auth-4',
+      email: 'patient@example.com',
+      fullName: 'Patient',
+      hospitalId: 'h-1',
+      roles: ['patient'],
+      permissions: ['billing:read', 'appointments:read'],
+      onboardingCompleted: true,
+    };
+
+    expect(guard.canActivate(createContext(patient))).toBe(false);
+  });
 });
