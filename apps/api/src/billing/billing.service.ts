@@ -208,64 +208,74 @@ export class BillingService {
     input: RecordPaymentInput,
     actor: AuthenticatedUser,
   ): Promise<InvoiceType> {
-    const invoice = await this.invoicesRepo.findOne({
-      where: { id: input.invoiceId, hospitalId },
-      relations: ['items', 'payments', 'patient'],
-    });
-    if (!invoice) throw new NotFoundException('Invoice not found');
-    if (invoice.status === 'void') {
-      throw new BadRequestException('Cannot record payment on a void invoice');
-    }
+    const paymentId = await this.invoicesRepo.manager.transaction(
+      async (manager) => {
+        // Lock invoice so concurrent payments serialize on the same row
+        const invoice = await manager
+          .createQueryBuilder(Invoice, 'invoice')
+          .setLock('pessimistic_write')
+          .where('invoice.id = :id', { id: input.invoiceId })
+          .andWhere('invoice.hospital_id = :hospitalId', { hospitalId })
+          .getOne();
+        if (!invoice) throw new NotFoundException('Invoice not found');
+        if (invoice.status === 'void') {
+          throw new BadRequestException(
+            'Cannot record payment on a void invoice',
+          );
+        }
+        if (invoice.status === 'paid') {
+          throw new BadRequestException('Invoice is already paid in full');
+        }
 
-    const currentPaid = (invoice.payments ?? []).reduce(
-      (sum, p) => sum + this.toNumber(p.amount),
-      0,
+        const payments = await manager.find(Payment, {
+          where: { invoiceId: invoice.id },
+        });
+        const currentPaid = payments.reduce(
+          (sum, p) => sum + this.toNumber(p.amount),
+          0,
+        );
+        const invoiceTotal = this.toNumber(invoice.totalAmount);
+        const remaining = Math.max(0, invoiceTotal - currentPaid);
+        if (input.amount > remaining + 0.001) {
+          throw new BadRequestException(
+            `Payment exceeds remaining balance of ${remaining.toFixed(2)}`,
+          );
+        }
+
+        const payment = await manager.save(
+          manager.create(Payment, {
+            invoiceId: invoice.id,
+            hospitalId,
+            amount: input.amount.toFixed(2),
+            method: input.method,
+            paidAt: new Date(),
+            recordedById: actor.id,
+          }),
+        );
+
+        const paidTotal = currentPaid + this.toNumber(payment.amount);
+        if (paidTotal >= invoiceTotal) {
+          invoice.status = 'paid';
+        } else if (invoice.status === 'draft') {
+          invoice.status = 'issued';
+          invoice.issuedAt = invoice.issuedAt ?? new Date();
+        }
+
+        await manager.save(invoice);
+        return payment.id;
+      },
     );
-    const invoiceTotal = this.toNumber(invoice.totalAmount);
-    const remaining = Math.max(0, invoiceTotal - currentPaid);
-    if (input.amount > remaining + 0.001) {
-      throw new BadRequestException(
-        `Payment exceeds remaining balance of ${remaining.toFixed(2)}`,
-      );
-    }
-
-    const payment = await this.paymentsRepo.save(
-      this.paymentsRepo.create({
-        invoiceId: invoice.id,
-        hospitalId,
-        amount: input.amount.toFixed(2),
-        method: input.method,
-        paidAt: new Date(),
-        recordedById: actor.id,
-      }),
-    );
-
-    invoice.payments = [...(invoice.payments ?? []), payment];
-
-    const paidTotal = invoice.payments.reduce(
-      (sum, p) => sum + this.toNumber(p.amount),
-      0,
-    );
-
-    if (paidTotal >= invoiceTotal) {
-      invoice.status = 'paid';
-    } else if (invoice.status === 'draft') {
-      invoice.status = 'issued';
-      invoice.issuedAt = invoice.issuedAt ?? new Date();
-    }
-
-    await this.invoicesRepo.save(invoice);
 
     await this.audit.log({
       actorId: actor.id,
       hospitalId,
       action: 'create',
       resource: 'payment',
-      resourceId: payment.id,
-      metadata: { invoiceId: invoice.id, amount: input.amount },
+      resourceId: paymentId,
+      metadata: { invoiceId: input.invoiceId, amount: input.amount },
     });
 
-    return this.toInvoiceType(invoice);
+    return this.getInvoice(hospitalId, input.invoiceId);
   }
 
   async voidInvoice(

@@ -300,11 +300,10 @@ export class StaffService {
       : null;
     if (!staff) throw new NotFoundException('Staff profile missing for invite');
 
-    const invitee = await this.usersRepo.findOne({ where: { id: staff.userId } });
-    if (
-      invitee?.hospitalId &&
-      invitee.hospitalId !== invite.hospitalId
-    ) {
+    const invitee = await this.usersRepo.findOne({
+      where: { id: staff.userId },
+    });
+    if (invitee?.hospitalId && invitee.hospitalId !== invite.hospitalId) {
       throw new BadRequestException(
         'This user already belongs to another hospital. CareConnect users can only be staff at one hospital.',
       );
