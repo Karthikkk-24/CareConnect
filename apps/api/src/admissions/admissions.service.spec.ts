@@ -4,6 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Admission, Bed, Patient, Ward } from '../database/entities';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
+import { DischargeService } from '../discharge/discharge.service';
 import { AdmissionsService } from './admissions.service';
 
 describe('AdmissionsService', () => {
@@ -32,6 +33,7 @@ describe('AdmissionsService', () => {
   const wardsRepo = { findOne: jest.fn(), find: jest.fn() };
   const bedsRepo = { findOne: jest.fn(), find: jest.fn(), save: jest.fn() };
   const audit = { log: jest.fn() };
+  const dischargeService = { createDischarge: jest.fn() };
 
   const actor: AuthenticatedUser = {
     id: 'admin-1',
@@ -55,6 +57,7 @@ describe('AdmissionsService', () => {
         { provide: getRepositoryToken(Ward), useValue: wardsRepo },
         { provide: getRepositoryToken(Bed), useValue: bedsRepo },
         { provide: AuditService, useValue: audit },
+        { provide: DischargeService, useValue: dischargeService },
       ],
     }).compile();
 

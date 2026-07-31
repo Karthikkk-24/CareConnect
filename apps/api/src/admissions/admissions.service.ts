@@ -9,6 +9,7 @@ import { QueryFailedError, Repository } from 'typeorm';
 import { Admission, Bed, Patient, Ward } from '../database/entities';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
+import { DischargeService } from '../discharge/discharge.service';
 import {
   AdmissionType,
   AdmitPatientInput,
@@ -34,6 +35,7 @@ export class AdmissionsService {
     @InjectRepository(Ward) private readonly wardsRepo: Repository<Ward>,
     @InjectRepository(Bed) private readonly bedsRepo: Repository<Bed>,
     private readonly audit: AuditService,
+    private readonly dischargeService: DischargeService,
   ) {}
 
   assertHospitalAccess(user: AuthenticatedUser, hospitalId: string) {
@@ -225,50 +227,19 @@ export class AdmissionsService {
     input: DischargeAdmissionInput,
     actor: AuthenticatedUser,
   ): Promise<AdmissionType> {
-    const admission = await this.findAdmissionOrThrow(input.id, hospitalId);
-
-    if (admission.status !== 'active') {
-      throw new BadRequestException('Admission is not active');
-    }
-
-    admission.status = 'discharged';
-    admission.dischargedAt = new Date();
-    if (input.notes) {
-      admission.reason = admission.reason
-        ? `${admission.reason}\nDischarge notes: ${input.notes}`
-        : input.notes;
-    }
-
-    if (admission.bedId) {
-      const bed = await this.bedsRepo.findOne({
-        where: { id: admission.bedId, hospitalId },
-      });
-      if (bed) {
-        bed.status = 'available';
-        await this.bedsRepo.save(bed);
-      }
-    }
-
-    const saved = await this.admissionsRepo.save(admission);
-
-    const patient = await this.patientsRepo.findOne({
-      where: { id: admission.patientId, hospitalId },
-    });
-    if (patient) {
-      patient.status = 'discharged';
-      await this.patientsRepo.save(patient);
-    }
-
-    await this.audit.log({
-      actorId: actor.id,
+    // Canonical path: always create a clinical discharge summary via DischargeService
+    await this.dischargeService.createDischarge(
       hospitalId,
-      action: 'discharge',
-      resource: 'admission',
-      resourceId: saved.id,
-      metadata: { patientId: saved.patientId },
-    });
+      {
+        admissionId: input.id,
+        summary: input.notes?.trim() || 'Discharged',
+      },
+      actor,
+    );
 
-    return this.toAdmissionType(saved);
+    return this.toAdmissionType(
+      await this.findAdmissionOrThrow(input.id, hospitalId),
+    );
   }
 
   async wardOccupancy(hospitalId: string): Promise<WardOccupancyType[]> {

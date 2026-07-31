@@ -1,10 +1,11 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import {
   Admission,
   Bed,
@@ -22,6 +23,13 @@ import {
   UpdateFollowUpStatusInput,
 } from './discharge.types';
 
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    error instanceof QueryFailedError &&
+    (error as QueryFailedError & { code?: string }).code === '23505'
+  );
+}
+
 @Injectable()
 export class DischargeService {
   constructor(
@@ -29,11 +37,8 @@ export class DischargeService {
     private readonly dischargesRepo: Repository<Discharge>,
     @InjectRepository(FollowUp)
     private readonly followUpsRepo: Repository<FollowUp>,
-    @InjectRepository(Admission)
-    private readonly admissionsRepo: Repository<Admission>,
     @InjectRepository(Patient)
     private readonly patientsRepo: Repository<Patient>,
-    @InjectRepository(Bed) private readonly bedsRepo: Repository<Bed>,
     private readonly audit: AuditService,
   ) {}
 
@@ -86,87 +91,116 @@ export class DischargeService {
     };
   }
 
-  private async dischargeAdmissionIfActive(
-    admission: Admission,
-    hospitalId: string,
-  ): Promise<void> {
-    if (admission.status !== 'active') return;
-
-    admission.status = 'discharged';
-    admission.dischargedAt = new Date();
-    await this.admissionsRepo.save(admission);
-
-    if (admission.bedId) {
-      const bed = await this.bedsRepo.findOne({
-        where: { id: admission.bedId, hospitalId },
-      });
-      if (bed) {
-        bed.status = 'available';
-        await this.bedsRepo.save(bed);
-      }
-    }
-
-    const patient = await this.patientsRepo.findOne({
-      where: { id: admission.patientId, hospitalId },
-    });
-    if (patient) {
-      patient.status = 'discharged';
-      await this.patientsRepo.save(patient);
-    }
-  }
-
   async createDischarge(
     hospitalId: string,
     input: CreateDischargeInput,
     actor: AuthenticatedUser,
   ): Promise<DischargeType> {
-    const admission = await this.admissionsRepo.findOne({
-      where: { id: input.admissionId, hospitalId },
-    });
-    if (!admission) throw new NotFoundException('Admission not found');
+    try {
+      const dischargeId = await this.dischargesRepo.manager.transaction(
+        async (manager) => {
+          const admission = await manager
+            .createQueryBuilder(Admission, 'admission')
+            .setLock('pessimistic_write')
+            .where('admission.id = :id', { id: input.admissionId })
+            .andWhere('admission.hospital_id = :hospitalId', { hospitalId })
+            .getOne();
+          if (!admission) throw new NotFoundException('Admission not found');
 
-    await this.dischargeAdmissionIfActive(admission, hospitalId);
+          const existing = await manager.findOne(Discharge, {
+            where: { admissionId: admission.id },
+          });
+          if (existing) {
+            throw new BadRequestException(
+              'A discharge summary already exists for this admission',
+            );
+          }
 
-    const discharge = await this.dischargesRepo.save(
-      this.dischargesRepo.create({
-        hospitalId,
-        admissionId: admission.id,
-        patientId: admission.patientId,
-        dischargedById: actor.id,
-        summary: input.summary,
-        medicationsAtDischarge: input.medicationsAtDischarge,
-        instructions: input.instructions,
-        dischargedAt: new Date(),
-      }),
-    );
+          if (admission.status === 'active') {
+            admission.status = 'discharged';
+            admission.dischargedAt = new Date();
+            await manager.save(admission);
 
-    if (input.followUpScheduledAt) {
-      await this.followUpsRepo.save(
-        this.followUpsRepo.create({
-          hospitalId,
-          patientId: admission.patientId,
-          dischargeId: discharge.id,
-          doctorId: input.followUpDoctorId ?? admission.attendingDoctorId,
-          scheduledAt: new Date(input.followUpScheduledAt),
-          type: input.followUpType ?? 'post_discharge',
-          status: 'scheduled',
-        }),
+            if (admission.bedId) {
+              const bed = await manager.findOne(Bed, {
+                where: { id: admission.bedId, hospitalId },
+              });
+              if (bed) {
+                bed.status = 'available';
+                await manager.save(bed);
+              }
+            }
+
+            const patient = await manager.findOne(Patient, {
+              where: { id: admission.patientId, hospitalId },
+            });
+            if (patient) {
+              patient.status = 'discharged';
+              await manager.save(patient);
+            }
+          } else if (admission.status !== 'discharged') {
+            throw new BadRequestException(
+              'Only active or already-discharged admissions can receive a discharge summary',
+            );
+          }
+
+          const discharge = await manager.save(
+            manager.create(Discharge, {
+              hospitalId,
+              admissionId: admission.id,
+              patientId: admission.patientId,
+              dischargedById: actor.id,
+              summary: input.summary,
+              medicationsAtDischarge: input.medicationsAtDischarge,
+              instructions: input.instructions,
+              dischargedAt: new Date(),
+            }),
+          );
+
+          if (input.followUpScheduledAt) {
+            await manager.save(
+              manager.create(FollowUp, {
+                hospitalId,
+                patientId: admission.patientId,
+                dischargeId: discharge.id,
+                doctorId: input.followUpDoctorId ?? admission.attendingDoctorId,
+                scheduledAt: new Date(input.followUpScheduledAt),
+                type: input.followUpType ?? 'post_discharge',
+                status: 'scheduled',
+              }),
+            );
+          }
+
+          return discharge.id;
+        },
       );
+
+      const discharge = await this.dischargesRepo.findOne({
+        where: { id: dischargeId, hospitalId },
+      });
+      if (!discharge) throw new NotFoundException('Discharge not found');
+
+      await this.audit.log({
+        actorId: actor.id,
+        hospitalId,
+        action: 'create',
+        resource: 'discharge',
+        resourceId: discharge.id,
+        metadata: {
+          patientId: discharge.patientId,
+          admissionId: discharge.admissionId,
+        },
+      });
+
+      return this.toDischargeType(discharge);
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new BadRequestException(
+          'A discharge summary already exists for this admission',
+        );
+      }
+      throw error;
     }
-
-    await this.audit.log({
-      actorId: actor.id,
-      hospitalId,
-      action: 'create',
-      resource: 'discharge',
-      resourceId: discharge.id,
-      metadata: {
-        patientId: discharge.patientId,
-        admissionId: discharge.admissionId,
-      },
-    });
-
-    return this.toDischargeType(discharge);
   }
 
   async createFollowUp(
