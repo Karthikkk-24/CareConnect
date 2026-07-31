@@ -167,8 +167,7 @@ export class BillingService {
         admissionId: input.admissionId,
         status,
         totalAmount: totalAmount.toFixed(2),
-        issuedAt:
-          status === 'issued' || status === 'paid' ? new Date() : undefined,
+        issuedAt: status === 'issued' ? new Date() : undefined,
       }),
     );
 
