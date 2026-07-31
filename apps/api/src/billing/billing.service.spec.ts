@@ -19,13 +19,16 @@ describe('BillingService', () => {
     createQueryBuilder: jest.fn(),
     find: jest.fn(),
     save: jest.fn(),
-    create: jest.fn((_entity, data) => ({ id: 'pay-1', ...data })),
+    create: jest.fn((_entity: unknown, data: Record<string, unknown>) => ({
+      id: 'pay-1',
+      ...data,
+    })),
   };
 
   const invoicesRepo = {
     manager: {
-      transaction: jest.fn(async (cb: (m: typeof manager) => unknown) =>
-        cb(manager),
+      transaction: jest.fn((cb: (m: typeof manager) => unknown) =>
+        Promise.resolve(cb(manager)),
       ),
     },
     findOne: jest.fn(),

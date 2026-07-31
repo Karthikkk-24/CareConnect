@@ -13,13 +13,13 @@ describe('AdmissionsService', () => {
     findOne: jest.fn(),
     createQueryBuilder: jest.fn(),
     save: jest.fn(),
-    create: jest.fn((_entity, data) => data),
+    create: jest.fn((_entity: unknown, data: Record<string, unknown>) => data),
   };
 
   const admissionsRepo = {
     manager: {
-      transaction: jest.fn(async (cb: (m: typeof manager) => unknown) =>
-        cb(manager),
+      transaction: jest.fn((cb: (m: typeof manager) => unknown) =>
+        Promise.resolve(cb(manager)),
       ),
     },
     findOne: jest.fn(),
