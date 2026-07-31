@@ -413,8 +413,18 @@ export const DASHBOARD_STATS_QUERY = gql`
 `;
 
 export const APPOINTMENTS_QUERY = gql`
-  query Appointments($hospitalId: String, $date: String, $status: String) {
-    appointments(hospitalId: $hospitalId, date: $date, status: $status) {
+  query Appointments(
+    $hospitalId: String
+    $date: String
+    $status: String
+    $doctorId: String
+  ) {
+    appointments(
+      hospitalId: $hospitalId
+      date: $date
+      status: $status
+      doctorId: $doctorId
+    ) {
       id
       patientId
       patient {
