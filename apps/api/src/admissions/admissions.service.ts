@@ -9,6 +9,7 @@ import { QueryFailedError, Repository } from 'typeorm';
 import { Admission, Bed, Patient, Ward } from '../database/entities';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
+import { HospitalDoctorValidator } from '../common/hospital-doctor.validator';
 import { DischargeService } from '../discharge/discharge.service';
 import {
   AdmissionType,
@@ -36,6 +37,7 @@ export class AdmissionsService {
     @InjectRepository(Bed) private readonly bedsRepo: Repository<Bed>,
     private readonly audit: AuditService,
     private readonly dischargeService: DischargeService,
+    private readonly doctorValidator: HospitalDoctorValidator,
   ) {}
 
   assertHospitalAccess(user: AuthenticatedUser, hospitalId: string) {
@@ -154,6 +156,12 @@ export class AdmissionsService {
           if (bed.status !== 'available') {
             throw new BadRequestException('Bed is not available');
           }
+
+          await this.doctorValidator.assertHospitalDoctor(
+            hospitalId,
+            input.attendingDoctorId,
+            'Attending doctor',
+          );
 
           const existingAdmission = await manager.findOne(Admission, {
             where: {
