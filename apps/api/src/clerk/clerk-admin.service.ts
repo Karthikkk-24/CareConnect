@@ -94,4 +94,15 @@ export class ClerkAdminService implements OnModuleInit {
       );
     }
   }
+
+  async reactivateUser(clerkUserId: string): Promise<void> {
+    if (!this.client) return;
+    try {
+      await this.client.users.unbanUser(clerkUserId);
+    } catch (error) {
+      this.logger.warn(
+        `Failed to reactivate Clerk user ${clerkUserId}: ${(error as Error).message}`,
+      );
+    }
+  }
 }

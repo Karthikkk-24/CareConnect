@@ -244,8 +244,10 @@ export class StaffService {
     const saved = await this.staffRepo.save(staff);
     if (input.isActive === false) {
       await this.usersRepo.update(staff.userId, { isActive: false });
+      await this.syncClerkActiveState(staff.userId, false);
     } else if (input.isActive === true) {
       await this.usersRepo.update(staff.userId, { isActive: true });
+      await this.syncClerkActiveState(staff.userId, true);
     }
 
     await this.audit.log({
@@ -266,6 +268,7 @@ export class StaffService {
     staff.isActive = false;
     await this.staffRepo.save(staff);
     await this.usersRepo.update(staff.userId, { isActive: false });
+    await this.syncClerkActiveState(staff.userId, false);
 
     await this.audit.log({
       actorId: actor.id,
@@ -276,6 +279,16 @@ export class StaffService {
     });
 
     return true;
+  }
+
+  private async syncClerkActiveState(userId: string, active: boolean) {
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    if (!user?.authId || user.authId.startsWith('pending_')) return;
+    if (active) {
+      await this.clerkAdmin.reactivateUser(user.authId);
+    } else {
+      await this.clerkAdmin.deactivateUser(user.authId);
+    }
   }
 
   async acceptInvite(
