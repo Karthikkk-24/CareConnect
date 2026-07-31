@@ -121,6 +121,13 @@ export class StaffService {
     let user: User;
     if (existingByEmail) {
       user = existingByEmail;
+      // Single-hospital policy: a user may belong to at most one hospital.
+      // Never attach foreign roles/staff profiles while hospitalId stays elsewhere.
+      if (user.hospitalId && user.hospitalId !== hospitalId) {
+        throw new BadRequestException(
+          'This user already belongs to another hospital. CareConnect users can only be staff at one hospital.',
+        );
+      }
       if (!user.hospitalId) {
         await this.usersRepo.update(user.id, {
           hospitalId,
@@ -292,6 +299,16 @@ export class StaffService {
       ? await this.findById(invite.staffProfileId)
       : null;
     if (!staff) throw new NotFoundException('Staff profile missing for invite');
+
+    const invitee = await this.usersRepo.findOne({ where: { id: staff.userId } });
+    if (
+      invitee?.hospitalId &&
+      invitee.hospitalId !== invite.hospitalId
+    ) {
+      throw new BadRequestException(
+        'This user already belongs to another hospital. CareConnect users can only be staff at one hospital.',
+      );
+    }
 
     await this.usersRepo.update(staff.userId, {
       authId,

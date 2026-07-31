@@ -44,6 +44,13 @@ CareConnect is a Turborepo monorepo for hospital and clinic operations.
 
 Authorization is enforced in Nest (not Postgres RLS). Migrations are Neon-compatible and do not depend on Supabase `auth.uid()`.
 
+### Multi-hospital / tenancy policy
+
+- Each user has at most one `users.hospital_id` (home hospital).
+- Staff invites **must not** attach roles or staff profiles for hospital B when the user already belongs to hospital A.
+- Platform roles (`super_admin`) and patient portal accounts may have a null hospital membership.
+- Role/permission grants on `user_roles` are hospital-scoped; effective permissions should only include the active hospital (plus platform roles).
+
 ## Modules
 
 Hospitals, users/RBAC, staff (+ invites), patients, facility, appointments, admissions, clinical, discharge/follow-ups, portal, billing, pharmacy, inventory, reports, uploads.
