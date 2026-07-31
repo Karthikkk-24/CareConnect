@@ -11,7 +11,7 @@ describe('AppointmentsService status machine', () => {
 
   const appointmentsRepo = {
     findOne: jest.fn(),
-    save: jest.fn(async (a: Appointment) => a),
+    save: jest.fn((a: Appointment) => Promise.resolve(a)),
     find: jest.fn(),
     create: jest.fn(),
     createQueryBuilder: jest.fn(),
