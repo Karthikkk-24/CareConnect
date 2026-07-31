@@ -20,6 +20,7 @@ import {
   PatientInsurance,
   PatientMedicalHistory,
   PatientMedication,
+  Admission,
   User,
 } from '../database/entities';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -69,6 +70,8 @@ export class PatientsService {
     private readonly importJobsRepo: Repository<PatientImportJob>,
     @InjectRepository(User)
     private readonly usersRepo: Repository<User>,
+    @InjectRepository(Admission)
+    private readonly admissionsRepo: Repository<Admission>,
     private readonly audit: AuditService,
   ) {}
 
@@ -402,6 +405,23 @@ export class PatientsService {
     }
 
     const patient = await this.findPatientOrThrow(id, hospitalId);
+
+    const activeAdmission = await this.admissionsRepo.findOne({
+      where: { patientId: id, hospitalId, status: 'active' },
+    });
+
+    if (activeAdmission) {
+      if (status !== 'admitted') {
+        throw new BadRequestException(
+          'Patient has an active admission; discharge the admission before changing status',
+        );
+      }
+    } else if (status === 'admitted') {
+      throw new BadRequestException(
+        'Cannot mark patient admitted without an active admission',
+      );
+    }
+
     patient.status = status;
     const saved = await this.patientsRepo.save(patient);
 

@@ -28,6 +28,7 @@ import { PatientsService } from './patients.service';
       PatientConsent,
       PatientImportJob,
       User,
+      Admission,
     ]),
   ],
   providers: [PatientsResolver, PatientsService],
