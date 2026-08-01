@@ -43,22 +43,22 @@ export class UploadsService {
       return document;
     }
 
-    // Linked patient portal user: only their own documents
+    // Hospital staff (including dual-role patient+staff): same hospital + patients read/write
+    const isHospitalStaff =
+      !!user.hospitalId &&
+      user.hospitalId === patient.hospitalId &&
+      (user.permissions.includes(PERMISSIONS.PATIENTS_READ) ||
+        user.permissions.includes(PERMISSIONS.PATIENTS_WRITE));
+    if (isHospitalStaff) {
+      return document;
+    }
+
+    // Pure patient portal user: only their linked chart's documents
     if (user.roles.includes('patient')) {
       if (patient.userId && patient.userId === user.id) {
         return document;
       }
       throw new ForbiddenException('Access denied');
-    }
-
-    // Hospital staff: same hospital + patients:read (or write)
-    if (
-      user.hospitalId &&
-      user.hospitalId === patient.hospitalId &&
-      (user.permissions.includes(PERMISSIONS.PATIENTS_READ) ||
-        user.permissions.includes(PERMISSIONS.PATIENTS_WRITE))
-    ) {
-      return document;
     }
 
     throw new ForbiddenException('Access denied');

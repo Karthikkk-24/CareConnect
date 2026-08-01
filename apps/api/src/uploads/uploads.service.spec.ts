@@ -172,6 +172,21 @@ describe('UploadsService', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
+    it('allows dual-role doctor+patient to download hospital docs', async () => {
+      mockDocLookup(document);
+      patientsRepo.findOne.mockResolvedValue({
+        ...patient,
+        userId: 'other-patient',
+      });
+
+      await expect(
+        service.assertCanDownload('abc.pdf', {
+          ...staffUser,
+          roles: ['doctor', 'patient'],
+        }),
+      ).resolves.toEqual(document);
+    });
+
     it('allows super_admin across hospitals', async () => {
       mockDocLookup(document);
       patientsRepo.findOne.mockResolvedValue(patient);
