@@ -3,6 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Discharge, FollowUp, Patient } from '../database/entities';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
+import { HospitalDoctorValidator } from '../common/hospital-doctor.validator';
 import { DischargeService } from './discharge.service';
 
 describe('DischargeService', () => {
@@ -32,6 +33,9 @@ describe('DischargeService', () => {
   const followUpsRepo = { save: jest.fn(), create: jest.fn(), find: jest.fn() };
   const patientsRepo = { findOne: jest.fn(), save: jest.fn() };
   const audit = { log: jest.fn() };
+  const doctorValidator = {
+    assertHospitalDoctor: jest.fn().mockResolvedValue(undefined),
+  };
 
   const actor: AuthenticatedUser = {
     id: 'doc-1',
@@ -53,6 +57,7 @@ describe('DischargeService', () => {
         { provide: getRepositoryToken(FollowUp), useValue: followUpsRepo },
         { provide: getRepositoryToken(Patient), useValue: patientsRepo },
         { provide: AuditService, useValue: audit },
+        { provide: HospitalDoctorValidator, useValue: doctorValidator },
       ],
     }).compile();
     service = module.get(DischargeService);

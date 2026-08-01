@@ -15,6 +15,7 @@ import {
 } from '../database/entities';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
+import { HospitalDoctorValidator } from '../common/hospital-doctor.validator';
 import {
   CreateDischargeInput,
   CreateFollowUpInput,
@@ -40,6 +41,7 @@ export class DischargeService {
     @InjectRepository(Patient)
     private readonly patientsRepo: Repository<Patient>,
     private readonly audit: AuditService,
+    private readonly doctorValidator: HospitalDoctorValidator,
   ) {}
 
   assertHospitalAccess(user: AuthenticatedUser, hospitalId: string) {
@@ -218,6 +220,19 @@ export class DischargeService {
         where: { id: input.dischargeId, hospitalId },
       });
       if (!discharge) throw new NotFoundException('Discharge not found');
+      if (discharge.patientId !== input.patientId) {
+        throw new BadRequestException(
+          'Discharge does not belong to the given patient',
+        );
+      }
+    }
+
+    if (input.doctorId) {
+      await this.doctorValidator.assertHospitalDoctor(
+        hospitalId,
+        input.doctorId,
+        'Follow-up doctor',
+      );
     }
 
     const followUp = await this.followUpsRepo.save(
