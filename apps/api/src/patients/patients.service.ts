@@ -821,15 +821,89 @@ export class PatientsService {
     });
     if (!patient) throw new NotFoundException('Patient not found');
 
+    const safeFileUrl = await this.assertOwnedUploadFileUrl(
+      input.fileUrl,
+      hospitalId,
+    );
+
     return this.documentsRepo.save(
       this.documentsRepo.create({
         patientId,
         name: input.name,
-        fileUrl: input.fileUrl,
+        fileUrl: safeFileUrl,
         fileType: input.fileType,
         documentType: input.documentType,
         uploadedById,
       }),
     );
+  }
+
+  /**
+   * Only allow same-origin upload paths produced by POST /uploads/patient-documents.
+   * Rejects third-party URLs and files already attached under another hospital.
+   */
+  private async assertOwnedUploadFileUrl(
+    fileUrl: string,
+    hospitalId: string,
+  ): Promise<string> {
+    const trimmed = fileUrl.trim();
+    let pathname: string;
+    try {
+      if (trimmed.startsWith('/uploads/')) {
+        pathname = trimmed.split('?')[0] ?? trimmed;
+      } else {
+        pathname = new URL(trimmed).pathname;
+      }
+    } catch {
+      throw new BadRequestException(
+        'Document fileUrl must be a valid /uploads/... path from this API',
+      );
+    }
+
+    const match = pathname.match(/^\/uploads\/([^/]+)$/);
+    if (!match) {
+      throw new BadRequestException(
+        'Document fileUrl must be an /uploads/<filename> path from this API',
+      );
+    }
+
+    const filename = basename(match[1]);
+    if (
+      !filename ||
+      filename !== match[1] ||
+      filename.includes('..') ||
+      /[%_]/.test(filename)
+    ) {
+      throw new BadRequestException('Invalid upload filename');
+    }
+
+    // UUID-style names from multer storage (uuid + optional extension)
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(filename)) {
+      throw new BadRequestException('Invalid upload filename');
+    }
+
+    const diskPath = join(process.cwd(), 'uploads', filename);
+    if (!existsSync(diskPath)) {
+      throw new BadRequestException('Upload file not found on server');
+    }
+
+    const existingDocs = await this.documentsRepo.find({
+      where: { fileUrl: ILike(`%/uploads/${filename}`) },
+      take: 20,
+    });
+
+    for (const doc of existingDocs) {
+      const owner = await this.patientsRepo.findOne({
+        where: { id: doc.patientId },
+      });
+      if (owner && owner.hospitalId !== hospitalId) {
+        throw new BadRequestException(
+          'Upload file is already linked to another hospital',
+        );
+      }
+    }
+
+    // Store a stable relative path so clients always hit this API origin
+    return `/uploads/${filename}`;
   }
 }
