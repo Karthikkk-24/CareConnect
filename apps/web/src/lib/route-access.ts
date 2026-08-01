@@ -48,7 +48,7 @@ const ROUTE_RULES: RouteRule[] = [
   },
   {
     prefix: '/settings',
-    anyRoles: ['hospital_admin', 'hospital_manager', 'super_admin'],
+    anyRoles: ['hospital_admin', 'super_admin'],
     anyPermissions: ['hospitals:write'],
   },
 ];
