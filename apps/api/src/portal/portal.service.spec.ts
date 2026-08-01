@@ -20,8 +20,12 @@ describe('PortalService', () => {
   const prescriptionsRepo = { find: jest.fn() };
   const labOrdersRepo = { find: jest.fn() };
   const labResultsRepo = { find: jest.fn() };
-  const appointmentsService = { toAppointmentType: jest.fn((a) => a) };
-  const clinicalService = { toPrescriptionType: jest.fn((p) => p) };
+  const appointmentsService = {
+    toAppointmentType: jest.fn((a: unknown) => a),
+  };
+  const clinicalService = {
+    toPrescriptionType: jest.fn((p: unknown) => p),
+  };
 
   const actor: AuthenticatedUser = {
     id: 'user-1',

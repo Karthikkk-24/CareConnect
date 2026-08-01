@@ -107,11 +107,17 @@ describe('AppointmentsService status machine', () => {
         permissions: ['appointments:read'],
       };
 
-      await service.findAll('hospital-a', undefined, undefined, undefined, doctor);
+      await service.findAll(
+        'hospital-a',
+        undefined,
+        undefined,
+        undefined,
+        doctor,
+      );
 
       expect(appointmentsRepo.find).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ doctorId: 'doc-9' }),
+          where: { hospitalId: 'hospital-a', doctorId: 'doc-9' },
         }),
       );
     });
@@ -119,7 +125,13 @@ describe('AppointmentsService status machine', () => {
     it('keeps hospital-wide list for receptionists', async () => {
       appointmentsRepo.find.mockResolvedValue([]);
 
-      await service.findAll('hospital-a', undefined, undefined, undefined, actor);
+      await service.findAll(
+        'hospital-a',
+        undefined,
+        undefined,
+        undefined,
+        actor,
+      );
 
       expect(appointmentsRepo.find).toHaveBeenCalledWith(
         expect.objectContaining({
