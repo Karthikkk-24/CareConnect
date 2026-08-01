@@ -11,14 +11,13 @@ import { canAccessRoute } from '@/lib/route-access';
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { data, loading } = useQuery(ME_QUERY, { errorPolicy: 'all' });
+  const { data, loading, error } = useQuery(ME_QUERY, { errorPolicy: 'all' });
   const me = data?.me;
 
   const roles: string[] = me?.roles ?? [];
   const permissions: string[] = me?.permissions ?? [];
-  const allowed =
-    !me ||
-    canAccessRoute(pathname, { roles, permissions });
+  // Fail closed: never treat missing/failed me as authorized
+  const allowed = !!me && canAccessRoute(pathname, { roles, permissions });
 
   useEffect(() => {
     if (!me) return;
@@ -43,6 +42,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <main id="main-content" tabIndex={-1} className="flex-1 overflow-auto outline-none">
         {loading && !me ? (
           <p className="text-clay-text-muted">Loading...</p>
+        ) : error && !me ? (
+          <ForbiddenAccess />
         ) : !allowed ? (
           <ForbiddenAccess />
         ) : (
