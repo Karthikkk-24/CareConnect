@@ -4,7 +4,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Like, Repository } from 'typeorm';
+import { basename } from 'path';
+import { Repository } from 'typeorm';
 import { PERMISSIONS } from '@careconnect/types';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { Patient, PatientDocument } from '../database/entities';
@@ -75,15 +76,26 @@ export class UploadsService {
   private async findDocumentByFilename(
     filename: string,
   ): Promise<PatientDocument | null> {
-    // fileUrl is stored as absolute URL ending in /uploads/<filename>
-    const bySuffix = await this.documentsRepo.findOne({
-      where: { fileUrl: Like(`%/uploads/${filename}`) },
-    });
-    if (bySuffix) return bySuffix;
+    const safe = basename(filename);
+    if (
+      !safe ||
+      safe !== filename ||
+      safe.includes('..') ||
+      /[%_]/.test(safe)
+    ) {
+      return null;
+    }
 
-    // Fallback: exact filename match for relative paths
-    return this.documentsRepo.findOne({
-      where: { fileUrl: filename },
-    });
+    const suffix = `/uploads/${safe}`;
+    // Exact suffix match via RIGHT — avoids LIKE metacharacters in user input
+    return this.documentsRepo
+      .createQueryBuilder('doc')
+      .where('doc.file_url = :relative', { relative: suffix })
+      .orWhere('doc.file_url = :filename', { filename: safe })
+      .orWhere('RIGHT(doc.file_url, :len) = :suffix', {
+        len: suffix.length,
+        suffix,
+      })
+      .getOne();
   }
 }
