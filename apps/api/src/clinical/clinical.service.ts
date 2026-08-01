@@ -456,33 +456,46 @@ export class ClinicalService {
     input: CompleteLabResultInput,
     actor: AuthenticatedUser,
   ): Promise<LabResultType> {
-    const order = await this.labOrdersRepo.findOne({
-      where: { id: input.labOrderId, hospitalId },
-    });
-    if (!order) throw new NotFoundException('Lab order not found');
+    const resultId = await this.labOrdersRepo.manager.transaction(
+      async (manager) => {
+        const order = await manager
+          .createQueryBuilder(LabOrder, 'order')
+          .setLock('pessimistic_write')
+          .where('order.id = :id', { id: input.labOrderId })
+          .andWhere('order.hospital_id = :hospitalId', { hospitalId })
+          .getOne();
+        if (!order) throw new NotFoundException('Lab order not found');
 
-    if (order.status === 'completed' || order.status === 'cancelled') {
-      throw new BadRequestException(
-        `Cannot complete lab order with status "${order.status}"`,
-      );
-    }
-    assertLabTransition(order.status, 'completed');
+        if (order.status === 'completed' || order.status === 'cancelled') {
+          throw new BadRequestException(
+            `Cannot complete lab order with status "${order.status}"`,
+          );
+        }
+        assertLabTransition(order.status, 'completed');
 
-    const result = await this.labResultsRepo.save(
-      this.labResultsRepo.create({
-        labOrderId: order.id,
-        hospitalId,
-        resultValue: input.resultValue,
-        referenceRange: input.referenceRange,
-        unit: input.unit,
-        resultFileUrl: input.resultFileUrl,
-        enteredById: actor.id,
-        completedAt: new Date(),
-      }),
+        const result = await manager.save(
+          manager.create(LabResult, {
+            labOrderId: order.id,
+            hospitalId,
+            resultValue: input.resultValue,
+            referenceRange: input.referenceRange,
+            unit: input.unit,
+            resultFileUrl: input.resultFileUrl,
+            enteredById: actor.id,
+            completedAt: new Date(),
+          }),
+        );
+
+        order.status = 'completed';
+        await manager.save(order);
+        return result.id;
+      },
     );
 
-    order.status = 'completed';
-    await this.labOrdersRepo.save(order);
+    const result = await this.labResultsRepo.findOne({
+      where: { id: resultId, hospitalId },
+    });
+    if (!result) throw new NotFoundException('Lab result not found');
 
     await this.audit.log({
       actorId: actor.id,
@@ -490,7 +503,7 @@ export class ClinicalService {
       action: 'complete',
       resource: 'lab_result',
       resourceId: result.id,
-      metadata: { labOrderId: order.id },
+      metadata: { labOrderId: input.labOrderId },
     });
 
     return this.toLabResultType(result);
