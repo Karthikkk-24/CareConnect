@@ -45,7 +45,11 @@ describe('ClinicalService', () => {
       ),
     },
   };
-  const labResultsRepo = { save: jest.fn(), create: jest.fn(), findOne: jest.fn() };
+  const labResultsRepo = {
+    save: jest.fn(),
+    create: jest.fn(),
+    findOne: jest.fn(),
+  };
   const patientsRepo = { findOne: jest.fn() };
   const admissionsRepo = { findOne: jest.fn() };
   const audit = { log: jest.fn() };
