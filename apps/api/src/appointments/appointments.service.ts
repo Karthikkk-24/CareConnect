@@ -177,11 +177,13 @@ export class AppointmentsService {
     date?: string,
     doctorId?: string,
     status?: string,
+    actor?: AuthenticatedUser,
   ): Promise<AppointmentType[]> {
     const where: Record<string, unknown> = { hospitalId };
 
-    if (doctorId) {
-      where.doctorId = doctorId;
+    const effectiveDoctorId = this.resolveDoctorScope(actor, doctorId);
+    if (effectiveDoctorId) {
+      where.doctorId = effectiveDoctorId;
     }
 
     if (status) {
@@ -210,6 +212,30 @@ export class AppointmentsService {
     });
 
     return appointments.map((a) => this.toAppointmentType(a));
+  }
+
+  /**
+   * Doctors without a hospital-wide schedule role only see their own appointments.
+   * Reception/nurse/admin keep hospital-wide visibility.
+   */
+  private resolveDoctorScope(
+    actor: AuthenticatedUser | undefined,
+    requestedDoctorId?: string,
+  ): string | undefined {
+    if (!actor) return requestedDoctorId;
+    const hospitalWide = actor.roles.some((role) =>
+      [
+        'super_admin',
+        'hospital_admin',
+        'hospital_manager',
+        'receptionist',
+        'nurse',
+      ].includes(role),
+    );
+    if (!hospitalWide && actor.roles.includes('doctor')) {
+      return actor.id;
+    }
+    return requestedDoctorId;
   }
 
   async updateStatus(

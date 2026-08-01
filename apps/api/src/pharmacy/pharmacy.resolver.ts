@@ -1,10 +1,11 @@
 import { UseGuards } from '@nestjs/common';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { PERMISSIONS } from '@careconnect/types';
+import { PERMISSIONS, ROLES } from '@careconnect/types';
 import { GqlAuthGuard } from '../auth/gql-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { Permissions } from '../rbac/permissions.decorator';
+import { Roles } from '../rbac/roles.decorator';
 import { RolesGuard } from '../rbac/roles.guard';
 import { PharmacyService } from './pharmacy.service';
 import {
@@ -13,6 +14,12 @@ import {
   PharmacyStockType,
   UpsertPharmacyStockInput,
 } from './pharmacy.types';
+
+const PHARMACY_ROLES = [
+  ROLES.PHARMACIST,
+  ROLES.HOSPITAL_ADMIN,
+  ROLES.HOSPITAL_MANAGER,
+] as const;
 
 @Resolver()
 @UseGuards(GqlAuthGuard, RolesGuard)
@@ -46,6 +53,7 @@ export class PharmacyResolver {
   }
 
   @Mutation(() => PharmacyStockType)
+  @Roles(...PHARMACY_ROLES)
   @Permissions(PERMISSIONS.PATIENTS_WRITE)
   async upsertPharmacyStock(
     @CurrentUser() user: AuthenticatedUser,
@@ -64,6 +72,7 @@ export class PharmacyResolver {
   }
 
   @Mutation(() => PendingPrescriptionType)
+  @Roles(...PHARMACY_ROLES)
   @Permissions(PERMISSIONS.PATIENTS_WRITE)
   async dispensePrescription(
     @CurrentUser() user: AuthenticatedUser,

@@ -65,7 +65,21 @@ export default function PatientDetailPage() {
 
   const handleOpenDocument = async (fileUrl: string) => {
     const token = await getToken();
-    const res = await fetch(fileUrl, {
+    // Only fetch same-origin upload paths — never send the Clerk JWT to arbitrary URLs
+    let pathname: string;
+    try {
+      pathname = fileUrl.startsWith('/uploads/')
+        ? fileUrl.split('?')[0] ?? fileUrl
+        : new URL(fileUrl, apiBase).pathname;
+    } catch {
+      setUploadError('Invalid document URL');
+      return;
+    }
+    if (!/^\/uploads\/[^/]+$/.test(pathname) || pathname.includes('..')) {
+      setUploadError('Invalid document URL');
+      return;
+    }
+    const res = await fetch(`${apiBase}${pathname}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
     if (!res.ok) {

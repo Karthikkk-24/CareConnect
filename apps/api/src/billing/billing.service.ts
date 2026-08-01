@@ -296,33 +296,42 @@ export class BillingService {
     id: string,
     actor: AuthenticatedUser,
   ): Promise<InvoiceType> {
-    const invoice = await this.invoicesRepo.findOne({
-      where: { id, hospitalId },
-      relations: ['items', 'payments', 'patient'],
+    await this.invoicesRepo.manager.transaction(async (manager) => {
+      const invoice = await manager
+        .createQueryBuilder(Invoice, 'invoice')
+        .setLock('pessimistic_write')
+        .where('invoice.id = :id', { id })
+        .andWhere('invoice.hospital_id = :hospitalId', { hospitalId })
+        .getOne();
+      if (!invoice) throw new NotFoundException('Invoice not found');
+      if (invoice.status === 'void') {
+        throw new BadRequestException('Invoice is already void');
+      }
+      if (invoice.status === 'paid') {
+        throw new BadRequestException('Cannot void a paid invoice');
+      }
+
+      const paymentCount = await manager.count(Payment, {
+        where: { invoiceId: invoice.id },
+      });
+      if (paymentCount > 0) {
+        throw new BadRequestException(
+          'Cannot void an invoice that has recorded payments',
+        );
+      }
+
+      invoice.status = 'void';
+      await manager.save(invoice);
     });
-    if (!invoice) throw new NotFoundException('Invoice not found');
-    if (invoice.status === 'void') {
-      throw new BadRequestException('Invoice is already void');
-    }
-    if (invoice.status === 'paid') {
-      throw new BadRequestException('Cannot void a paid invoice');
-    }
-    const paymentCount = (invoice.payments ?? []).length;
-    if (paymentCount > 0) {
-      throw new BadRequestException(
-        'Cannot void an invoice that has recorded payments',
-      );
-    }
-    invoice.status = 'void';
-    await this.invoicesRepo.save(invoice);
+
     await this.audit.log({
       actorId: actor.id,
       hospitalId,
       action: 'void',
       resource: 'invoice',
-      resourceId: invoice.id,
+      resourceId: id,
     });
-    return this.toInvoiceType(invoice);
+    return this.getInvoice(hospitalId, id);
   }
 
   async sumRevenue(hospitalId: string): Promise<number> {

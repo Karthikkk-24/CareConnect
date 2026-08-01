@@ -7,6 +7,7 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 import { Permissions } from '../rbac/permissions.decorator';
 import { Roles } from '../rbac/roles.decorator';
 import { RolesGuard } from '../rbac/roles.guard';
+import { STAFF_ROLES } from '../rbac/staff-roles';
 import { AuditService } from '../audit/audit.service';
 import { HospitalsService } from './hospitals.service';
 import {
@@ -39,13 +40,21 @@ export class HospitalsResolver {
     return this.hospitalsService.findByIdForUser(id, user);
   }
 
-  /** Bootstrap: any authenticated user without a hospital may create one during onboarding. */
+  /** Bootstrap: only unassigned non-patient/non-staff users may create a hospital during admin onboarding. */
   @Mutation(() => HospitalType)
   async createHospital(
     @CurrentUser() user: AuthenticatedUser,
     @Args('input') input: CreateHospitalInput,
   ): Promise<HospitalType> {
-    const canBootstrap = !user.hospitalId;
+    if (user.roles.includes(ROLES.PATIENT)) {
+      throw new ForbiddenException('Patients cannot create hospitals');
+    }
+
+    const hasStaffRole = user.roles.some((role) =>
+      STAFF_ROLES.includes(role as (typeof STAFF_ROLES)[number]),
+    );
+
+    const canBootstrap = !user.hospitalId && !hasStaffRole;
     const canWrite =
       user.roles.includes('super_admin') ||
       user.permissions.includes(PERMISSIONS.HOSPITALS_WRITE);

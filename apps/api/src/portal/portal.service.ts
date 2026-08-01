@@ -41,31 +41,16 @@ export class PortalService {
     }
   }
 
+  /**
+   * Portal PHI is only available after an explicit hospital link
+   * (`patients.user_id`). Email must never auto-grant chart access.
+   */
   private async findLinkedPatient(
     user: AuthenticatedUser,
   ): Promise<Patient | null> {
-    const byUserId = await this.patientsRepo.findOne({
+    return this.patientsRepo.findOne({
       where: { userId: user.id },
     });
-    if (byUserId) return byUserId;
-
-    if (user.email) {
-      // Prefer hospital-scoped match when the patient user is linked to a hospital
-      if (user.hospitalId) {
-        return this.patientsRepo.findOne({
-          where: { email: user.email, hospitalId: user.hospitalId },
-        });
-      }
-      // Without hospital context, only match when exactly one patient has this email
-      const matches = await this.patientsRepo.find({
-        where: { email: user.email },
-        take: 2,
-      });
-      if (matches.length === 1) return matches[0];
-      return null;
-    }
-
-    return null;
   }
 
   private toProfile(patient: Patient): PortalPatientProfileType {

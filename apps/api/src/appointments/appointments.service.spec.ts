@@ -96,4 +96,48 @@ describe('AppointmentsService status machine', () => {
       service.updateStatus('missing', 'checked_in', 'hospital-a', actor),
     ).rejects.toThrow(NotFoundException);
   });
+
+  describe('doctor appointment scoping', () => {
+    it('forces doctorId for doctor-only actors', async () => {
+      appointmentsRepo.find.mockResolvedValue([]);
+      const doctor: AuthenticatedUser = {
+        ...actor,
+        id: 'doc-9',
+        roles: ['doctor'],
+        permissions: ['appointments:read'],
+      };
+
+      await service.findAll(
+        'hospital-a',
+        undefined,
+        undefined,
+        undefined,
+        doctor,
+      );
+
+      expect(appointmentsRepo.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { hospitalId: 'hospital-a', doctorId: 'doc-9' },
+        }),
+      );
+    });
+
+    it('keeps hospital-wide list for receptionists', async () => {
+      appointmentsRepo.find.mockResolvedValue([]);
+
+      await service.findAll(
+        'hospital-a',
+        undefined,
+        undefined,
+        undefined,
+        actor,
+      );
+
+      expect(appointmentsRepo.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { hospitalId: 'hospital-a' },
+        }),
+      );
+    });
+  });
 });
