@@ -37,6 +37,7 @@ const statusVariant = (status: string) => {
 
 export default function AppointmentsPage() {
   const [selectedDate, setSelectedDate] = useState(todayDateString());
+  const { data: meData } = useQuery(ME_QUERY);
   const me = meData?.me;
   const hospitalId = me?.hospitalId;
   const isDoctorOnly =
