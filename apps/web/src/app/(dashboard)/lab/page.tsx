@@ -42,6 +42,7 @@ export default function LabPage() {
 
   const { data: meData } = useQuery(ME_QUERY);
   const hospitalId = meData?.me?.hospitalId;
+  const canCreateOrders = (meData?.me?.permissions ?? []).includes('patients:write');
 
   const { data, loading, refetch } = useQuery(LAB_ORDERS_QUERY, {
     variables: { hospitalId, status: undefined },
@@ -50,7 +51,7 @@ export default function LabPage() {
 
   const { data: patientsData } = useQuery(PATIENTS_QUERY, {
     variables: { search: patientSearch, limit: 8, hospitalId },
-    skip: !hospitalId || patientSearch.length < 2,
+    skip: !hospitalId || !canCreateOrders || patientSearch.length < 2,
   });
 
   const [completeResult, { loading: completing }] = useMutation(COMPLETE_LAB_RESULT_MUTATION, {
@@ -132,9 +133,11 @@ export default function LabPage() {
       ) : null}
 
       <div className="mb-6 flex justify-end">
-        <ClayButton onClick={() => setShowNewOrder(!showNewOrder)}>
-          {showNewOrder ? 'Hide Order Form' : 'New Lab Order'}
-        </ClayButton>
+        {canCreateOrders ? (
+          <ClayButton onClick={() => setShowNewOrder(!showNewOrder)}>
+            {showNewOrder ? 'Hide Order Form' : 'New Lab Order'}
+          </ClayButton>
+        ) : null}
       </div>
 
       {showNewOrder ? (

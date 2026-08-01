@@ -29,13 +29,27 @@ describe('ClinicalService', () => {
     findOne: jest.fn(),
   };
   const prescriptionItemsRepo = { save: jest.fn(), create: jest.fn() };
+  const labManager = {
+    createQueryBuilder: jest.fn(),
+    save: jest.fn(),
+    create: jest.fn((_entity: unknown, data: Record<string, unknown>) => data),
+  };
   const labOrdersRepo = {
     save: jest.fn(),
     create: jest.fn(),
     find: jest.fn(),
     findOne: jest.fn(),
+    manager: {
+      transaction: jest.fn((cb: (m: typeof labManager) => unknown) =>
+        Promise.resolve(cb(labManager)),
+      ),
+    },
   };
-  const labResultsRepo = { save: jest.fn(), create: jest.fn() };
+  const labResultsRepo = {
+    save: jest.fn(),
+    create: jest.fn(),
+    findOne: jest.fn(),
+  };
   const patientsRepo = { findOne: jest.fn() };
   const admissionsRepo = { findOne: jest.fn() };
   const audit = { log: jest.fn() };
@@ -117,11 +131,17 @@ describe('ClinicalService', () => {
 
   describe('lab order status machine', () => {
     it('rejects re-completing a completed lab order', async () => {
-      labOrdersRepo.findOne.mockResolvedValue({
-        id: 'lab-1',
-        hospitalId: 'hospital-a',
-        status: 'completed',
-      });
+      const qb = {
+        setLock: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue({
+          id: 'lab-1',
+          hospitalId: 'hospital-a',
+          status: 'completed',
+        }),
+      };
+      labManager.createQueryBuilder.mockReturnValue(qb);
 
       await expect(
         service.completeLabResult(
@@ -130,7 +150,7 @@ describe('ClinicalService', () => {
           actor,
         ),
       ).rejects.toThrow(BadRequestException);
-      expect(labResultsRepo.save).not.toHaveBeenCalled();
+      expect(labManager.save).not.toHaveBeenCalled();
     });
 
     it('advances ordered → collected', async () => {

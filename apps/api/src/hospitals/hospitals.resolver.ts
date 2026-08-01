@@ -50,9 +50,7 @@ export class HospitalsResolver {
       throw new ForbiddenException('Patients cannot create hospitals');
     }
 
-    const hasStaffRole = user.roles.some((role) =>
-      STAFF_ROLES.includes(role as (typeof STAFF_ROLES)[number]),
-    );
+    const hasStaffRole = user.roles.some((role) => STAFF_ROLES.includes(role));
 
     const canBootstrap = !user.hospitalId && !hasStaffRole;
     const canWrite =

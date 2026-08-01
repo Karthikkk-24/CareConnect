@@ -31,6 +31,14 @@ const CLINICIAN_ROLES = [
   ROLES.HOSPITAL_MANAGER,
 ] as const;
 
+/** Doctors and nurses may author SOAP notes and lab orders. */
+const CLINICAL_AUTHOR_ROLES = [
+  ROLES.DOCTOR,
+  ROLES.NURSE,
+  ROLES.HOSPITAL_ADMIN,
+  ROLES.HOSPITAL_MANAGER,
+] as const;
+
 @Resolver()
 @UseGuards(GqlAuthGuard, RolesGuard)
 export class ClinicalResolver {
@@ -146,6 +154,7 @@ export class ClinicalResolver {
   }
 
   @Mutation(() => ClinicalNoteType)
+  @Roles(...CLINICAL_AUTHOR_ROLES)
   @Permissions(PERMISSIONS.PATIENTS_WRITE)
   async createClinicalNote(
     @CurrentUser() user: AuthenticatedUser,
@@ -183,6 +192,7 @@ export class ClinicalResolver {
   }
 
   @Mutation(() => LabOrderType)
+  @Roles(...CLINICAL_AUTHOR_ROLES)
   @Permissions(PERMISSIONS.PATIENTS_WRITE)
   async createLabOrder(
     @CurrentUser() user: AuthenticatedUser,

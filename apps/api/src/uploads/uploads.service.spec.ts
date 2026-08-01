@@ -10,6 +10,7 @@ describe('UploadsService', () => {
 
   const documentsRepo = {
     findOne: jest.fn(),
+    createQueryBuilder: jest.fn(),
   };
   const patientsRepo = {
     findOne: jest.fn(),
@@ -17,6 +18,14 @@ describe('UploadsService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    documentsRepo.createQueryBuilder.mockImplementation(() => {
+      const qb = {
+        where: jest.fn().mockReturnThis(),
+        orWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(null),
+      };
+      return qb;
+    });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -99,15 +108,30 @@ describe('UploadsService', () => {
       userId: 'user-patient-1',
     };
 
+    const mockDocLookup = (doc: typeof document | null) => {
+      documentsRepo.createQueryBuilder.mockImplementation(() => ({
+        where: jest.fn().mockReturnThis(),
+        orWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(doc),
+      }));
+    };
+
     it('throws NotFound when no document row matches', async () => {
-      documentsRepo.findOne.mockResolvedValue(null);
+      mockDocLookup(null);
       await expect(
         service.assertCanDownload('missing.pdf', staffUser),
       ).rejects.toThrow(NotFoundException);
     });
 
+    it('rejects filenames with LIKE wildcards without querying', async () => {
+      await expect(
+        service.assertCanDownload('%.pdf', staffUser),
+      ).rejects.toThrow(NotFoundException);
+      expect(documentsRepo.createQueryBuilder).not.toHaveBeenCalled();
+    });
+
     it('allows same-hospital staff with patients:read', async () => {
-      documentsRepo.findOne.mockResolvedValue(document);
+      mockDocLookup(document);
       patientsRepo.findOne.mockResolvedValue(patient);
 
       await expect(
@@ -116,7 +140,7 @@ describe('UploadsService', () => {
     });
 
     it('denies staff from another hospital', async () => {
-      documentsRepo.findOne.mockResolvedValue(document);
+      mockDocLookup(document);
       patientsRepo.findOne.mockResolvedValue(patient);
 
       await expect(
@@ -128,7 +152,7 @@ describe('UploadsService', () => {
     });
 
     it('allows linked patient for their own document', async () => {
-      documentsRepo.findOne.mockResolvedValue(document);
+      mockDocLookup(document);
       patientsRepo.findOne.mockResolvedValue(patient);
 
       await expect(
@@ -137,7 +161,7 @@ describe('UploadsService', () => {
     });
 
     it('denies patient for another patient document', async () => {
-      documentsRepo.findOne.mockResolvedValue(document);
+      mockDocLookup(document);
       patientsRepo.findOne.mockResolvedValue({
         ...patient,
         userId: 'other-user',
@@ -148,8 +172,23 @@ describe('UploadsService', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
+    it('allows dual-role doctor+patient to download hospital docs', async () => {
+      mockDocLookup(document);
+      patientsRepo.findOne.mockResolvedValue({
+        ...patient,
+        userId: 'other-patient',
+      });
+
+      await expect(
+        service.assertCanDownload('abc.pdf', {
+          ...staffUser,
+          roles: ['doctor', 'patient'],
+        }),
+      ).resolves.toEqual(document);
+    });
+
     it('allows super_admin across hospitals', async () => {
-      documentsRepo.findOne.mockResolvedValue(document);
+      mockDocLookup(document);
       patientsRepo.findOne.mockResolvedValue(patient);
 
       await expect(

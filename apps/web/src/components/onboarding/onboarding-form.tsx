@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
 import { useMutation } from '@apollo/client';
 import { ClayButton, ClayCard, ClayInput } from '@careconnect/ui';
-import { COMPLETE_ONBOARDING_MUTATION, CREATE_HOSPITAL_MUTATION } from '@/lib/graphql/queries';
+import { COMPLETE_ONBOARDING_MUTATION, COMPLETE_PATIENT_ONBOARDING, CREATE_HOSPITAL_MUTATION } from '@/lib/graphql/queries';
 
 type ClerkMeta = { hospitalName?: string; fullName?: string; accountType?: string };
 
@@ -45,6 +45,7 @@ function OnboardingFormFields({
 
   const [createHospital] = useMutation(CREATE_HOSPITAL_MUTATION);
   const [completeOnboarding] = useMutation(COMPLETE_ONBOARDING_MUTATION);
+  const [completePatientOnboarding] = useMutation(COMPLETE_PATIENT_ONBOARDING);
 
   // Staff must join via invite — never bootstrap as hospital_admin from this form
   if (accountType === 'staff') {
@@ -63,6 +64,46 @@ function OnboardingFormFields({
             <ClayButton>Register as hospital admin</ClayButton>
           </Link>
         </div>
+      </ClayCard>
+    );
+  }
+
+  if (accountType === 'patient') {
+    const handlePatientSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setLoading(true);
+      setError('');
+      try {
+        await completePatientOnboarding({
+          variables: { fullName: fullName.trim() },
+        });
+        router.push('/portal');
+        router.refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Onboarding failed');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    return (
+      <ClayCard className="w-full max-w-lg">
+        <h1 className="mb-2 text-2xl font-bold text-clay-text">Complete patient setup</h1>
+        <p className="mb-6 text-sm text-clay-text-muted">
+          Finish your portal profile. A hospital must link your account before chart data appears.
+        </p>
+        <form onSubmit={handlePatientSubmit} className="flex flex-col gap-4">
+          <ClayInput
+            label="Your Full Name"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            required
+          />
+          {error ? <p className="text-sm text-clay-error">{error}</p> : null}
+          <ClayButton type="submit" isLoading={loading}>
+            Continue to portal
+          </ClayButton>
+        </form>
       </ClayCard>
     );
   }

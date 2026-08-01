@@ -191,9 +191,7 @@ describe('AdmissionsService', () => {
         .mockReturnValueOnce(admissionQb)
         .mockReturnValueOnce(bedQb);
       manager.findOne.mockResolvedValue(patient);
-      manager.save.mockImplementation((row: unknown) =>
-        Promise.resolve(row),
-      );
+      manager.save.mockImplementation((row: unknown) => Promise.resolve(row));
 
       admissionsRepo.findOne.mockResolvedValue({
         ...admission,
