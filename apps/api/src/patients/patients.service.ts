@@ -527,21 +527,39 @@ export class PatientsService {
     const lookupEmail =
       email?.trim().toLowerCase() || patient.email?.toLowerCase();
 
-    if (!targetUserId && lookupEmail) {
-      const portalUser = await this.usersRepo.findOne({
-        where: { email: lookupEmail },
+    let targetUser: User | null = null;
+    if (targetUserId) {
+      targetUser = await this.usersRepo.findOne({
+        where: { id: targetUserId },
+        relations: ['userRoles', 'userRoles.role'],
       });
-      if (!portalUser) {
+    } else if (lookupEmail) {
+      targetUser = await this.usersRepo
+        .createQueryBuilder('user')
+        .leftJoinAndSelect('user.userRoles', 'userRoles')
+        .leftJoinAndSelect('userRoles.role', 'role')
+        .where('LOWER(user.email) = :email', { email: lookupEmail })
+        .getOne();
+      if (!targetUser) {
         throw new NotFoundException(
           `No CareConnect user found for email ${lookupEmail}. Ask the patient to register first.`,
         );
       }
-      targetUserId = portalUser.id;
+      targetUserId = targetUser.id;
     }
 
-    if (!targetUserId) {
+    if (!targetUserId || !targetUser) {
       throw new BadRequestException(
         'Provide a portal user email or userId to link (cannot default to staff account)',
+      );
+    }
+
+    const hasPatientRole = (targetUser.userRoles ?? []).some(
+      (ur) => ur.role?.slug === 'patient',
+    );
+    if (!hasPatientRole) {
+      throw new BadRequestException(
+        'Only users with the patient role can be linked to a patient chart',
       );
     }
 
