@@ -39,6 +39,7 @@ export class AppointmentsResolver {
       date,
       doctorId,
       status,
+      user,
     );
   }
 

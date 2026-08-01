@@ -37,11 +37,21 @@ const statusVariant = (status: string) => {
 
 export default function AppointmentsPage() {
   const [selectedDate, setSelectedDate] = useState(todayDateString());
-  const { data: meData } = useQuery(ME_QUERY);
-  const hospitalId = meData?.me?.hospitalId;
+  const me = meData?.me;
+  const hospitalId = me?.hospitalId;
+  const isDoctorOnly =
+    Array.isArray(me?.roles) &&
+    me.roles.includes('doctor') &&
+    !me.roles.some((r: string) =>
+      ['hospital_admin', 'hospital_manager', 'super_admin', 'receptionist', 'nurse'].includes(r),
+    );
 
   const { data, loading, refetch } = useQuery(APPOINTMENTS_QUERY, {
-    variables: { hospitalId, date: selectedDate },
+    variables: {
+      hospitalId,
+      date: selectedDate,
+      ...(isDoctorOnly && me?.id ? { doctorId: me.id } : {}),
+    },
     skip: !hospitalId,
   });
 

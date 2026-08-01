@@ -22,6 +22,13 @@ export default function DashboardPage() {
   const today = todayDateString();
   const { data: meData } = useQuery(ME_QUERY);
   const hospitalId = meData?.me?.hospitalId;
+  const me = meData?.me;
+  const isDoctorOnly =
+    Array.isArray(me?.roles) &&
+    me.roles.includes('doctor') &&
+    !me.roles.some((r: string) =>
+      ['hospital_admin', 'hospital_manager', 'super_admin', 'receptionist', 'nurse'].includes(r),
+    );
 
   const { data: staffData } = useQuery(STAFF_MEMBERS_QUERY, {
     variables: { hospitalId },
@@ -39,7 +46,11 @@ export default function DashboardPage() {
   });
 
   const { data: appointmentsData } = useQuery(APPOINTMENTS_QUERY, {
-    variables: { hospitalId, date: today },
+    variables: {
+      hospitalId,
+      date: today,
+      ...(isDoctorOnly && me?.id ? { doctorId: me.id } : {}),
+    },
     skip: !hospitalId || !!statsData?.dashboardStats,
     errorPolicy: 'ignore',
   });
