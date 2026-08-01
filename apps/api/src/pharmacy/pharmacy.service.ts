@@ -109,9 +109,16 @@ export class PharmacyService {
     input: UpsertPharmacyStockInput,
     actor: AuthenticatedUser,
   ): Promise<PharmacyStockType> {
-    const existing = await this.pharmacyStockRepo.findOne({
-      where: { hospitalId, drugName: input.drugName },
-    });
+    const drugName = input.drugName.trim();
+    if (!drugName) {
+      throw new BadRequestException('Drug name is required');
+    }
+
+    const existing = await this.pharmacyStockRepo
+      .createQueryBuilder('stock')
+      .where('stock.hospital_id = :hospitalId', { hospitalId })
+      .andWhere('LOWER(stock.drug_name) = LOWER(:drugName)', { drugName })
+      .getOne();
 
     const stock = existing
       ? await this.pharmacyStockRepo.save({
@@ -122,7 +129,7 @@ export class PharmacyService {
       : await this.pharmacyStockRepo.save(
           this.pharmacyStockRepo.create({
             hospitalId,
-            drugName: input.drugName,
+            drugName,
             quantity: input.quantity.toFixed(2),
             unit: input.unit ?? 'each',
           }),

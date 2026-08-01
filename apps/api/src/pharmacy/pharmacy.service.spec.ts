@@ -19,6 +19,7 @@ describe('PharmacyService', () => {
     findOne: jest.fn(),
     save: jest.fn(),
     create: jest.fn(),
+    createQueryBuilder: jest.fn(),
   };
   const prescriptionsRepo = {
     find: jest.fn(),
