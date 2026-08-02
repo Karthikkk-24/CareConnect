@@ -33,11 +33,13 @@ function isUniqueViolation(error: unknown): boolean {
 
 /**
  * Follow-up status machine:
- *   scheduled → completed | missed
+ *   scheduled → completed | missed | rescheduled
+ *   rescheduled → scheduled | completed | missed
  * Terminal: completed, missed (immutable)
  */
 const FOLLOW_UP_TRANSITIONS: Record<string, readonly string[]> = {
-  scheduled: ['completed', 'missed'],
+  scheduled: ['completed', 'missed', 'rescheduled'],
+  rescheduled: ['scheduled', 'completed', 'missed'],
   completed: [],
   missed: [],
 };
