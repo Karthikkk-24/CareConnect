@@ -370,69 +370,71 @@ export class StaffService {
     authId: string,
     email: string,
   ): Promise<StaffProfile> {
-    const staffId = await this.invitesRepo.manager.transaction(async (manager) => {
-      const invitesRepo = manager.getRepository(StaffInvite);
-      const usersRepo = manager.getRepository(User);
-      const staffRepo = manager.getRepository(StaffProfile);
+    const staffId = await this.invitesRepo.manager.transaction(
+      async (manager) => {
+        const invitesRepo = manager.getRepository(StaffInvite);
+        const usersRepo = manager.getRepository(User);
+        const staffRepo = manager.getRepository(StaffProfile);
 
-      const invite = await invitesRepo
-        .createQueryBuilder('invite')
-        .setLock('pessimistic_write')
-        .where('invite.token = :token', { token })
-        .getOne();
-      if (!invite) throw new NotFoundException('Invite not found');
-      if (invite.acceptedAt)
-        throw new UnauthorizedException('Invite already accepted');
-      if (invite.expiresAt < new Date())
-        throw new UnauthorizedException('Invite expired');
-      if (invite.email.toLowerCase() !== email.toLowerCase()) {
-        throw new ForbiddenException(
-          'Invite email does not match signed-in user',
-        );
-      }
+        const invite = await invitesRepo
+          .createQueryBuilder('invite')
+          .setLock('pessimistic_write')
+          .where('invite.token = :token', { token })
+          .getOne();
+        if (!invite) throw new NotFoundException('Invite not found');
+        if (invite.acceptedAt)
+          throw new UnauthorizedException('Invite already accepted');
+        if (invite.expiresAt < new Date())
+          throw new UnauthorizedException('Invite expired');
+        if (invite.email.toLowerCase() !== email.toLowerCase()) {
+          throw new ForbiddenException(
+            'Invite email does not match signed-in user',
+          );
+        }
 
-      const staff = invite.staffProfileId
-        ? await staffRepo.findOne({
-            where: { id: invite.staffProfileId },
-            relations: ['user', 'user.userRoles', 'user.userRoles.role'],
-          })
-        : null;
-      if (!staff) throw new NotFoundException('Staff profile missing for invite');
-      if (!staff.isActive) {
-        throw new ForbiddenException(
-          'This staff account has been deactivated; contact a hospital administrator',
-        );
-      }
+        const staff = invite.staffProfileId
+          ? await staffRepo.findOne({
+              where: { id: invite.staffProfileId },
+              relations: ['user', 'user.userRoles', 'user.userRoles.role'],
+            })
+          : null;
+        if (!staff)
+          throw new NotFoundException('Staff profile missing for invite');
+        if (!staff.isActive) {
+          throw new ForbiddenException(
+            'This staff account has been deactivated; contact a hospital administrator',
+          );
+        }
 
-      const invitee = await usersRepo.findOne({
-        where: { id: staff.userId },
-      });
-      if (invitee && invitee.isActive === false) {
-        throw new ForbiddenException(
-          'This account has been deactivated; contact a hospital administrator',
-        );
-      }
-      if (invitee?.hospitalId && invitee.hospitalId !== invite.hospitalId) {
-        throw new BadRequestException(
-          'This user already belongs to another hospital. CareConnect users can only be staff at one hospital.',
-        );
-      }
+        const invitee = await usersRepo.findOne({
+          where: { id: staff.userId },
+        });
+        if (invitee && invitee.isActive === false) {
+          throw new ForbiddenException(
+            'This account has been deactivated; contact a hospital administrator',
+          );
+        }
+        if (invitee?.hospitalId && invitee.hospitalId !== invite.hospitalId) {
+          throw new BadRequestException(
+            'This user already belongs to another hospital. CareConnect users can only be staff at one hospital.',
+          );
+        }
 
-      await usersRepo.update(staff.userId, {
-        authId,
-        onboardingCompleted: true,
-        hospitalId: invite.hospitalId,
-        isActive: true,
-      });
+        await usersRepo.update(staff.userId, {
+          authId,
+          onboardingCompleted: true,
+          hospitalId: invite.hospitalId,
+          isActive: true,
+        });
 
-      invite.acceptedAt = new Date();
-      await invitesRepo.save(invite);
-      return staff.id;
-    });
+        invite.acceptedAt = new Date();
+        await invitesRepo.save(invite);
+        return staff.id;
+      },
+    );
 
     return (await this.findById(staffId))!;
   }
-
 
   toStaffType(staff: StaffProfile & { inviteToken?: string }) {
     const roleSlug = staff.user?.userRoles?.[0]?.role?.slug ?? 'staff';

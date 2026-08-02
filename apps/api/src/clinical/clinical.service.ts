@@ -497,7 +497,9 @@ export class ClinicalService {
         }
         assertLabTransition(order.status, 'completed');
 
-        const safeResultFileUrl = this.assertLocalUploadUrl(input.resultFileUrl);
+        const safeResultFileUrl = this.assertLocalUploadUrl(
+          input.resultFileUrl,
+        );
 
         const result = await manager.save(
           manager.create(LabResult, {
