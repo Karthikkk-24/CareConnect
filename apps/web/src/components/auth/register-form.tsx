@@ -40,8 +40,13 @@ export function RegisterForm() {
     if (type === 'patient') {
       try {
         await completePatientOnboarding({ variables: { fullName } });
-      } catch {
-        // User row may still be syncing; portal will surface errors if role missing
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Failed to complete patient registration. Please try again or contact support.',
+        );
+        return;
       }
       router.push('/portal');
     } else {
