@@ -78,7 +78,8 @@ describe('ClinicalService', () => {
       (cb: (m: typeof rxManager) => unknown) => Promise.resolve(cb(rxManager)),
     );
     labOrdersRepo.manager.transaction.mockImplementation(
-      (cb: (m: typeof labManager) => unknown) => Promise.resolve(cb(labManager)),
+      (cb: (m: typeof labManager) => unknown) =>
+        Promise.resolve(cb(labManager)),
     );
     const module: TestingModule = await Test.createTestingModule({
       providers: [

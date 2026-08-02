@@ -40,7 +40,8 @@ describe('FacilityService', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     bedsRepo.manager.transaction.mockImplementation(
-      (cb: (m: typeof bedManager) => unknown) => Promise.resolve(cb(bedManager)),
+      (cb: (m: typeof bedManager) => unknown) =>
+        Promise.resolve(cb(bedManager)),
     );
     const module: TestingModule = await Test.createTestingModule({
       providers: [
