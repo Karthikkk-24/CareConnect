@@ -5,6 +5,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { existsSync } from 'fs';
+import { basename, join } from 'path';
 import { Repository } from 'typeorm';
 import {
   Admission,
@@ -495,6 +497,8 @@ export class ClinicalService {
         }
         assertLabTransition(order.status, 'completed');
 
+        const safeResultFileUrl = this.assertLocalUploadUrl(input.resultFileUrl);
+
         const result = await manager.save(
           manager.create(LabResult, {
             labOrderId: order.id,
@@ -502,7 +506,7 @@ export class ClinicalService {
             resultValue: input.resultValue,
             referenceRange: input.referenceRange,
             unit: input.unit,
-            resultFileUrl: input.resultFileUrl,
+            resultFileUrl: safeResultFileUrl,
             enteredById: actor.id,
             completedAt: new Date(),
           }),
