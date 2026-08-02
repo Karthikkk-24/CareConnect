@@ -114,31 +114,60 @@ export class PharmacyService {
       throw new BadRequestException('Drug name is required');
     }
 
-    const existing = await this.pharmacyStockRepo
-      .createQueryBuilder('stock')
-      .where('stock.hospital_id = :hospitalId', { hospitalId })
-      .andWhere('LOWER(stock.drug_name) = LOWER(:drugName)', { drugName })
-      .getOne();
+    const { stock, created } = await this.pharmacyStockRepo.manager.transaction(
+      async (manager) => {
+        const existing = await manager
+          .createQueryBuilder(PharmacyStock, 'stock')
+          .setLock('pessimistic_write')
+          .where('stock.hospital_id = :hospitalId', { hospitalId })
+          .andWhere('LOWER(stock.drug_name) = LOWER(:drugName)', { drugName })
+          .getOne();
 
-    const stock = existing
-      ? await this.pharmacyStockRepo.save({
-          ...existing,
-          quantity: input.quantity.toFixed(2),
-          unit: input.unit ?? existing.unit,
-        })
-      : await this.pharmacyStockRepo.save(
-          this.pharmacyStockRepo.create({
-            hospitalId,
-            drugName,
-            quantity: input.quantity.toFixed(2),
-            unit: input.unit ?? 'each',
-          }),
-        );
+        if (existing) {
+          existing.quantity = input.quantity.toFixed(2);
+          if (input.unit) existing.unit = input.unit;
+          return { stock: await manager.save(existing), created: false };
+        }
+
+        try {
+          const createdRow = await manager.save(
+            manager.create(PharmacyStock, {
+              hospitalId,
+              drugName,
+              quantity: input.quantity.toFixed(2),
+              unit: input.unit ?? 'each',
+            }),
+          );
+          return { stock: createdRow, created: true };
+        } catch (error) {
+          // Concurrent insert won the unique index — lock and update that row.
+          if (
+            !(
+              error instanceof Error &&
+              'code' in error &&
+              (error as { code?: string }).code === '23505'
+            )
+          ) {
+            throw error;
+          }
+          const raced = await manager
+            .createQueryBuilder(PharmacyStock, 'stock')
+            .setLock('pessimistic_write')
+            .where('stock.hospital_id = :hospitalId', { hospitalId })
+            .andWhere('LOWER(stock.drug_name) = LOWER(:drugName)', { drugName })
+            .getOne();
+          if (!raced) throw error;
+          raced.quantity = input.quantity.toFixed(2);
+          if (input.unit) raced.unit = input.unit;
+          return { stock: await manager.save(raced), created: false };
+        }
+      },
+    );
 
     await this.audit.log({
       actorId: actor.id,
       hospitalId,
-      action: existing ? 'update' : 'create',
+      action: created ? 'create' : 'update',
       resource: 'pharmacy_stock',
       resourceId: stock.id,
       metadata: { drugName: stock.drugName, quantity: input.quantity },
