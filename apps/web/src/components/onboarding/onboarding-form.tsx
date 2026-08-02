@@ -1,12 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
-import { useMutation } from '@apollo/client';
+import { useMutation, useQuery } from '@apollo/client';
 import { ClayButton, ClayCard, ClayInput } from '@careconnect/ui';
-import { COMPLETE_ONBOARDING_MUTATION, COMPLETE_PATIENT_ONBOARDING, CREATE_HOSPITAL_MUTATION } from '@/lib/graphql/queries';
+import {
+  COMPLETE_ONBOARDING_MUTATION,
+  COMPLETE_PATIENT_ONBOARDING,
+  CREATE_HOSPITAL_MUTATION,
+  ME_QUERY,
+} from '@/lib/graphql/queries';
 
 type ClerkMeta = { hospitalName?: string; fullName?: string; accountType?: string };
 
@@ -183,11 +188,31 @@ function OnboardingFormFields({
 
 export function OnboardingForm() {
   const { user, isLoaded } = useUser();
+  const router = useRouter();
+  const { data: meData, loading: meLoading } = useQuery(ME_QUERY);
 
-  if (!isLoaded) {
+  useEffect(() => {
+    const me = meData?.me;
+    if (!me?.onboardingCompleted) return;
+    if ((me.roles ?? []).includes('patient')) {
+      router.replace('/portal');
+    } else {
+      router.replace('/dashboard');
+    }
+  }, [meData?.me, router]);
+
+  if (!isLoaded || meLoading) {
     return (
       <ClayCard className="w-full max-w-lg">
         <p className="text-sm text-clay-text-muted">Loading...</p>
+      </ClayCard>
+    );
+  }
+
+  if (meData?.me?.onboardingCompleted) {
+    return (
+      <ClayCard className="w-full max-w-lg">
+        <p className="text-sm text-clay-text-muted">Redirecting…</p>
       </ClayCard>
     );
   }
