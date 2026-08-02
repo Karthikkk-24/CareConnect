@@ -18,6 +18,7 @@ interface HospitalFormProps {
   onSubmit: (data: HospitalFormValues) => Promise<void>;
   submitLabel?: string;
   isLoading?: boolean;
+  readOnly?: boolean;
 }
 
 export function HospitalForm({
@@ -25,6 +26,7 @@ export function HospitalForm({
   onSubmit,
   submitLabel = 'Save Changes',
   isLoading,
+  readOnly = false,
 }: HospitalFormProps) {
   const {
     register,
@@ -43,19 +45,32 @@ export function HospitalForm({
         <ClayInput
           label="Hospital Name"
           error={errors.name?.message}
+          disabled={readOnly}
           {...register('name', { required: 'Hospital name is required' })}
         />
         <div className="grid gap-4 md:grid-cols-2">
-          <ClayInput label="Email" type="email" {...register('email')} />
-          <ClayInput label="Phone" type="tel" {...register('phone')} />
-          <ClayInput label="Address" className="md:col-span-2" {...register('address')} />
-          <ClayInput label="City" {...register('city')} />
-          <ClayInput label="Country" {...register('country')} />
-          <ClayInput label="Logo URL" className="md:col-span-2" {...register('logoUrl')} />
+          <ClayInput label="Email" type="email" disabled={readOnly} {...register('email')} />
+          <ClayInput label="Phone" type="tel" disabled={readOnly} {...register('phone')} />
+          <ClayInput
+            label="Address"
+            className="md:col-span-2"
+            disabled={readOnly}
+            {...register('address')}
+          />
+          <ClayInput label="City" disabled={readOnly} {...register('city')} />
+          <ClayInput label="Country" disabled={readOnly} {...register('country')} />
+          <ClayInput
+            label="Logo URL"
+            className="md:col-span-2"
+            disabled={readOnly}
+            {...register('logoUrl')}
+          />
         </div>
-        <ClayButton type="submit" isLoading={isLoading}>
-          {submitLabel}
-        </ClayButton>
+        {readOnly ? null : (
+          <ClayButton type="submit" isLoading={isLoading}>
+            {submitLabel}
+          </ClayButton>
+        )}
       </form>
     </ClayCard>
   );

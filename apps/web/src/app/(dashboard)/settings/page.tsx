@@ -15,6 +15,7 @@ export default function SettingsPage() {
 
   const { data: meData } = useQuery(ME_QUERY);
   const hospitalId = meData?.me?.hospitalId;
+  const canWriteHospital = (meData?.me?.permissions ?? []).includes('hospitals:write');
 
   const { data, loading: fetching } = useQuery(HOSPITAL_QUERY, {
     variables: { id: hospitalId },
@@ -107,6 +108,7 @@ export default function SettingsPage() {
         onSubmit={handleSubmit}
         isLoading={loading}
         submitLabel="Save Hospital Profile"
+        readOnly={!canWriteHospital}
       />
     </div>
   );
