@@ -391,8 +391,8 @@ export default function FacilitySettingsPage() {
           </div>
 
           {selectedWardId ? (
-            {canWriteFacility ? (
-          <form onSubmit={handleCreateBed} className="mb-4 space-y-3">
+            canWriteFacility ? (
+              <form onSubmit={handleCreateBed} className="mb-4 space-y-3">
               <ClayInput
                 label="Label *"
                 value={bedLabel}
@@ -405,7 +405,7 @@ export default function FacilitySettingsPage() {
                 Add Bed
               </ClayButton>
             </form>
-          ) : null}
+            ) : null
           ) : (
             <p className="mb-4 rounded-2xl bg-clay-primary-light/20 px-3 py-2 text-sm text-clay-text-muted">
               <DoorClosed className="mr-1 inline-block h-4 w-4 align-text-bottom" />
@@ -441,9 +441,7 @@ export default function FacilitySettingsPage() {
                     >
                       {b.status}
                     </ClayBadge>
-                    {b.status !== 'occupied' ? (
-                      {canWriteFacility ? (
-
+                    {b.status !== 'occupied' && canWriteFacility ? (
                       <ClayButton
                         type="button"
                         size="sm"
@@ -457,8 +455,6 @@ export default function FacilitySettingsPage() {
                       >
                         <Trash2 className="h-4 w-4 text-clay-error" />
                       </ClayButton>
-
-                      ) : null}
                     ) : null}
                   </div>
                 </div>
