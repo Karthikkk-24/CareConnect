@@ -250,6 +250,7 @@ export class AdmissionsService {
       where: { hospitalId, status: 'active' },
       relations: ['patient', 'attendingDoctor', 'ward', 'bed'],
       order: { admittedAt: 'DESC' },
+      take: 200,
     });
     return admissions.map((a) => this.toAdmissionType(a));
   }

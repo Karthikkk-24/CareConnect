@@ -636,6 +636,7 @@ export class ClinicalService {
       where,
       relations: ['patient', 'orderedBy'],
       order: { createdAt: 'DESC' },
+      take: 200,
     });
     return orders.map((o) => this.toLabOrderType(o));
   }

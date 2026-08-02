@@ -100,6 +100,7 @@ export class PharmacyService {
     const stock = await this.pharmacyStockRepo.find({
       where: { hospitalId },
       order: { drugName: 'ASC' },
+      take: 200,
     });
     return stock.map((item) => this.toPharmacyStockType(item));
   }
@@ -183,6 +184,7 @@ export class PharmacyService {
       where: { hospitalId, status: 'pending' },
       relations: ['items', 'patient'],
       order: { createdAt: 'ASC' },
+      take: 200,
     });
     return prescriptions.map((prescription) =>
       this.toPendingPrescriptionType(prescription),

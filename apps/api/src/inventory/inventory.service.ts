@@ -1,10 +1,11 @@
 import {
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import { InventoryItem } from '../database/entities';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
@@ -13,6 +14,13 @@ import {
   InventoryItemType,
   UpdateInventoryQuantityInput,
 } from './inventory.types';
+
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    error instanceof QueryFailedError &&
+    (error as QueryFailedError & { code?: string }).code === '23505'
+  );
+}
 
 @Injectable()
 export class InventoryService {
@@ -61,16 +69,26 @@ export class InventoryService {
     input: CreateInventoryItemInput,
     actor: AuthenticatedUser,
   ): Promise<InventoryItemType> {
-    const item = await this.inventoryRepo.save(
-      this.inventoryRepo.create({
-        hospitalId,
-        name: input.name,
-        sku: input.sku,
-        quantity: (input.quantity ?? 0).toFixed(2),
-        unit: input.unit ?? 'each',
-        reorderLevel: (input.reorderLevel ?? 0).toFixed(2),
-      }),
-    );
+    let item: InventoryItem;
+    try {
+      item = await this.inventoryRepo.save(
+        this.inventoryRepo.create({
+          hospitalId,
+          name: input.name,
+          sku: input.sku,
+          quantity: (input.quantity ?? 0).toFixed(2),
+          unit: input.unit ?? 'each',
+          reorderLevel: (input.reorderLevel ?? 0).toFixed(2),
+        }),
+      );
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new ConflictException(
+          'An inventory item with this SKU already exists in this hospital',
+        );
+      }
+      throw error;
+    }
 
     await this.audit.log({
       actorId: actor.id,
@@ -88,6 +106,7 @@ export class InventoryService {
     const items = await this.inventoryRepo.find({
       where: { hospitalId },
       order: { name: 'ASC' },
+      take: 200,
     });
     return items.map((item) => this.toInventoryItemType(item));
   }

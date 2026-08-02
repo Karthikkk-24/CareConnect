@@ -216,6 +216,7 @@ export class BillingService {
     const invoices = await this.invoicesRepo.find({
       where: { hospitalId },
       relations: ['items', 'payments', 'patient'],
+      take: 200,
       order: { createdAt: 'DESC' },
     });
     return invoices.map((invoice) => this.toInvoiceType(invoice));
