@@ -76,11 +76,14 @@ export class UploadsController {
     this.uploadsService.assertCanUpload(req.user);
 
     if (!file) throw new BadRequestException('file is required');
-    const base =
-      process.env.API_PUBLIC_URL?.replace(/\/$/, '') ||
-      `${req.protocol}://${req.get('host')}`;
+    // Prefer configured public base; otherwise return a stable relative path
+    // so client-controlled Host headers cannot poison stored document URLs.
+    const configured = process.env.API_PUBLIC_URL?.replace(/\/$/, '');
+    const url = configured
+      ? `${configured}/uploads/${file.filename}`
+      : `/uploads/${file.filename}`;
     return {
-      url: `${base}/uploads/${file.filename}`,
+      url,
       fileName: file.originalname,
       fileType: file.mimetype,
       size: file.size,
