@@ -480,6 +480,18 @@ export class PatientsService {
       throw new BadRequestException(
         'Cannot mark patient admitted without an active admission',
       );
+    } else if (status === 'discharged') {
+      const priorDischarge = await this.admissionsRepo.findOne({
+        where: [
+          { patientId: id, hospitalId, status: 'discharged' },
+          { patientId: id, hospitalId, status: 'transferred' },
+        ],
+      });
+      if (!priorDischarge && patient.status !== 'discharged') {
+        throw new BadRequestException(
+          'Cannot mark patient discharged without a completed discharge or transfer',
+        );
+      }
     }
 
     patient.status = status;
