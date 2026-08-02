@@ -28,6 +28,12 @@ export default function StaffPage() {
   });
 
   const staff = data?.staffMembers ?? [];
+  const permissions = meData?.me?.permissions ?? [];
+  const roles = meData?.me?.roles ?? [];
+  const canWriteStaff = permissions.includes('staff:write');
+  const canDeactivateStaff =
+    canWriteStaff &&
+    (roles.includes('hospital_admin') || roles.includes('super_admin'));
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Deactivate ${name}?`)) return;
@@ -43,12 +49,14 @@ export default function StaffPage() {
       <DashboardHeader title="Staff Management" subtitle="Manage your hospital team" />
 
       <div className="mb-6 flex justify-end">
-        <Link href="/staff/new">
-          <ClayButton>
-            <Plus className="h-4 w-4" />
-            Add Staff
-          </ClayButton>
-        </Link>
+        {canWriteStaff ? (
+          <Link href="/staff/new">
+            <ClayButton>
+              <Plus className="h-4 w-4" />
+              Add Staff
+            </ClayButton>
+          </Link>
+        ) : null}
       </div>
 
       <ClayCard padding="none" className="overflow-hidden">
@@ -75,10 +83,15 @@ export default function StaffPage() {
             ) : staff.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-6 py-8 text-center text-clay-text-muted">
-                  No staff members yet.{' '}
-                  <Link href="/staff/new" className="text-clay-primary hover:underline">
-                    Add your first team member
-                  </Link>
+                  No staff members yet.
+                  {canWriteStaff ? (
+                    <>
+                      {' '}
+                      <Link href="/staff/new" className="text-clay-primary hover:underline">
+                        Add your first team member
+                      </Link>
+                    </>
+                  ) : null}
                 </td>
               </tr>
             ) : (
@@ -111,29 +124,33 @@ export default function StaffPage() {
                     </ClayBadge>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex justify-end gap-2">
-                      <Link href={`/staff/${member.id}/edit`}>
-                        <button className="flex h-8 w-8 items-center justify-center rounded-xl bg-clay-primary-light text-clay-primary hover:shadow-clay-sm">
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                      </Link>
-                      {member.isActive ? (
-                        <button
-                          onClick={() => handleDelete(member.id, member.fullName)}
-                          className="flex h-8 w-8 items-center justify-center rounded-xl bg-red-50 text-clay-error hover:shadow-clay-sm"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleReactivate(member.id)}
-                          title="Reactivate"
-                          className="flex h-8 w-8 items-center justify-center rounded-xl bg-clay-primary-light text-clay-primary hover:shadow-clay-sm"
-                        >
-                          <RotateCcw className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
+                    {canWriteStaff ? (
+                      <div className="flex justify-end gap-2">
+                        <Link href={`/staff/${member.id}/edit`}>
+                          <button className="flex h-8 w-8 items-center justify-center rounded-xl bg-clay-primary-light text-clay-primary hover:shadow-clay-sm">
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                        </Link>
+                        {member.isActive ? (
+                          canDeactivateStaff ? (
+                            <button
+                              onClick={() => handleDelete(member.id, member.fullName)}
+                              className="flex h-8 w-8 items-center justify-center rounded-xl bg-red-50 text-clay-error hover:shadow-clay-sm"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          ) : null
+                        ) : (
+                          <button
+                            onClick={() => handleReactivate(member.id)}
+                            title="Reactivate"
+                            className="flex h-8 w-8 items-center justify-center rounded-xl bg-clay-primary-light text-clay-primary hover:shadow-clay-sm"
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                    ) : null}
                   </td>
                 </tr>
               ))

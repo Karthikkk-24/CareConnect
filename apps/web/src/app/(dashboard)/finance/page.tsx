@@ -28,6 +28,7 @@ export default function FinancePage() {
   ).length;
   const paid = invoices.filter((inv: { status: string }) => inv.status === 'paid').length;
   const revenueTotal = reportsData?.hospitalReports?.revenueTotal ?? 0;
+  const canWriteBilling = (meData?.me?.permissions ?? []).includes('billing:write');
 
   return (
     <div>
@@ -36,14 +37,16 @@ export default function FinancePage() {
         subtitle="Billing overview and invoice management"
       />
 
-      <div className="mb-6 flex justify-end">
-        <Link href="/finance/invoices/new">
-          <ClayButton>
-            <Plus className="mr-2 h-4 w-4" />
-            New Invoice
-          </ClayButton>
-        </Link>
-      </div>
+      {canWriteBilling ? (
+        <div className="mb-6 flex justify-end">
+          <Link href="/finance/invoices/new">
+            <ClayButton>
+              <Plus className="mr-2 h-4 w-4" />
+              New Invoice
+            </ClayButton>
+          </Link>
+        </div>
+      ) : null}
 
       <div className="mb-8 grid gap-6 md:grid-cols-3">
         <ClayStatCard
@@ -60,7 +63,9 @@ export default function FinancePage() {
         <div className="grid gap-3 sm:grid-cols-2">
           {[
             { label: 'View All Invoices', href: '/finance/invoices' },
-            { label: 'Create Invoice', href: '/finance/invoices/new' },
+            ...(canWriteBilling
+              ? [{ label: 'Create Invoice', href: '/finance/invoices/new' }]
+              : []),
             { label: 'Reports Hub', href: '/reports' },
           ].map((action) => (
             <Link
