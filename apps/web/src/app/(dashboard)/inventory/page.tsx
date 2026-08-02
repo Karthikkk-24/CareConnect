@@ -23,6 +23,7 @@ export default function InventoryPage() {
 
   const { data: meData } = useQuery(ME_QUERY);
   const hospitalId = meData?.me?.hospitalId;
+  const canWrite = (meData?.me?.permissions ?? []).includes('patients:write');
 
   const { data, loading, refetch } = useQuery(INVENTORY_ITEMS_QUERY, {
     variables: { hospitalId },
@@ -91,16 +92,18 @@ export default function InventoryPage() {
       />
 
       <div className="mb-6 flex justify-end">
-        <ClayButton onClick={() => setShowForm(!showForm)}>
-          {showForm ? 'Hide Form' : 'Add Item'}
-        </ClayButton>
+        {canWrite ? (
+          <ClayButton onClick={() => setShowForm(!showForm)}>
+            {showForm ? 'Hide Form' : 'Add Item'}
+          </ClayButton>
+        ) : null}
       </div>
 
       {error ? (
         <p className="mb-4 rounded-2xl bg-red-50 px-4 py-2 text-sm text-clay-error">{error}</p>
       ) : null}
 
-      {showForm ? (
+      {showForm && canWrite ? (
         <ClayCard className="mb-6 max-w-2xl">
           <h2 className="mb-4 text-lg font-semibold text-clay-text">Add Inventory Item</h2>
           <form onSubmit={handleCreate} className="space-y-4">
@@ -180,24 +183,26 @@ export default function InventoryPage() {
                     <ClayBadge variant={lowStock ? 'warning' : 'success'}>
                       {item.quantity} {item.unit}
                     </ClayBadge>
-                    <div className="flex gap-1">
-                      <ClayButton
-                        size="sm"
-                        variant="secondary"
-                        disabled={updating}
-                        onClick={() => handleAdjust(item.id, item.quantity, -1)}
-                      >
-                        −
-                      </ClayButton>
-                      <ClayButton
-                        size="sm"
-                        variant="secondary"
-                        disabled={updating}
-                        onClick={() => handleAdjust(item.id, item.quantity, 1)}
-                      >
-                        +
-                      </ClayButton>
-                    </div>
+                    {canWrite ? (
+                      <div className="flex gap-1">
+                        <ClayButton
+                          size="sm"
+                          variant="secondary"
+                          disabled={updating}
+                          onClick={() => handleAdjust(item.id, item.quantity, -1)}
+                        >
+                          −
+                        </ClayButton>
+                        <ClayButton
+                          size="sm"
+                          variant="secondary"
+                          disabled={updating}
+                          onClick={() => handleAdjust(item.id, item.quantity, 1)}
+                        >
+                          +
+                        </ClayButton>
+                      </div>
+                    ) : null}
                   </div>
                 );
               },
