@@ -1,9 +1,30 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
+import { promises as fs } from 'fs';
+import { join } from 'path';
 import { Patient, PatientDocument } from '../database/entities';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { UploadsService } from './uploads.service';
+
+jest.mock('fs', () => {
+  const actual = jest.requireActual<typeof import('fs')>('fs');
+  return {
+    ...actual,
+    promises: {
+      ...actual.promises,
+      readdir: jest.fn(),
+      stat: jest.fn(),
+      unlink: jest.fn(),
+    },
+  };
+});
+
+const mockedFs = fs as unknown as {
+  readdir: jest.Mock;
+  stat: jest.Mock;
+  unlink: jest.Mock;
+};
 
 describe('UploadsService', () => {
   let service: UploadsService;
@@ -14,6 +35,14 @@ describe('UploadsService', () => {
   };
   const patientsRepo = {
     findOne: jest.fn(),
+  };
+  const queryRunner = {
+    connect: jest.fn().mockResolvedValue(undefined),
+    release: jest.fn().mockResolvedValue(undefined),
+    query: jest.fn(),
+  };
+  const dataSource = {
+    createQueryRunner: jest.fn(() => queryRunner),
   };
 
   beforeEach(async () => {
@@ -26,6 +55,15 @@ describe('UploadsService', () => {
       };
       return qb;
     });
+    queryRunner.connect.mockResolvedValue(undefined);
+    queryRunner.release.mockResolvedValue(undefined);
+    queryRunner.query.mockImplementation((sql: string) => {
+      if (sql.includes('pg_try_advisory_lock')) {
+        return Promise.resolve([{ locked: true }]);
+      }
+      return Promise.resolve([]);
+    });
+    dataSource.createQueryRunner.mockReturnValue(queryRunner);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -35,6 +73,7 @@ describe('UploadsService', () => {
           useValue: documentsRepo,
         },
         { provide: getRepositoryToken(Patient), useValue: patientsRepo },
+        { provide: getDataSourceToken(), useValue: dataSource },
       ],
     }).compile();
 
@@ -199,6 +238,83 @@ describe('UploadsService', () => {
           permissions: [],
         }),
       ).resolves.toEqual(document);
+    });
+  });
+
+  describe('removeOrphanUploads', () => {
+    const NOW = new Date('2026-08-02T12:00:00Z');
+    const ORPHAN = '123e4567-e89b-42d3-a456-426614174000.pdf';
+    const LINKED = '123e4567-e89b-42d3-a456-426614174001.pdf';
+    const NOT_UUID = 'readme.txt';
+    const DOTFILE = '...env';
+
+    const statFor = (mtimeMs: number) => ({
+      isFile: () => true,
+      mtimeMs,
+    });
+    const oldEnough = NOW.getTime() - 48 * 60 * 60 * 1000; // 48h ago (TTL is 24h)
+    const tooRecent = NOW.getTime() - 60 * 60 * 1000; // 1h ago
+
+    it('removes old uploads that have no document row', async () => {
+      mockedFs.readdir.mockResolvedValue([ORPHAN, LINKED, NOT_UUID, DOTFILE]);
+      mockedFs.stat.mockResolvedValue(statFor(oldEnough));
+      let lookup = 0;
+      documentsRepo.createQueryBuilder.mockImplementation(() => ({
+        where: jest.fn().mockReturnThis(),
+        orWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockImplementation(() => {
+          lookup += 1;
+          // First UUID file = orphan; second = linked document
+          return Promise.resolve(lookup === 1 ? null : { id: 'doc-1' });
+        }),
+      }));
+
+      await service.removeOrphanUploads(NOW);
+
+      expect(mockedFs.unlink).toHaveBeenCalledTimes(1);
+      expect(mockedFs.unlink).toHaveBeenCalledWith(
+        join(process.cwd(), 'uploads', ORPHAN),
+      );
+    });
+
+    it('keeps files newer than the TTL even when unlinked', async () => {
+      mockedFs.readdir.mockResolvedValue([ORPHAN]);
+      mockedFs.stat.mockResolvedValue(statFor(tooRecent));
+
+      await service.removeOrphanUploads(NOW);
+
+      expect(mockedFs.unlink).not.toHaveBeenCalled();
+      expect(documentsRepo.createQueryBuilder).not.toHaveBeenCalled();
+    });
+
+    it('releases the advisory lock and query runner when uploads dir is missing', async () => {
+      mockedFs.readdir.mockRejectedValue(new Error('ENOENT'));
+
+      await expect(service.removeOrphanUploads(NOW)).resolves.toBeUndefined();
+
+      const calls = queryRunner.query.mock.calls as [string, ...unknown[]][];
+      const unlock = calls.find(([sql]) => sql.includes('pg_advisory_unlock'));
+      expect(unlock).toBeDefined();
+      expect(queryRunner.release).toHaveBeenCalled();
+    });
+
+    it('does nothing when another instance already holds the lock', async () => {
+      queryRunner.query.mockImplementation((sql: string) => {
+        if (sql.includes('pg_try_advisory_lock')) {
+          return Promise.resolve([{ locked: false }]);
+        }
+        return Promise.resolve([]);
+      });
+
+      await service.removeOrphanUploads(NOW);
+
+      expect(mockedFs.readdir).not.toHaveBeenCalled();
+      expect(mockedFs.unlink).not.toHaveBeenCalled();
+      const unlock = (
+        queryRunner.query.mock.calls as [string, ...unknown[]][]
+      ).find(([sql]) => sql.includes('pg_advisory_unlock'));
+      expect(unlock).toBeUndefined();
+      expect(queryRunner.release).toHaveBeenCalled();
     });
   });
 });
