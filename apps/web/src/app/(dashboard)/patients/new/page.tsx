@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery } from '@apollo/client';
 import type { CreatePatientInput } from '@careconnect/types';
+import { ForbiddenAccess } from '@/components/auth/forbidden-access';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
 import { PatientWizard } from '@/components/patients/patient-wizard';
 import { CREATE_PATIENT_MUTATION, ME_QUERY } from '@/lib/graphql/queries';
@@ -13,6 +14,8 @@ export default function NewPatientPage() {
   const [error, setError] = useState('');
   const { data: meData } = useQuery(ME_QUERY);
   const [createPatient, { loading }] = useMutation(CREATE_PATIENT_MUTATION);
+
+  const canWritePatients = (meData?.me?.permissions ?? []).includes('patients:write');
 
   const handleSubmit = async (input: CreatePatientInput) => {
     setError('');
@@ -25,6 +28,16 @@ export default function NewPatientPage() {
       setError(err instanceof Error ? err.message : 'Failed to register patient');
     }
   };
+
+  if (!meData?.me) {
+    return null;
+  }
+
+  if (!canWritePatients) {
+    return (
+      <ForbiddenAccess message="You do not have permission to register patients." />
+    );
+  }
 
   return (
     <div>

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery } from '@apollo/client';
 import { ClayButton, ClayCard, ClayInput } from '@careconnect/ui';
 import { ClayTextarea } from '@/components/clinical/clay-textarea';
+import { ForbiddenAccess } from '@/components/auth/forbidden-access';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
 import {
   CREATE_APPOINTMENT_MUTATION,
@@ -40,6 +41,8 @@ function NewAppointmentForm() {
 
   const [createAppointment, { loading }] = useMutation(CREATE_APPOINTMENT_MUTATION);
 
+  const canWriteAppointments = (meData?.me?.permissions ?? []).includes('appointments:write');
+
   const doctors =
     staffData?.staffMembers?.filter(
       (s: { roleSlug: string; isActive: boolean }) =>
@@ -74,6 +77,16 @@ function NewAppointmentForm() {
       setError(err instanceof Error ? err.message : 'Failed to create appointment');
     }
   };
+
+  if (!meData?.me) {
+    return null;
+  }
+
+  if (!canWriteAppointments) {
+    return (
+      <ForbiddenAccess message="You do not have permission to create appointments." />
+    );
+  }
 
   return (
     <div>

@@ -15,6 +15,21 @@ type RouteRule = {
   anyRoles?: string[];
 };
 
+/** Write/create/edit routes — checked before read rules (longest prefix first) */
+const WRITE_ROUTE_RULES: RouteRule[] = [
+  { prefix: '/finance/invoices/new', anyPermissions: ['billing:write'] },
+  { prefix: '/appointments/new', anyPermissions: ['appointments:write'] },
+  { prefix: '/patients/import', anyPermissions: ['patients:write'] },
+  { prefix: '/patients/new', anyPermissions: ['patients:write'] },
+  { prefix: '/staff/new', anyPermissions: ['staff:write'] },
+];
+
+const WRITE_ROUTE_PATTERNS: { pattern: RegExp; anyPermissions: string[] }[] = [
+  { pattern: /^\/patients\/[^/]+\/edit$/, anyPermissions: ['patients:write'] },
+  { pattern: /^\/patients\/[^/]+\/discharge$/, anyPermissions: ['patients:write'] },
+  { pattern: /^\/staff\/[^/]+\/edit$/, anyPermissions: ['staff:write'] },
+];
+
 const ROUTE_RULES: RouteRule[] = [
   { prefix: '/staff', anyPermissions: ['staff:read'] },
   { prefix: '/patients', anyPermissions: ['patients:read'] },
@@ -58,12 +73,38 @@ const SORTED_RULES = [...ROUTE_RULES].sort(
   (a, b) => b.prefix.length - a.prefix.length,
 );
 
+const SORTED_WRITE_RULES = [...WRITE_ROUTE_RULES].sort(
+  (a, b) => b.prefix.length - a.prefix.length,
+);
+
+function hasWriteAccess(anyPermissions: string[], ctx: AccessContext): boolean {
+  if (ctx.roles.includes('super_admin')) return true;
+  return anyPermissions.some((perm) => ctx.permissions.includes(perm));
+}
+
+function matchesWriteRoute(pathname: string, ctx: AccessContext): boolean | null {
+  for (const { pattern, anyPermissions } of WRITE_ROUTE_PATTERNS) {
+    if (pattern.test(pathname)) {
+      return hasWriteAccess(anyPermissions, ctx);
+    }
+  }
+
+  const writeRule = SORTED_WRITE_RULES.find(
+    (r) => pathname === r.prefix || pathname.startsWith(`${r.prefix}/`),
+  );
+  if (!writeRule?.anyPermissions) return null;
+  return hasWriteAccess(writeRule.anyPermissions, ctx);
+}
+
 /** Routes any authenticated non-patient staff may open without a specific rule */
 const STAFF_PUBLIC_ROUTES = ['/dashboard'];
 
 export function canAccessRoute(pathname: string, ctx: AccessContext): boolean {
   if (ctx.roles.includes('super_admin')) return true;
   if (ctx.roles.includes('patient')) return false;
+
+  const writeAccess = matchesWriteRoute(pathname, ctx);
+  if (writeAccess !== null) return writeAccess;
 
   if (STAFF_PUBLIC_ROUTES.some((route) => pathname === route)) return true;
 

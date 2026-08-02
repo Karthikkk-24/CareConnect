@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { ClayButton, ClayCard } from '@careconnect/ui';
 import { ClayTextarea } from '@/components/clinical/clay-textarea';
+import { ForbiddenAccess } from '@/components/auth/forbidden-access';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
 import {
   ACTIVE_ADMISSIONS_QUERY,
@@ -26,6 +27,7 @@ export default function PatientDischargePage() {
 
   const { data: meData } = useQuery(ME_QUERY);
   const hospitalId = meData?.me?.hospitalId;
+  const canWritePatients = (meData?.me?.permissions ?? []).includes('patients:write');
 
   const { data: patientData, loading: patientLoading } = useQuery(PATIENT_QUERY, {
     variables: { id, hospitalId },
@@ -72,6 +74,16 @@ export default function PatientDischargePage() {
       setError(err instanceof Error ? err.message : 'Failed to create discharge');
     }
   };
+
+  if (!meData?.me) {
+    return null;
+  }
+
+  if (!canWritePatients) {
+    return (
+      <ForbiddenAccess message="You do not have permission to discharge patients." />
+    );
+  }
 
   if (patientLoading || admissionsLoading) {
     return <p className="text-clay-text-muted">Loading discharge form...</p>;

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useMutation, useQuery } from '@apollo/client';
 import { Download, Upload } from 'lucide-react';
 import { ClayButton, ClayCard, ClayBadge } from '@careconnect/ui';
+import { ForbiddenAccess } from '@/components/auth/forbidden-access';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
 import { IMPORT_PATIENTS_MUTATION, ME_QUERY } from '@/lib/graphql/queries';
 import { getCsvTemplate, parsePatientCsv } from '@/lib/csv-parser';
@@ -22,6 +23,8 @@ export default function ImportPatientsPage() {
   const [importError, setImportError] = useState('');
   const { data: meData } = useQuery(ME_QUERY);
   const [importPatients, { loading }] = useMutation(IMPORT_PATIENTS_MUTATION);
+
+  const canWritePatients = (meData?.me?.permissions ?? []).includes('patients:write');
 
   const handleFile = async (file: File) => {
     const text = await file.text();
@@ -57,6 +60,16 @@ export default function ImportPatientsPage() {
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  if (!meData?.me) {
+    return null;
+  }
+
+  if (!canWritePatients) {
+    return (
+      <ForbiddenAccess message="You do not have permission to import patients." />
+    );
+  }
 
   return (
     <div>
