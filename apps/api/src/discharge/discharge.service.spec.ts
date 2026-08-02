@@ -30,7 +30,21 @@ describe('DischargeService', () => {
     save: jest.fn(),
     create: jest.fn(),
   };
-  const followUpsRepo = { save: jest.fn(), create: jest.fn(), find: jest.fn() };
+  const followManager = {
+    createQueryBuilder: jest.fn(),
+    save: jest.fn(),
+  };
+  const followUpsRepo = {
+    save: jest.fn(),
+    create: jest.fn(),
+    find: jest.fn(),
+    findOne: jest.fn(),
+    manager: {
+      transaction: jest.fn((cb: (m: typeof followManager) => unknown) =>
+        Promise.resolve(cb(followManager)),
+      ),
+    },
+  };
   const patientsRepo = { findOne: jest.fn(), save: jest.fn() };
   const audit = { log: jest.fn() };
   const doctorValidator = {
@@ -50,6 +64,10 @@ describe('DischargeService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    followUpsRepo.manager.transaction.mockImplementation(
+      (cb: (m: typeof followManager) => unknown) =>
+        Promise.resolve(cb(followManager)),
+    );
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DischargeService,
@@ -88,6 +106,60 @@ describe('DischargeService', () => {
       ).rejects.toThrow(
         'A discharge summary already exists for this admission',
       );
+    });
+  });
+
+  describe('updateFollowUpStatus', () => {
+    it('advances scheduled → completed under a row lock', async () => {
+      const row = {
+        id: 'fu-1',
+        hospitalId: 'hospital-a',
+        status: 'scheduled',
+      };
+      const qb = {
+        setLock: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(row),
+      };
+      followManager.createQueryBuilder.mockReturnValue(qb);
+      followManager.save.mockImplementation((r: typeof row) => {
+        Object.assign(row, r);
+        return Promise.resolve(row);
+      });
+      followUpsRepo.findOne.mockImplementation(() =>
+        Promise.resolve({ ...row, patient: null, doctor: null }),
+      );
+
+      const result = await service.updateFollowUpStatus(
+        'hospital-a',
+        { id: 'fu-1', status: 'completed' },
+        actor,
+      );
+      expect(result.status).toBe('completed');
+      expect(qb.setLock).toHaveBeenCalledWith('pessimistic_write');
+    });
+
+    it('rejects completed → scheduled', async () => {
+      const qb = {
+        setLock: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue({
+          id: 'fu-1',
+          hospitalId: 'hospital-a',
+          status: 'completed',
+        }),
+      };
+      followManager.createQueryBuilder.mockReturnValue(qb);
+
+      await expect(
+        service.updateFollowUpStatus(
+          'hospital-a',
+          { id: 'fu-1', status: 'scheduled' },
+          actor,
+        ),
+      ).rejects.toThrow(/Cannot transition follow-up/);
     });
   });
 });
