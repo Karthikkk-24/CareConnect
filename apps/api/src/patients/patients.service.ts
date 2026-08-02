@@ -420,6 +420,11 @@ export class PatientsService {
     // Soft-delete policy: soft-remove the patient row; hard-remove linked
     // document metadata and unlink PHI files from disk. Other related rows
     // remain for audit but are unreachable via patient queries.
+    // Clear portal binding so the unique user_id index frees the account.
+    const previousUserId = patient.userId;
+    patient.userId = null as unknown as string | undefined;
+    await this.patientsRepo.save(patient);
+
     const documents = await this.documentsRepo.find({
       where: { patientId: id },
     });
@@ -440,6 +445,7 @@ export class PatientsService {
       metadata: {
         fullName: patient.fullName,
         documentsRemoved: documents.length,
+        previousUserId,
       },
     });
 
