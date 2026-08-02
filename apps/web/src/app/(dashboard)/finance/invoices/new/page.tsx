@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery } from '@apollo/client';
 import { ClayButton, ClayCard, ClayInput } from '@careconnect/ui';
+import { ForbiddenAccess } from '@/components/auth/forbidden-access';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
 import {
   CREATE_INVOICE_MUTATION,
@@ -29,6 +30,7 @@ export default function NewInvoicePage() {
 
   const { data: meData } = useQuery(ME_QUERY);
   const hospitalId = meData?.me?.hospitalId;
+  const canWriteBilling = (meData?.me?.permissions ?? []).includes('billing:write');
 
   const { data: patientsData } = useQuery(PATIENTS_QUERY, {
     variables: { search: patientSearch, limit: 8, hospitalId },
@@ -91,6 +93,16 @@ export default function NewInvoicePage() {
       setError(err instanceof Error ? err.message : 'Failed to create invoice');
     }
   };
+
+  if (!meData?.me) {
+    return null;
+  }
+
+  if (!canWriteBilling) {
+    return (
+      <ForbiddenAccess message="You do not have permission to create invoices." />
+    );
+  }
 
   return (
     <div>

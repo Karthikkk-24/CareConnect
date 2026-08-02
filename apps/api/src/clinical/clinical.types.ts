@@ -1,6 +1,8 @@
 import { Field, Float, ID, InputType, Int, ObjectType } from '@nestjs/graphql';
 import {
   IsArray,
+  ArrayMaxSize,
+  ArrayMinSize,
   IsBoolean,
   IsIn,
   IsInt,
@@ -397,6 +399,8 @@ export class CreatePrescriptionInput {
 
   @Field(() => [PrescriptionItemInput])
   @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(50)
   @ValidateNested({ each: true })
   @Type(() => PrescriptionItemInput)
   items: PrescriptionItemInput[];

@@ -39,6 +39,7 @@ const statusVariant = (status: string) => {
 export default function FollowUpsPage() {
   const { data: meData } = useQuery(ME_QUERY);
   const hospitalId = meData?.me?.hospitalId;
+  const canWritePatients = (meData?.me?.permissions ?? []).includes('patients:write');
   const [showForm, setShowForm] = useState(false);
   const [patientSearch, setPatientSearch] = useState('');
   const [patientId, setPatientId] = useState('');
@@ -73,7 +74,12 @@ export default function FollowUpsPage() {
   const followUps = data?.followUps ?? [];
 
   const handleStatus = async (id: string, status: string) => {
-    await updateStatus({ variables: { hospitalId, input: { id, status } } });
+    setError('');
+    try {
+      await updateStatus({ variables: { hospitalId, input: { id, status } } });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update follow-up status');
+    }
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -103,11 +109,17 @@ export default function FollowUpsPage() {
       />
 
       <div className="mb-6 flex justify-end">
+        {canWritePatients ? (
         <ClayButton onClick={() => setShowForm((v) => !v)}>
           <Plus className="mr-2 h-4 w-4" />
           {showForm ? 'Hide form' : 'Schedule follow-up'}
         </ClayButton>
+        ) : null}
       </div>
+
+      {error && !showForm ? (
+        <p className="mb-4 text-sm text-clay-error">{error}</p>
+      ) : null}
 
       {showForm ? (
         <ClayCard className="mb-6 max-w-xl space-y-4">
@@ -174,9 +186,11 @@ export default function FollowUpsPage() {
           <div className="px-6 py-12 text-center">
             <CalendarClock className="mx-auto mb-3 h-10 w-10 text-clay-text-muted/50" />
             <p className="text-clay-text-muted">No follow-ups scheduled.</p>
+            {canWritePatients ? (
             <ClayButton className="mt-4" size="sm" onClick={() => setShowForm(true)}>
               Schedule one
             </ClayButton>
+            ) : null}
           </div>
         ) : (
           <div className="divide-y divide-white/30">
@@ -208,7 +222,7 @@ export default function FollowUpsPage() {
                   <ClayBadge variant={statusVariant(item.status)}>
                     {item.status.replace(/_/g, ' ')}
                   </ClayBadge>
-                  {item.status === 'scheduled' ? (
+                  {item.status === 'scheduled' && canWritePatients ? (
                     <div className="flex gap-2">
                       <ClayButton size="sm" onClick={() => handleStatus(item.id, 'completed')}>
                         Complete

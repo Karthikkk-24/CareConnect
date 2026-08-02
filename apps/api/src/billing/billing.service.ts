@@ -160,31 +160,40 @@ export class BillingService {
       0,
     );
 
-    const invoice = await this.invoicesRepo.save(
-      this.invoicesRepo.create({
-        hospitalId,
-        patientId: input.patientId,
-        admissionId: input.admissionId,
-        status,
-        totalAmount: totalAmount.toFixed(2),
-        issuedAt: status === 'issued' ? new Date() : undefined,
-      }),
+    const invoiceId = await this.invoicesRepo.manager.transaction(
+      async (manager) => {
+        const invoice = await manager.save(
+          manager.create(Invoice, {
+            hospitalId,
+            patientId: input.patientId,
+            admissionId: input.admissionId,
+            status,
+            totalAmount: totalAmount.toFixed(2),
+            issuedAt: status === 'issued' ? new Date() : undefined,
+          }),
+        );
+
+        await manager.save(
+          input.items.map((item) =>
+            manager.create(InvoiceItem, {
+              invoiceId: invoice.id,
+              description: item.description,
+              quantity: item.quantity.toFixed(2),
+              unitPrice: item.unitPrice.toFixed(2),
+              amount: (item.quantity * item.unitPrice).toFixed(2),
+            }),
+          ),
+        );
+
+        return invoice.id;
+      },
     );
 
-    const items = await this.invoiceItemsRepo.save(
-      input.items.map((item) =>
-        this.invoiceItemsRepo.create({
-          invoiceId: invoice.id,
-          description: item.description,
-          quantity: item.quantity.toFixed(2),
-          unitPrice: item.unitPrice.toFixed(2),
-          amount: (item.quantity * item.unitPrice).toFixed(2),
-        }),
-      ),
-    );
-
-    invoice.items = items;
-    invoice.payments = [];
+    const invoice = await this.invoicesRepo.findOne({
+      where: { id: invoiceId, hospitalId },
+      relations: ['items', 'payments', 'patient'],
+    });
+    if (!invoice) throw new NotFoundException('Invoice not found');
 
     await this.audit.log({
       actorId: actor.id,

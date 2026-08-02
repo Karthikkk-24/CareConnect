@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useMutation, useQuery } from '@apollo/client';
 import type { CreatePatientInput } from '@careconnect/types';
+import { ForbiddenAccess } from '@/components/auth/forbidden-access';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
 import { PatientWizard } from '@/components/patients/patient-wizard';
 import { ME_QUERY, PATIENT_QUERY, UPDATE_PATIENT_MUTATION } from '@/lib/graphql/queries';
@@ -104,6 +105,8 @@ export default function EditPatientPage() {
 
   const [updatePatient, { loading }] = useMutation(UPDATE_PATIENT_MUTATION);
 
+  const canWritePatients = (meData?.me?.permissions ?? []).includes('patients:write');
+
   const handleSubmit = async (input: CreatePatientInput) => {
     setError('');
     try {
@@ -115,6 +118,16 @@ export default function EditPatientPage() {
       setError(err instanceof Error ? err.message : 'Failed to update patient');
     }
   };
+
+  if (!meData?.me) {
+    return null;
+  }
+
+  if (!canWritePatients) {
+    return (
+      <ForbiddenAccess message="You do not have permission to edit patients." />
+    );
+  }
 
   if (fetching) {
     return <p className="text-clay-text-muted">Loading patient...</p>;

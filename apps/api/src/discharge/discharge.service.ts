@@ -31,6 +31,27 @@ function isUniqueViolation(error: unknown): boolean {
   );
 }
 
+/**
+ * Follow-up status machine:
+ *   scheduled → completed | missed
+ * Terminal: completed, missed (immutable)
+ */
+const FOLLOW_UP_TRANSITIONS: Record<string, readonly string[]> = {
+  scheduled: ['completed', 'missed'],
+  completed: [],
+  missed: [],
+};
+
+function assertFollowUpTransition(from: string, to: string) {
+  if (from === to) return;
+  const allowed = FOLLOW_UP_TRANSITIONS[from] ?? [];
+  if (!allowed.includes(to)) {
+    throw new BadRequestException(
+      `Cannot transition follow-up from "${from}" to "${to}"`,
+    );
+  }
+}
+
 @Injectable()
 export class DischargeService {
   constructor(
@@ -140,9 +161,12 @@ export class DischargeService {
               patient.status = 'discharged';
               await manager.save(patient);
             }
-          } else if (admission.status !== 'discharged') {
+          } else if (
+            admission.status !== 'discharged' &&
+            admission.status !== 'transferred'
+          ) {
             throw new BadRequestException(
-              'Only active or already-discharged admissions can receive a discharge summary',
+              'Only active, transferred, or already-discharged admissions can receive a discharge summary',
             );
           }
 
@@ -270,18 +294,31 @@ export class DischargeService {
     input: UpdateFollowUpStatusInput,
     actor: AuthenticatedUser,
   ): Promise<FollowUpType> {
-    const followUp = await this.followUpsRepo.findOne({
-      where: { id: input.id, hospitalId },
+    const followUpId = await this.followUpsRepo.manager.transaction(
+      async (manager) => {
+        const followUp = await manager
+          .createQueryBuilder(FollowUp, 'followUp')
+          .setLock('pessimistic_write')
+          .where('followUp.id = :id', { id: input.id })
+          .andWhere('followUp.hospital_id = :hospitalId', { hospitalId })
+          .getOne();
+        if (!followUp) throw new NotFoundException('Follow-up not found');
+
+        assertFollowUpTransition(followUp.status, input.status);
+        followUp.status = input.status;
+        if (input.notes !== undefined) {
+          followUp.notes = input.notes;
+        }
+        await manager.save(followUp);
+        return followUp.id;
+      },
+    );
+
+    const saved = await this.followUpsRepo.findOne({
+      where: { id: followUpId, hospitalId },
       relations: ['patient', 'doctor'],
     });
-    if (!followUp) throw new NotFoundException('Follow-up not found');
-
-    followUp.status = input.status;
-    if (input.notes !== undefined) {
-      followUp.notes = input.notes;
-    }
-
-    const saved = await this.followUpsRepo.save(followUp);
+    if (!saved) throw new NotFoundException('Follow-up not found');
 
     await this.audit.log({
       actorId: actor.id,

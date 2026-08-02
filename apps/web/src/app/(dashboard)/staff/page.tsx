@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { Plus, Pencil, Trash2, RotateCcw } from 'lucide-react';
 import { ClayBadge, ClayButton, ClayCard } from '@careconnect/ui';
@@ -34,14 +35,25 @@ export default function StaffPage() {
   const canDeactivateStaff =
     canWriteStaff &&
     (roles.includes('hospital_admin') || roles.includes('super_admin'));
+  const [actionError, setActionError] = useState('');
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Deactivate ${name}?`)) return;
-    await deleteStaff({ variables: { id } });
+    setActionError('');
+    try {
+      await deleteStaff({ variables: { id } });
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to deactivate staff member');
+    }
   };
 
   const handleReactivate = async (id: string) => {
-    await updateStaff({ variables: { id, input: { isActive: true } } });
+    setActionError('');
+    try {
+      await updateStaff({ variables: { id, input: { isActive: true } } });
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Failed to reactivate staff member');
+    }
   };
 
   return (
@@ -58,6 +70,10 @@ export default function StaffPage() {
           </Link>
         ) : null}
       </div>
+
+      {actionError ? (
+        <p className="mb-4 text-sm text-clay-error">{actionError}</p>
+      ) : null}
 
       <ClayCard padding="none" className="overflow-hidden">
         <table className="w-full">
