@@ -145,9 +145,12 @@ export class DischargeService {
             await manager.save(admission);
 
             if (admission.bedId) {
-              const bed = await manager.findOne(Bed, {
-                where: { id: admission.bedId, hospitalId },
-              });
+              const bed = await manager
+                .createQueryBuilder(Bed, 'bed')
+                .setLock('pessimistic_write')
+                .where('bed.id = :id', { id: admission.bedId })
+                .andWhere('bed.hospital_id = :hospitalId', { hospitalId })
+                .getOne();
               if (bed) {
                 bed.status = 'available';
                 await manager.save(bed);
