@@ -16,10 +16,9 @@ export default function FinancePage() {
     skip: !hospitalId,
   });
 
-  const { data: reportsData } = useQuery(HOSPITAL_REPORTS_QUERY, {
+  const { data: reportsData, error: reportsError } = useQuery(HOSPITAL_REPORTS_QUERY, {
     variables: { hospitalId },
     skip: !hospitalId,
-    errorPolicy: 'ignore',
   });
 
   const invoices = invoicesData?.invoices ?? [];
@@ -27,7 +26,14 @@ export default function FinancePage() {
     (inv: { status: string }) => inv.status === 'draft' || inv.status === 'issued',
   ).length;
   const paid = invoices.filter((inv: { status: string }) => inv.status === 'paid').length;
-  const revenueTotal = reportsData?.hospitalReports?.revenueTotal ?? 0;
+  const revenueTotal = reportsData?.hospitalReports?.revenueTotal;
+  const revenueDisplay =
+    reportsError || revenueTotal == null
+      ? '—'
+      : `$${Number(revenueTotal).toLocaleString(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })}`;
   const canWriteBilling = (meData?.me?.permissions ?? []).includes('billing:write');
 
   return (
@@ -51,7 +57,7 @@ export default function FinancePage() {
       <div className="mb-8 grid gap-6 md:grid-cols-3">
         <ClayStatCard
           title="Total Revenue"
-          value={`$${revenueTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          value={revenueDisplay}
           icon={<DollarSign className="h-5 w-5" />}
         />
         <ClayStatCard title="Outstanding Invoices" value={outstanding} icon={<FileText className="h-5 w-5" />} />

@@ -53,19 +53,18 @@ export default function DashboardPage() {
       ['hospital_admin', 'hospital_manager', 'super_admin', 'receptionist', 'nurse'].includes(r),
     );
 
-  const { data: staffData } = useQuery(STAFF_MEMBERS_QUERY, {
+  const { data: staffData, error: staffError } = useQuery(STAFF_MEMBERS_QUERY, {
     variables: { hospitalId },
-    skip: !hospitalId,
+    skip: !hospitalId || !(me?.permissions ?? []).includes('staff:read'),
   });
-  const { data: patientsData } = useQuery(PATIENTS_QUERY, {
+  const { data: patientsData, error: patientsError } = useQuery(PATIENTS_QUERY, {
     variables: { page: 1, limit: 1, hospitalId },
-    skip: !hospitalId,
+    skip: !hospitalId || !(me?.permissions ?? []).includes('patients:read'),
   });
 
-  const { data: statsData } = useQuery(DASHBOARD_STATS_QUERY, {
+  const { data: statsData, error: statsError } = useQuery(DASHBOARD_STATS_QUERY, {
     variables: { hospitalId },
-    skip: !hospitalId,
-    errorPolicy: 'ignore',
+    skip: !hospitalId || !(me?.permissions ?? []).includes('reports:read'),
   });
 
   const { data: appointmentsData } = useQuery(APPOINTMENTS_QUERY, {
@@ -75,29 +74,43 @@ export default function DashboardPage() {
       ...(isDoctorOnly && me?.id ? { doctorId: me.id } : {}),
     },
     skip: !hospitalId || !!statsData?.dashboardStats,
-    errorPolicy: 'ignore',
   });
 
   const { data: admissionsData } = useQuery(ACTIVE_ADMISSIONS_QUERY, {
     variables: { hospitalId },
     skip: !hospitalId || !!statsData?.dashboardStats,
-    errorPolicy: 'ignore',
   });
 
-  const staffCount = staffData?.staffMembers?.length ?? 0;
-  const patientCount = patientsData?.patients?.total ?? 0;
+  const canReadStaff = (me?.permissions ?? []).includes('staff:read');
+  const canReadPatients = (me?.permissions ?? []).includes('patients:read');
+  const staffCount = canReadStaff
+    ? staffError
+      ? '—'
+      : (staffData?.staffMembers?.length ?? 0)
+    : '—';
+  const patientCount = canReadPatients
+    ? patientsError
+      ? '—'
+      : (patientsData?.patients?.total ?? 0)
+    : '—';
 
   const appointmentsToday =
-    statsData?.dashboardStats?.appointmentsToday ??
-    appointmentsData?.appointments?.length ??
-    '—';
+    statsError && !appointmentsData
+      ? '—'
+      : (statsData?.dashboardStats?.appointmentsToday ??
+        appointmentsData?.appointments?.length ??
+        '—');
 
   const activeAdmissions =
-    statsData?.dashboardStats?.activeAdmissions ??
-    admissionsData?.activeAdmissions?.length ??
-    '—';
+    statsError && !admissionsData
+      ? '—'
+      : (statsData?.dashboardStats?.activeAdmissions ??
+        admissionsData?.activeAdmissions?.length ??
+        '—');
 
   const hasAppointments = typeof appointmentsToday === 'number' && appointmentsToday > 0;
+  const hasStaff = typeof staffCount === 'number' && staffCount > 0;
+  const hasPatients = typeof patientCount === 'number' && patientCount > 0;
 
   const access = {
     roles: me?.roles ?? [],
@@ -148,8 +161,8 @@ export default function DashboardPage() {
           <ul className="space-y-3">
             {[
               { done: !!meData?.me?.onboardingCompleted, text: 'Complete onboarding' },
-              { done: staffCount > 0, text: 'Add your first staff member' },
-              { done: patientCount > 0, text: 'Register your first patient' },
+              { done: hasStaff, text: 'Add your first staff member' },
+              { done: hasPatients, text: 'Register your first patient' },
               { done: hasAppointments, text: 'Set up appointment scheduling (Phase 3)' },
             ].map((item) => (
               <li key={item.text} className="flex items-center gap-3 text-sm">
