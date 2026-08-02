@@ -37,9 +37,11 @@ const statusVariant = (status: string) => {
 
 export default function AppointmentsPage() {
   const [selectedDate, setSelectedDate] = useState(todayDateString());
+  const [statusError, setStatusError] = useState('');
   const { data: meData } = useQuery(ME_QUERY);
   const me = meData?.me;
   const hospitalId = me?.hospitalId;
+  const canWriteAppointments = (me?.permissions ?? []).includes('appointments:write');
   const isDoctorOnly =
     Array.isArray(me?.roles) &&
     me.roles.includes('doctor') &&
@@ -66,13 +68,18 @@ export default function AppointmentsPage() {
   const appointments = data?.appointments ?? [];
 
   const handleStatus = async (id: string, status: string) => {
-    if (status === 'cancelled') {
-      await cancelAppointment({
-        variables: { input: { id }, hospitalId },
-      });
-      return;
+    setStatusError('');
+    try {
+      if (status === 'cancelled') {
+        await cancelAppointment({
+          variables: { input: { id }, hospitalId },
+        });
+        return;
+      }
+      await updateStatus({ variables: { id, status, hospitalId } });
+    } catch (err) {
+      setStatusError(err instanceof Error ? err.message : 'Failed to update appointment status');
     }
-    await updateStatus({ variables: { id, status, hospitalId } });
   };
 
   return (
@@ -96,13 +103,19 @@ export default function AppointmentsPage() {
             className="rounded-2xl border border-white/60 bg-clay-surface px-3 py-2 shadow-clay-inset"
           />
         </label>
-        <Link href="/appointments/new">
-          <ClayButton>
-            <Plus className="h-4 w-4" />
-            New Appointment
-          </ClayButton>
-        </Link>
+        {canWriteAppointments ? (
+          <Link href="/appointments/new">
+            <ClayButton>
+              <Plus className="h-4 w-4" />
+              New Appointment
+            </ClayButton>
+          </Link>
+        ) : null}
       </div>
+
+      {statusError ? (
+        <p className="mb-4 rounded-2xl bg-red-50 px-4 py-2 text-sm text-clay-error">{statusError}</p>
+      ) : null}
 
       <ClayCard padding="none" className="overflow-hidden">
         {loading ? (
@@ -111,9 +124,11 @@ export default function AppointmentsPage() {
           <div className="px-6 py-12 text-center">
             <Calendar className="mx-auto mb-3 h-10 w-10 text-clay-text-muted/50" />
             <p className="text-clay-text-muted">No appointments scheduled for today.</p>
-            <Link href="/appointments/new" className="mt-3 inline-block text-sm text-clay-primary hover:underline">
-              Schedule one now
-            </Link>
+            {canWriteAppointments ? (
+              <Link href="/appointments/new" className="mt-3 inline-block text-sm text-clay-primary hover:underline">
+                Schedule one now
+              </Link>
+            ) : null}
           </div>
         ) : (
           <div className="divide-y divide-white/30">
@@ -145,7 +160,7 @@ export default function AppointmentsPage() {
                   <ClayBadge variant={statusVariant(appt.status)}>
                     {appt.status.replace(/_/g, ' ')}
                   </ClayBadge>
-                  {appt.status === 'scheduled' ? (
+                  {canWriteAppointments && appt.status === 'scheduled' ? (
                     <div className="flex gap-2">
                       <ClayButton
                         size="sm"
@@ -163,7 +178,7 @@ export default function AppointmentsPage() {
                       </ClayButton>
                     </div>
                   ) : null}
-                  {appt.status === 'checked_in' ? (
+                  {canWriteAppointments && appt.status === 'checked_in' ? (
                     <ClayButton size="sm" onClick={() => handleStatus(appt.id, 'completed')}>
                       Complete
                     </ClayButton>
