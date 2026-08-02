@@ -58,6 +58,7 @@ export default function PatientDetailPage() {
   });
 
   const patient = data?.patient;
+  const canWritePatients = (meData?.me?.permissions ?? []).includes('patients:write');
 
   const apiBase = (
     process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/graphql'
@@ -160,55 +161,61 @@ export default function PatientDetailPage() {
             <ClayButton size="sm">Discharge</ClayButton>
           </Link>
         ) : null}
-        <select
-          aria-label="Update patient status"
-          className="rounded-2xl border border-white/60 bg-clay-surface px-3 py-2 text-sm shadow-clay-inset"
-          value={patient.status}
-          onChange={(e) =>
-            updateStatus({
-              variables: { id, status: e.target.value, hospitalId: meData?.me?.hospitalId },
-            })
-          }
-        >
-          {['registered', 'checked_in', 'admitted', 'discharged', 'inactive'].map((s) => (
-            <option key={s} value={s}>
-              {s.replace(/_/g, ' ')}
-            </option>
-          ))}
-        </select>
-        <ClayButton
-          size="sm"
-          variant="ghost"
-          onClick={() => {
-            const email =
-              window.prompt(
-                'Portal user email to link (defaults to patient email)',
-                patient.email ?? '',
-              ) ?? '';
-            linkAccount({
-              variables: {
-                patientId: id,
-                hospitalId: meData?.me?.hospitalId,
-                email: email || undefined,
-              },
-            });
-          }}
-        >
-          Link portal account
-        </ClayButton>
-        <ClayButton
-          size="sm"
-          variant="ghost"
-          onClick={async () => {
-            if (!confirm('Soft-delete this patient?')) return;
-            await deletePatient({
-              variables: { id, hospitalId: meData?.me?.hospitalId },
-            });
-            window.location.href = '/patients';
-          }}
-        >
-          Delete
-        </ClayButton>
+        {canWritePatients ? (
+          <select
+            aria-label="Update patient status"
+            className="rounded-2xl border border-white/60 bg-clay-surface px-3 py-2 text-sm shadow-clay-inset"
+            value={patient.status}
+            onChange={(e) =>
+              updateStatus({
+                variables: { id, status: e.target.value, hospitalId: meData?.me?.hospitalId },
+              })
+            }
+          >
+            {['registered', 'checked_in', 'admitted', 'discharged', 'inactive'].map((s) => (
+              <option key={s} value={s}>
+                {s.replace(/_/g, ' ')}
+              </option>
+            ))}
+          </select>
+        ) : null}
+        {canWritePatients ? (
+          <ClayButton
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              const email =
+                window.prompt(
+                  'Portal user email to link (defaults to patient email)',
+                  patient.email ?? '',
+                ) ?? '';
+              linkAccount({
+                variables: {
+                  patientId: id,
+                  hospitalId: meData?.me?.hospitalId,
+                  email: email || undefined,
+                },
+              });
+            }}
+          >
+            Link portal account
+          </ClayButton>
+        ) : null}
+        {canWritePatients ? (
+          <ClayButton
+            size="sm"
+            variant="ghost"
+            onClick={async () => {
+              if (!confirm('Soft-delete this patient?')) return;
+              await deletePatient({
+                variables: { id, hospitalId: meData?.me?.hospitalId },
+              });
+              window.location.href = '/patients';
+            }}
+          >
+            Delete
+          </ClayButton>
+        ) : null}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -283,29 +290,31 @@ export default function PatientDetailPage() {
         <ClayCard className="lg:col-span-3">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-semibold text-clay-text">Documents</h2>
-            <div className="flex flex-wrap items-center gap-3">
-              <select
-                value={documentType}
-                onChange={(e) => setDocumentType(e.target.value)}
-                className="rounded-2xl border border-white/60 bg-clay-surface px-4 py-2 text-sm text-clay-text shadow-clay-inset outline-none"
-              >
-                {DOCUMENT_TYPES.map((type) => (
-                  <option key={type.value} value={type.value}>
-                    {type.label}
-                  </option>
-                ))}
-              </select>
-              <label className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-clay-surface px-4 py-2 text-sm font-medium text-clay-primary shadow-clay-sm hover:shadow-clay">
-                <Upload className="h-4 w-4" />
-                {uploading ? 'Uploading...' : 'Upload'}
-                <input
-                  type="file"
-                  className="hidden"
-                  disabled={uploading}
-                  onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])}
-                />
-              </label>
-            </div>
+            {canWritePatients ? (
+              <div className="flex flex-wrap items-center gap-3">
+                <select
+                  value={documentType}
+                  onChange={(e) => setDocumentType(e.target.value)}
+                  className="rounded-2xl border border-white/60 bg-clay-surface px-4 py-2 text-sm text-clay-text shadow-clay-inset outline-none"
+                >
+                  {DOCUMENT_TYPES.map((type) => (
+                    <option key={type.value} value={type.value}>
+                      {type.label}
+                    </option>
+                  ))}
+                </select>
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-clay-surface px-4 py-2 text-sm font-medium text-clay-primary shadow-clay-sm hover:shadow-clay">
+                  <Upload className="h-4 w-4" />
+                  {uploading ? 'Uploading...' : 'Upload'}
+                  <input
+                    type="file"
+                    className="hidden"
+                    disabled={uploading}
+                    onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])}
+                  />
+                </label>
+              </div>
+            ) : null}
           </div>
           {uploadError ? <p className="mb-4 text-sm text-clay-error">{uploadError}</p> : null}
           {patient.documents?.length ? (
@@ -323,21 +332,23 @@ export default function PatientDetailPage() {
                     <FileText className="h-5 w-5 shrink-0 text-clay-primary" />
                     <span className="truncate text-sm text-clay-text">{d.name}</span>
                   </button>
-                  <ClayButton
-                    size="sm"
-                    variant="ghost"
-                    onClick={() =>
-                      deleteDocument({
-                        variables: {
-                          id: d.id,
-                          patientId: id,
-                          hospitalId: meData?.me?.hospitalId,
-                        },
-                      })
-                    }
-                  >
-                    Delete
-                  </ClayButton>
+                  {canWritePatients ? (
+                    <ClayButton
+                      size="sm"
+                      variant="ghost"
+                      onClick={() =>
+                        deleteDocument({
+                          variables: {
+                            id: d.id,
+                            patientId: id,
+                            hospitalId: meData?.me?.hospitalId,
+                          },
+                        })
+                      }
+                    >
+                      Delete
+                    </ClayButton>
+                  ) : null}
                 </div>
               ))}
             </div>
