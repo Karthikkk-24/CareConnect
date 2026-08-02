@@ -49,8 +49,7 @@ export default function PortalAppointmentsPage() {
         ) : error ? (
           <div className="px-6 py-8">
             <PortalQueryError
-              message={error.message || 'We could not load your appointments.'}
-              onRetry={() => refetch()}
+      onRetry={() => refetch()}
             />
           </div>
         ) : !patient ? (

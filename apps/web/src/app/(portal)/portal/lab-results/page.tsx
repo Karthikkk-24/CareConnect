@@ -22,8 +22,7 @@ export default function PortalLabResultsPage() {
         ) : error ? (
           <div className="px-6 py-8">
             <PortalQueryError
-              message={error.message || 'We could not load your lab results.'}
-              onRetry={() => refetch()}
+      onRetry={() => refetch()}
             />
           </div>
         ) : !patient ? (
