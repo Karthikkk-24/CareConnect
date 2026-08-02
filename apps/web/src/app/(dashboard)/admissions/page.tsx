@@ -29,6 +29,7 @@ export default function AdmissionsPage() {
 
   const { data: meData } = useQuery(ME_QUERY);
   const hospitalId = meData?.me?.hospitalId;
+  const canWritePatients = (meData?.me?.permissions ?? []).includes('patients:write');
 
   const { data, loading, refetch } = useQuery(ACTIVE_ADMISSIONS_QUERY, {
     variables: { hospitalId },
@@ -115,10 +116,12 @@ export default function AdmissionsPage() {
             Bed Occupancy
           </ClayButton>
         </Link>
+        {canWritePatients ? (
         <ClayButton onClick={() => setShowForm(!showForm)}>
           <Plus className="h-4 w-4" />
           {showForm ? 'Hide Form' : 'Admit Patient'}
         </ClayButton>
+        ) : null}
       </div>
 
       {showForm ? (
@@ -280,6 +283,7 @@ export default function AdmissionsPage() {
                       <ClayBadge variant="success">{adm.status}</ClayBadge>
                     </td>
                     <td className="px-6 py-4 text-right">
+                      {canWritePatients ? (
                       <ClayButton
                         size="sm"
                         variant="secondary"
@@ -290,6 +294,7 @@ export default function AdmissionsPage() {
                       >
                         Discharge
                       </ClayButton>
+                      ) : null}
                     </td>
                   </tr>
                 ),

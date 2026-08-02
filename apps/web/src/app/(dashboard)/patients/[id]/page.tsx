@@ -24,6 +24,7 @@ export default function PatientDetailPage() {
   const { getToken } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [mutationError, setMutationError] = useState('');
   const [documentType, setDocumentType] = useState('identification');
   const { data: meData } = useQuery(ME_QUERY);
   const { data, loading, refetch } = useQuery(PATIENT_QUERY, {
@@ -35,6 +36,68 @@ export default function PatientDetailPage() {
   const [updateStatus] = useMutation(UPDATE_PATIENT_STATUS, { onCompleted: () => refetch() });
   const [deletePatient] = useMutation(DELETE_PATIENT_MUTATION);
   const [linkAccount] = useMutation(LINK_PATIENT_ACCOUNT, { onCompleted: () => refetch() });
+
+  const handleStatusChange = async (newStatus: string) => {
+    setMutationError('');
+    try {
+      await updateStatus({
+        variables: { id, status: newStatus, hospitalId: meData?.me?.hospitalId },
+      });
+    } catch (err) {
+      setMutationError(err instanceof Error ? err.message : 'Failed to update patient status');
+      refetch();
+    }
+  };
+
+  const handleLinkAccount = async () => {
+    const patientEmail = data?.patient?.email;
+    const email =
+      window.prompt(
+        'Portal user email to link (defaults to patient email)',
+        patientEmail ?? '',
+      ) ?? '';
+    if (email === null && !patientEmail) return;
+    setMutationError('');
+    try {
+      await linkAccount({
+        variables: {
+          patientId: id,
+          hospitalId: meData?.me?.hospitalId,
+          email: email || undefined,
+        },
+      });
+    } catch (err) {
+      setMutationError(err instanceof Error ? err.message : 'Failed to link portal account');
+    }
+  };
+
+  const handleDeleteDocument = async (documentId: string) => {
+    setMutationError('');
+    try {
+      await deleteDocument({
+        variables: {
+          id: documentId,
+          patientId: id,
+          hospitalId: meData?.me?.hospitalId,
+        },
+      });
+    } catch (err) {
+      setMutationError(err instanceof Error ? err.message : 'Failed to delete document');
+    }
+  };
+
+  const handleDeletePatient = async () => {
+    if (!confirm('Soft-delete this patient?')) return;
+    setMutationError('');
+    try {
+      await deletePatient({
+        variables: { id, hospitalId: meData?.me?.hospitalId },
+      });
+      window.location.href = '/patients';
+    } catch (err) {
+      setMutationError(err instanceof Error ? err.message : 'Failed to delete patient');
+    }
+  };
 
   const vitalsQuery = useQuery(PATIENT_VITALS_QUERY, {
     variables: { patientId: id, hospitalId: meData?.me?.hospitalId },
@@ -145,18 +208,20 @@ export default function PatientDetailPage() {
         <ClayBadge>{patient.status}</ClayBadge>
         {patient.gender && <ClayBadge variant="info">{patient.gender}</ClayBadge>}
         {patient.bloodGroup && <ClayBadge variant="warning">{patient.bloodGroup}</ClayBadge>}
+        {canWritePatients ? (
         <Link href={`/patients/${id}/edit`}>
           <ClayButton variant="secondary" size="sm">
             Edit
           </ClayButton>
         </Link>
+        ) : null}
         <Link href={`/patients/${id}/history`}>
           <ClayButton variant="secondary" size="sm">
             <History className="h-4 w-4" />
             Full History
           </ClayButton>
         </Link>
-        {patient.status === 'admitted' ? (
+        {patient.status === 'admitted' && canWritePatients ? (
           <Link href={`/patients/${id}/discharge`}>
             <ClayButton size="sm">Discharge</ClayButton>
           </Link>
@@ -166,11 +231,7 @@ export default function PatientDetailPage() {
             aria-label="Update patient status"
             className="rounded-2xl border border-white/60 bg-clay-surface px-3 py-2 text-sm shadow-clay-inset"
             value={patient.status}
-            onChange={(e) =>
-              updateStatus({
-                variables: { id, status: e.target.value, hospitalId: meData?.me?.hospitalId },
-              })
-            }
+            onChange={(e) => handleStatusChange(e.target.value)}
           >
             {['registered', 'checked_in', 'admitted', 'discharged', 'inactive'].map((s) => (
               <option key={s} value={s}>
@@ -183,20 +244,7 @@ export default function PatientDetailPage() {
           <ClayButton
             size="sm"
             variant="ghost"
-            onClick={() => {
-              const email =
-                window.prompt(
-                  'Portal user email to link (defaults to patient email)',
-                  patient.email ?? '',
-                ) ?? '';
-              linkAccount({
-                variables: {
-                  patientId: id,
-                  hospitalId: meData?.me?.hospitalId,
-                  email: email || undefined,
-                },
-              });
-            }}
+            onClick={handleLinkAccount}
           >
             Link portal account
           </ClayButton>
@@ -205,18 +253,16 @@ export default function PatientDetailPage() {
           <ClayButton
             size="sm"
             variant="ghost"
-            onClick={async () => {
-              if (!confirm('Soft-delete this patient?')) return;
-              await deletePatient({
-                variables: { id, hospitalId: meData?.me?.hospitalId },
-              });
-              window.location.href = '/patients';
-            }}
+            onClick={handleDeletePatient}
           >
             Delete
           </ClayButton>
         ) : null}
       </div>
+
+      {mutationError ? (
+        <p className="mb-4 text-sm text-clay-error">{mutationError}</p>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <ClayCard className="lg:col-span-2">
@@ -336,15 +382,7 @@ export default function PatientDetailPage() {
                     <ClayButton
                       size="sm"
                       variant="ghost"
-                      onClick={() =>
-                        deleteDocument({
-                          variables: {
-                            id: d.id,
-                            patientId: id,
-                            hospitalId: meData?.me?.hospitalId,
-                          },
-                        })
-                      }
+                      onClick={() => handleDeleteDocument(d.id)}
                     >
                       Delete
                     </ClayButton>

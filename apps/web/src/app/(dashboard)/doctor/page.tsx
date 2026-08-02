@@ -20,6 +20,7 @@ export default function DoctorDashboardPage() {
   const { data: meData } = useQuery(ME_QUERY);
   const hospitalId = meData?.me?.hospitalId;
   const doctorId = meData?.me?.id;
+  const canWriteAppointments = (meData?.me?.permissions ?? []).includes('appointments:write');
 
   const { data, loading } = useQuery(APPOINTMENTS_QUERY, {
     variables: { hospitalId, date: today, doctorId },
@@ -33,7 +34,9 @@ export default function DoctorDashboardPage() {
 
   const quickLinks = [
     { label: 'All Appointments', href: '/appointments', icon: Calendar },
-    { label: 'New Appointment', href: '/appointments/new', icon: Calendar },
+    ...(canWriteAppointments
+      ? [{ label: 'New Appointment', href: '/appointments/new', icon: Calendar }]
+      : []),
     { label: 'Patients', href: '/patients', icon: Users },
     { label: 'Admissions', href: '/admissions', icon: FileText },
     { label: 'Order Lab', href: '/lab', icon: FlaskConical },
