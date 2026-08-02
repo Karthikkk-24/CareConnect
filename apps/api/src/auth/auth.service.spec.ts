@@ -200,7 +200,7 @@ describe('AuthService', () => {
     it('takes an advisory lock and assigns hospital_admin when none exist', async () => {
       usersRepo.findOne.mockResolvedValue({
         id: 'user-1',
-        hospitalId: undefined,
+        hospitalId: 'hospital-a',
       });
       hospitalsRepo.findOne.mockResolvedValue({ id: 'hospital-a' });
       manager.findOne.mockResolvedValue({
@@ -230,7 +230,7 @@ describe('AuthService', () => {
     it('rejects bootstrap when an admin already exists under the lock', async () => {
       usersRepo.findOne.mockResolvedValue({
         id: 'user-1',
-        hospitalId: undefined,
+        hospitalId: 'hospital-a',
       });
       hospitalsRepo.findOne.mockResolvedValue({ id: 'hospital-a' });
       manager.findOne.mockResolvedValue({
@@ -260,6 +260,19 @@ describe('AuthService', () => {
           true,
         ),
       ).rejects.toThrow(/first-time registration/);
+      expect(usersRepo.manager.transaction).not.toHaveBeenCalled();
+    });
+
+    it('rejects bootstrap when caller is not bound to the hospital', async () => {
+      usersRepo.findOne.mockResolvedValue({
+        id: 'user-1',
+        hospitalId: undefined,
+      });
+      hospitalsRepo.findOne.mockResolvedValue({ id: 'hospital-a' });
+
+      await expect(
+        service.completeOnboarding(actor, 'Founder', 'hospital-a', true),
+      ).rejects.toThrow(/created this hospital/);
       expect(usersRepo.manager.transaction).not.toHaveBeenCalled();
     });
   });

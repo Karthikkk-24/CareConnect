@@ -61,7 +61,7 @@ export class HospitalsResolver {
       throw new ForbiddenException('Not allowed to create hospitals');
     }
 
-    const hospital = await this.hospitalsService.create(input);
+    const hospital = await this.hospitalsService.create(input, user);
     await this.audit.log({
       actorId: user.id,
       hospitalId: hospital.id,
