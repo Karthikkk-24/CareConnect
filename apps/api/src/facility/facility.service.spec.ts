@@ -9,11 +9,20 @@ import { FacilityService } from './facility.service';
 describe('FacilityService', () => {
   let service: FacilityService;
 
+  const bedManager = {
+    createQueryBuilder: jest.fn(),
+    save: jest.fn(),
+  };
   const departmentsRepo = {};
   const wardsRepo = {};
   const bedsRepo = {
     findOne: jest.fn(),
     save: jest.fn(),
+    manager: {
+      transaction: jest.fn((cb: (m: typeof bedManager) => unknown) =>
+        Promise.resolve(cb(bedManager)),
+      ),
+    },
   };
   const audit = { log: jest.fn() };
 
@@ -30,6 +39,9 @@ describe('FacilityService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    bedsRepo.manager.transaction.mockImplementation(
+      (cb: (m: typeof bedManager) => unknown) => Promise.resolve(cb(bedManager)),
+    );
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         FacilityService,
@@ -43,7 +55,7 @@ describe('FacilityService', () => {
   });
 
   describe('updateBedStatus', () => {
-    it('sets available bed to maintenance', async () => {
+    it('sets available bed to maintenance under a row lock', async () => {
       const bed = {
         id: 'bed-1',
         hospitalId: 'hospital-a',
@@ -52,10 +64,15 @@ describe('FacilityService', () => {
         status: 'available',
         createdAt: new Date(),
       };
-      bedsRepo.findOne.mockResolvedValue(bed);
-      bedsRepo.save.mockImplementation((row: typeof bed) =>
-        Promise.resolve(row),
-      );
+      const qb = {
+        setLock: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue({ ...bed }),
+      };
+      bedManager.createQueryBuilder.mockReturnValue(qb);
+      bedManager.save.mockResolvedValue(bed);
+      bedsRepo.findOne.mockResolvedValue({ ...bed, status: 'maintenance' });
 
       const result = await service.updateBedStatus(
         'hospital-a',
@@ -63,14 +80,21 @@ describe('FacilityService', () => {
         actor,
       );
       expect(result.status).toBe('maintenance');
+      expect(qb.setLock).toHaveBeenCalledWith('pessimistic_write');
     });
 
     it('rejects changing an occupied bed', async () => {
-      bedsRepo.findOne.mockResolvedValue({
-        id: 'bed-1',
-        hospitalId: 'hospital-a',
-        status: 'occupied',
-      });
+      const qb = {
+        setLock: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue({
+          id: 'bed-1',
+          hospitalId: 'hospital-a',
+          status: 'occupied',
+        }),
+      };
+      bedManager.createQueryBuilder.mockReturnValue(qb);
 
       await expect(
         service.updateBedStatus(
