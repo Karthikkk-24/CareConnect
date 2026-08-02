@@ -63,7 +63,8 @@ export function ForgotPasswordForm() {
       });
       if (attempt.status === 'complete') {
         await setActive({ session: attempt.createdSessionId });
-        router.push('/dashboard');
+        // Role-aware landing happens in dashboard/portal layouts after me loads.
+        router.push('/onboarding');
         router.refresh();
       } else {
         setError('Reset incomplete. Please try again.');
