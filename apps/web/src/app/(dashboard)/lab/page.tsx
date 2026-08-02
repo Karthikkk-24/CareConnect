@@ -43,6 +43,7 @@ export default function LabPage() {
   const { data: meData } = useQuery(ME_QUERY);
   const hospitalId = meData?.me?.hospitalId;
   const canCreateOrders = (meData?.me?.permissions ?? []).includes('patients:write');
+  const canWriteLab = (meData?.me?.permissions ?? []).includes('lab:write');
 
   const { data, loading, refetch } = useQuery(LAB_ORDERS_QUERY, {
     variables: { hospitalId, status: undefined },
@@ -242,6 +243,7 @@ export default function LabPage() {
           )}
         </ClayCard>
 
+        {canWriteLab ? (
         <ClayCard>
           <h2 className="mb-4 text-lg font-semibold text-clay-text">Enter Result</h2>
           {selectedOrderId ? (
@@ -278,6 +280,7 @@ export default function LabPage() {
             </p>
           )}
         </ClayCard>
+        ) : null}
       </div>
     </div>
   );

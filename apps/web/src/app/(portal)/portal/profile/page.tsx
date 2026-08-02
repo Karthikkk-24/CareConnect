@@ -41,8 +41,7 @@ export default function PortalProfilePage() {
             <p className="text-sm text-clay-text-muted">Loading profile...</p>
           ) : error ? (
             <PortalQueryError
-              message={error.message || 'We could not load your patient record.'}
-              onRetry={() => refetch()}
+      onRetry={() => refetch()}
             />
           ) : !patient ? (
             <p className="text-sm text-clay-text-muted">

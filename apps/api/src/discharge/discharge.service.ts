@@ -33,11 +33,13 @@ function isUniqueViolation(error: unknown): boolean {
 
 /**
  * Follow-up status machine:
- *   scheduled → completed | missed
+ *   scheduled → completed | missed | rescheduled
+ *   rescheduled → scheduled | completed | missed
  * Terminal: completed, missed (immutable)
  */
 const FOLLOW_UP_TRANSITIONS: Record<string, readonly string[]> = {
-  scheduled: ['completed', 'missed'],
+  scheduled: ['completed', 'missed', 'rescheduled'],
+  rescheduled: ['scheduled', 'completed', 'missed'],
   completed: [],
   missed: [],
 };
@@ -145,9 +147,12 @@ export class DischargeService {
             await manager.save(admission);
 
             if (admission.bedId) {
-              const bed = await manager.findOne(Bed, {
-                where: { id: admission.bedId, hospitalId },
-              });
+              const bed = await manager
+                .createQueryBuilder(Bed, 'bed')
+                .setLock('pessimistic_write')
+                .where('bed.id = :id', { id: admission.bedId })
+                .andWhere('bed.hospital_id = :hospitalId', { hospitalId })
+                .getOne();
               if (bed) {
                 bed.status = 'available';
                 await manager.save(bed);

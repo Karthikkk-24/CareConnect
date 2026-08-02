@@ -42,6 +42,7 @@ interface Bed {
 export default function FacilitySettingsPage() {
   const { data: meData } = useQuery(ME_QUERY);
   const hospitalId = meData?.me?.hospitalId;
+  const canWriteFacility = (meData?.me?.permissions ?? []).includes('hospitals:write');
 
   const [selectedWardId, setSelectedWardId] = useState<string | null>(null);
   const [deptName, setDeptName] = useState('');
@@ -224,6 +225,7 @@ export default function FacilitySettingsPage() {
             <h2 className="text-lg font-semibold text-clay-text">Departments</h2>
           </div>
 
+          {canWriteFacility ? (
           <form onSubmit={handleCreateDept} className="mb-4 space-y-3">
             <ClayInput
               label="Name *"
@@ -243,6 +245,7 @@ export default function FacilitySettingsPage() {
               Add Department
             </ClayButton>
           </form>
+          ) : null}
 
           <div className="space-y-2">
             {departmentsQuery.loading ? (
@@ -261,6 +264,8 @@ export default function FacilitySettingsPage() {
                       <p className="text-xs text-clay-text-muted">{d.description}</p>
                     ) : null}
                   </div>
+                  {canWriteFacility ? (
+
                   <ClayButton
                     type="button"
                     size="sm"
@@ -274,6 +279,8 @@ export default function FacilitySettingsPage() {
                   >
                     <Trash2 className="h-4 w-4 text-clay-error" />
                   </ClayButton>
+
+                  ) : null}
                 </div>
               ))
             )}
@@ -286,6 +293,7 @@ export default function FacilitySettingsPage() {
             <h2 className="text-lg font-semibold text-clay-text">Wards</h2>
           </div>
 
+          {canWriteFacility ? (
           <form onSubmit={handleCreateWard} className="mb-4 space-y-3">
             <ClayInput
               label="Name *"
@@ -323,6 +331,7 @@ export default function FacilitySettingsPage() {
               Add Ward
             </ClayButton>
           </form>
+          ) : null}
 
           <div className="space-y-2">
             {wardsQuery.loading ? (
@@ -351,6 +360,8 @@ export default function FacilitySettingsPage() {
                         <p className="text-xs text-clay-text-muted">Floor {w.floor}</p>
                       ) : null}
                     </button>
+                    {canWriteFacility ? (
+
                     <ClayButton
                       type="button"
                       size="sm"
@@ -364,6 +375,8 @@ export default function FacilitySettingsPage() {
                     >
                       <Trash2 className="h-4 w-4 text-clay-error" />
                     </ClayButton>
+
+                    ) : null}
                   </div>
                 );
               })
@@ -378,7 +391,8 @@ export default function FacilitySettingsPage() {
           </div>
 
           {selectedWardId ? (
-            <form onSubmit={handleCreateBed} className="mb-4 space-y-3">
+            canWriteFacility ? (
+              <form onSubmit={handleCreateBed} className="mb-4 space-y-3">
               <ClayInput
                 label="Label *"
                 value={bedLabel}
@@ -391,6 +405,7 @@ export default function FacilitySettingsPage() {
                 Add Bed
               </ClayButton>
             </form>
+            ) : null
           ) : (
             <p className="mb-4 rounded-2xl bg-clay-primary-light/20 px-3 py-2 text-sm text-clay-text-muted">
               <DoorClosed className="mr-1 inline-block h-4 w-4 align-text-bottom" />
@@ -426,7 +441,7 @@ export default function FacilitySettingsPage() {
                     >
                       {b.status}
                     </ClayBadge>
-                    {b.status !== 'occupied' ? (
+                    {b.status !== 'occupied' && canWriteFacility ? (
                       <ClayButton
                         type="button"
                         size="sm"

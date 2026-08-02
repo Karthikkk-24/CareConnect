@@ -95,6 +95,11 @@ export function PortalLayoutClient({ children }: { children: React.ReactNode }) 
     );
   }
 
+  // Fail closed: non-patient authenticated users must not mount portal PHI pages.
+  if (me && !isPatient && me.onboardingCompleted) {
+    return <ForbiddenAccess />;
+  }
+
   if (onboardingError) {
     const retryFullName =
       (typeof user?.unsafeMetadata?.fullName === 'string' && user.unsafeMetadata.fullName) ||
@@ -129,12 +134,6 @@ export function PortalLayoutClient({ children }: { children: React.ReactNode }) 
       </a>
       <PortalSidebar />
       <main id="portal-main" className="flex-1 overflow-auto">
-        {!isPatient && me?.onboardingCompleted ? (
-          <p className="mb-4 rounded-2xl bg-clay-warning/10 p-4 text-sm text-clay-text">
-            Your account is not a patient portal user. If you are hospital staff, use the
-            dashboard instead.
-          </p>
-        ) : null}
         {children}
       </main>
     </div>

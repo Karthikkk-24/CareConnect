@@ -25,12 +25,16 @@ describe('StaffService', () => {
     findOne: jest.fn(),
     save: jest.fn(),
     create: jest.fn(),
+    manager: {
+      transaction: jest.fn(),
+    },
   };
   const usersRepo = {
     findOne: jest.fn(),
     save: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
+    createQueryBuilder: jest.fn(),
   };
   const rolesRepo = { findOne: jest.fn() };
   const userRolesRepo = {
@@ -49,10 +53,15 @@ describe('StaffService', () => {
         set: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
+        setLock: jest.fn().mockReturnThis(),
+        getOne: jest.fn(),
         execute: jest.fn().mockResolvedValue({ affected: 1 }),
       };
       return qb;
     }),
+    manager: {
+      transaction: jest.fn(),
+    },
   };
   const clerkAdmin = {
     isConfigured: jest.fn().mockReturnValue(false),
@@ -142,13 +151,37 @@ describe('StaffService', () => {
         id: 'role-doctor',
         slug: 'doctor',
       });
-      usersRepo.findOne.mockResolvedValue({
+      const existingUser = {
         id: 'user-1',
         email: 'doc@example.com',
         hospitalId: 'hospital-b',
         fullName: 'Existing Doc',
         authId: 'auth-1',
-      });
+      };
+      staffRepo.manager.transaction.mockImplementation(
+        (cb: (m: Record<string, unknown>) => unknown) => {
+          const manager = {
+            getRepository: (entity: unknown) => {
+              if (entity === User) {
+                return {
+                  createQueryBuilder: () => ({
+                    where: jest.fn().mockReturnThis(),
+                    getOne: jest.fn().mockResolvedValue(existingUser),
+                  }),
+                  update: usersRepo.update,
+                  save: usersRepo.save,
+                  create: usersRepo.create,
+                };
+              }
+              if (entity === UserRole) return userRolesRepo;
+              if (entity === StaffProfile) return staffRepo;
+              if (entity === StaffInvite) return invitesRepo;
+              return {};
+            },
+          };
+          return Promise.resolve(cb(manager));
+        },
+      );
 
       await expect(
         service.create(
@@ -169,21 +202,47 @@ describe('StaffService', () => {
 
   describe('acceptInvite — deactivated staff', () => {
     it('rejects invite acceptance when staff profile is inactive', async () => {
-      invitesRepo.findOne.mockResolvedValue({
+      const invite = {
         token: 'tok',
         email: 'doc@example.com',
         hospitalId: 'hospital-a',
         staffProfileId: 'staff-1',
         acceptedAt: null,
         expiresAt: new Date(Date.now() + 86400000),
-      });
-      staffRepo.findOne.mockResolvedValue({
+      };
+      const inactiveStaff = {
         id: 'staff-1',
         userId: 'user-1',
         hospitalId: 'hospital-a',
         isActive: false,
         user: { email: 'doc@example.com', isActive: false },
-      });
+      };
+      invitesRepo.manager.transaction.mockImplementation(
+        (cb: (m: Record<string, unknown>) => unknown) => {
+          const manager = {
+            getRepository: (entity: unknown) => {
+              if (entity === StaffInvite) {
+                return {
+                  createQueryBuilder: () => ({
+                    setLock: jest.fn().mockReturnThis(),
+                    where: jest.fn().mockReturnThis(),
+                    getOne: jest.fn().mockResolvedValue(invite),
+                  }),
+                  save: invitesRepo.save,
+                };
+              }
+              if (entity === User) return usersRepo;
+              if (entity === StaffProfile) {
+                return {
+                  findOne: jest.fn().mockResolvedValue(inactiveStaff),
+                };
+              }
+              return {};
+            },
+          };
+          return Promise.resolve(cb(manager));
+        },
+      );
 
       await expect(
         service.acceptInvite('tok', 'auth-new', 'doc@example.com'),

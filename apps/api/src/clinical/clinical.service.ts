@@ -5,6 +5,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { existsSync } from 'fs';
+import { basename, join } from 'path';
 import { Repository } from 'typeorm';
 import {
   Admission,
@@ -144,6 +146,11 @@ export class ClinicalService {
     if (admission.patientId !== patientId) {
       throw new BadRequestException(
         'Admission does not belong to the given patient',
+      );
+    }
+    if (admission.status !== 'active') {
+      throw new BadRequestException(
+        'Clinical records can only be linked to an active admission',
       );
     }
   }
@@ -490,6 +497,10 @@ export class ClinicalService {
         }
         assertLabTransition(order.status, 'completed');
 
+        const safeResultFileUrl = this.assertLocalUploadUrl(
+          input.resultFileUrl,
+        );
+
         const result = await manager.save(
           manager.create(LabResult, {
             labOrderId: order.id,
@@ -497,7 +508,7 @@ export class ClinicalService {
             resultValue: input.resultValue,
             referenceRange: input.referenceRange,
             unit: input.unit,
-            resultFileUrl: input.resultFileUrl,
+            resultFileUrl: safeResultFileUrl,
             enteredById: actor.id,
             completedAt: new Date(),
           }),
@@ -680,5 +691,38 @@ export class ClinicalService {
       take: 50,
     });
     return rows.map((p) => this.toPrescriptionType(p));
+  }
+
+  /** Lab result attachments must use same-origin /uploads paths. */
+  private assertLocalUploadUrl(fileUrl?: string): string | undefined {
+    if (fileUrl == null || fileUrl.trim() === '') return undefined;
+    const trimmed = fileUrl.trim();
+    let pathname: string;
+    try {
+      if (trimmed.startsWith('/uploads/')) {
+        pathname = trimmed.split('?')[0] ?? trimmed;
+      } else {
+        pathname = new URL(trimmed).pathname;
+      }
+    } catch {
+      throw new BadRequestException(
+        'Lab result fileUrl must be a valid /uploads/... path from this API',
+      );
+    }
+    const match = pathname.match(/^\/uploads\/([^/]+)$/);
+    if (!match) {
+      throw new BadRequestException(
+        'Lab result fileUrl must be an /uploads/<filename> path from this API',
+      );
+    }
+    const filename = basename(match[1]);
+    if (!filename || filename !== match[1] || filename.includes('..')) {
+      throw new BadRequestException('Invalid upload filename');
+    }
+    const diskPath = join(process.cwd(), 'uploads', filename);
+    if (!existsSync(diskPath)) {
+      throw new BadRequestException('Upload file not found on server');
+    }
+    return `/uploads/${filename}`;
   }
 }

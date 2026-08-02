@@ -25,8 +25,7 @@ export default function PortalPrescriptionsPage() {
         ) : error ? (
           <div className="px-6 py-8">
             <PortalQueryError
-              message={error.message || 'We could not load your prescriptions.'}
-              onRetry={() => refetch()}
+      onRetry={() => refetch()}
             />
           </div>
         ) : !patient ? (

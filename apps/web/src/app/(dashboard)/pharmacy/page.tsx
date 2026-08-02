@@ -21,6 +21,7 @@ export default function PharmacyPage() {
 
   const { data: meData } = useQuery(ME_QUERY);
   const hospitalId = meData?.me?.hospitalId;
+  const canWrite = (meData?.me?.permissions ?? []).includes('patients:write');
 
   const { data: rxData, loading: rxLoading, refetch: refetchRx } = useQuery(
     PENDING_PRESCRIPTIONS_QUERY,
@@ -129,13 +130,15 @@ export default function PharmacyPage() {
                         ))}
                       </ul>
                     </div>
-                    <ClayButton
-                      size="sm"
-                      isLoading={dispensing}
-                      onClick={() => handleDispense(rx.id)}
-                    >
-                      Dispense
-                    </ClayButton>
+                    {canWrite ? (
+                      <ClayButton
+                        size="sm"
+                        isLoading={dispensing}
+                        onClick={() => handleDispense(rx.id)}
+                      >
+                        Dispense
+                      </ClayButton>
+                    ) : null}
                   </div>
                 ),
               )}
@@ -144,6 +147,7 @@ export default function PharmacyPage() {
         </ClayCard>
 
         <div className="space-y-6">
+          {canWrite ? (
           <ClayCard>
             <h2 className="mb-4 text-lg font-semibold text-clay-text">Update Stock</h2>
             <form onSubmit={handleStockSubmit} className="space-y-4">
@@ -174,6 +178,7 @@ export default function PharmacyPage() {
               </ClayButton>
             </form>
           </ClayCard>
+          ) : null}
 
           <ClayCard padding="none" className="overflow-hidden">
             <div className="border-b border-white/40 bg-clay-primary-light/30 px-6 py-4">

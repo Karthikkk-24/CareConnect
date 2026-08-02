@@ -58,8 +58,7 @@ export default function PortalDashboardPage() {
         <p className="text-clay-text-muted">Loading your health records...</p>
       ) : error ? (
         <PortalQueryError
-          message={error.message || 'We could not load your health records.'}
-          onRetry={() => refetch()}
+      onRetry={() => refetch()}
         />
       ) : !patient ? (
         <ClayCard>

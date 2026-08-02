@@ -246,25 +246,38 @@ export class AuthService {
   }
 
   /** Patient portal path: assign patient role and mark onboarding complete. */
-  async completePatientOnboarding(userId: string, fullName: string) {
-    await this.usersRepo.update(userId, {
+  async completePatientOnboarding(user: AuthenticatedUser, fullName: string) {
+    const staffRoles = (user.roles ?? []).filter((role) => role !== 'patient');
+    if (user.hospitalId || staffRoles.length > 0) {
+      throw new ForbiddenException(
+        'Only patient accounts without a hospital assignment can complete patient onboarding',
+      );
+    }
+
+    await this.usersRepo.update(user.id, {
       fullName,
       onboardingCompleted: true,
     });
 
-    const existingRoles = await this.userRolesRepo.find({ where: { userId } });
+    const existingRoles = await this.userRolesRepo.find({
+      where: { userId: user.id },
+    });
     if (existingRoles.length === 0) {
       const patientRole = await this.rolesRepo.findOne({
         where: { slug: 'patient' },
       });
       if (patientRole) {
-        await this.userRolesRepo.save(
-          this.userRolesRepo.create({
-            userId,
-            roleId: patientRole.id,
-            hospitalId: undefined,
-          }),
-        );
+        try {
+          await this.userRolesRepo.save(
+            this.userRolesRepo.create({
+              userId: user.id,
+              roleId: patientRole.id,
+              hospitalId: undefined,
+            }),
+          );
+        } catch (error) {
+          if (!isUniqueViolation(error)) throw error;
+        }
       }
     }
   }

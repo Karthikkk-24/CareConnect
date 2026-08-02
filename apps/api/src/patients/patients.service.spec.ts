@@ -38,6 +38,9 @@ describe('PatientsService', () => {
     create: jest.fn(),
     softRemove: jest.fn(),
     createQueryBuilder: jest.fn(),
+    manager: {
+      transaction: jest.fn(),
+    },
   };
 
   const relatedRepo = {
@@ -182,8 +185,28 @@ describe('PatientsService', () => {
         updatedAt: new Date(),
       };
 
-      patientsRepo.create.mockReturnValue(savedPatient);
-      patientsRepo.save.mockResolvedValue(savedPatient);
+      patientsRepo.manager.transaction.mockImplementation(
+        (cb: (m: Record<string, unknown>) => unknown) => {
+          const manager = {
+            save: jest.fn((entity: unknown) =>
+              Promise.resolve(
+                typeof entity === 'object' && entity && 'id' in entity
+                  ? entity
+                  : savedPatient,
+              ),
+            ),
+            create: jest.fn(
+              (_entity: unknown, data: Record<string, unknown>) => ({
+                ...savedPatient,
+                ...data,
+              }),
+            ),
+            getRepository: () => relatedRepo,
+          };
+          return Promise.resolve(cb(manager));
+        },
+      );
+      patientsRepo.findOne.mockResolvedValue(savedPatient);
 
       const result = await service.create(
         'hospital-1',
@@ -196,7 +219,6 @@ describe('PatientsService', () => {
       );
 
       expect(result.fullName).toBe('Jane Doe');
-      expect(patientsRepo.save).toHaveBeenCalled();
       expect(audit.log).toHaveBeenCalledWith(
         expect.objectContaining({ action: 'create', resource: 'patient' }),
       );

@@ -9,6 +9,7 @@ import { useSignIn } from '@clerk/nextjs';
 import { loginSchema, type LoginInput } from '@careconnect/types';
 import { useTranslations } from 'next-intl';
 import { ClayButton, ClayCard, ClayInput } from '@careconnect/ui';
+import { safeInternalPath } from '@/lib/safe-redirect';
 
 export function LoginForm() {
   const t = useTranslations('auth');
@@ -18,7 +19,7 @@ export function LoginForm() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const redirectTo = searchParams.get('redirect') ?? '/dashboard';
+  const redirectTo = safeInternalPath(searchParams.get('redirect'), '/dashboard');
 
   const {
     register,
