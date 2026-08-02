@@ -3,11 +3,12 @@
 import { useQuery } from '@apollo/client';
 import { ClayBadge, ClayCard } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
+import { PortalQueryError } from '@/components/portal/portal-query-error';
 import { ME_QUERY, PORTAL_PATIENT_RECORDS_QUERY } from '@/lib/graphql/queries';
 
 export default function PortalProfilePage() {
   const { data: meData } = useQuery(ME_QUERY);
-  const { data, loading } = useQuery(PORTAL_PATIENT_RECORDS_QUERY);
+  const { data, loading, error, refetch } = useQuery(PORTAL_PATIENT_RECORDS_QUERY);
   const patient = data?.portalPatientRecords?.patient;
 
   return (
@@ -38,6 +39,11 @@ export default function PortalProfilePage() {
           <h2 className="mb-4 text-lg font-semibold text-clay-text">Patient Record</h2>
           {loading ? (
             <p className="text-sm text-clay-text-muted">Loading profile...</p>
+          ) : error ? (
+            <PortalQueryError
+              message={error.message || 'We could not load your patient record.'}
+              onRetry={() => refetch()}
+            />
           ) : !patient ? (
             <p className="text-sm text-clay-text-muted">
               No patient record is linked to this account yet. Your hospital can link your profile

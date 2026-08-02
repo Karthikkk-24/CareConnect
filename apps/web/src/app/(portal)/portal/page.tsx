@@ -5,11 +5,12 @@ import { useQuery } from '@apollo/client';
 import { Calendar, FileText, FlaskConical, Pill } from 'lucide-react';
 import { ClayCard, ClayStatCard } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
+import { PortalQueryError } from '@/components/portal/portal-query-error';
 import { ME_QUERY, PORTAL_PATIENT_RECORDS_QUERY } from '@/lib/graphql/queries';
 
 export default function PortalDashboardPage() {
   const { data: meData } = useQuery(ME_QUERY);
-  const { data, loading } = useQuery(PORTAL_PATIENT_RECORDS_QUERY);
+  const { data, loading, error, refetch } = useQuery(PORTAL_PATIENT_RECORDS_QUERY);
 
   const records = data?.portalPatientRecords;
   const patient = records?.patient;
@@ -55,6 +56,11 @@ export default function PortalDashboardPage() {
 
       {loading ? (
         <p className="text-clay-text-muted">Loading your health records...</p>
+      ) : error ? (
+        <PortalQueryError
+          message={error.message || 'We could not load your health records.'}
+          onRetry={() => refetch()}
+        />
       ) : !patient ? (
         <ClayCard>
           <p className="text-clay-text-muted">

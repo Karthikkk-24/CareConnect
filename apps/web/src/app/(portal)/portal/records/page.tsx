@@ -4,10 +4,11 @@ import { useQuery } from '@apollo/client';
 import { FileText } from 'lucide-react';
 import { ClayBadge, ClayCard } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
+import { PortalQueryError } from '@/components/portal/portal-query-error';
 import { PORTAL_PATIENT_RECORDS_QUERY } from '@/lib/graphql/queries';
 
 export default function PortalRecordsPage() {
-  const { data, loading } = useQuery(PORTAL_PATIENT_RECORDS_QUERY);
+  const { data, loading, error, refetch } = useQuery(PORTAL_PATIENT_RECORDS_QUERY);
   const patient = data?.portalPatientRecords?.patient;
   const appointments = data?.portalPatientRecords?.appointments ?? [];
   const prescriptions = data?.portalPatientRecords?.prescriptions ?? [];
@@ -22,6 +23,11 @@ export default function PortalRecordsPage() {
 
       {loading ? (
         <p className="text-clay-text-muted">Loading records...</p>
+      ) : error ? (
+        <PortalQueryError
+          message={error.message || 'We could not load your medical records.'}
+          onRetry={() => refetch()}
+        />
       ) : !patient ? (
         <ClayCard>
           <p className="text-clay-text-muted">No linked patient record found.</p>

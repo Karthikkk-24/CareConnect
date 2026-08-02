@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery } from '@apollo/client';
 import { useUser } from '@clerk/nextjs';
+import { ClayButton, ClayCard } from '@careconnect/ui';
 import { COMPLETE_PATIENT_ONBOARDING, ME_QUERY } from '@/lib/graphql/queries';
 import { ForbiddenAccess } from '@/components/auth/forbidden-access';
 import { PortalSidebar } from '@/components/layout/portal-sidebar';
@@ -15,6 +16,8 @@ export function PortalLayoutClient({ children }: { children: React.ReactNode }) 
   const { data, loading, error, refetch } = useQuery(ME_QUERY, { errorPolicy: 'all' });
   const [completePatientOnboarding] = useMutation(COMPLETE_PATIENT_ONBOARDING);
   const ran = useRef(false);
+  const [onboardingError, setOnboardingError] = useState<string | null>(null);
+  const [onboardingRetrying, setOnboardingRetrying] = useState(false);
   const me = data?.me;
   const roles: string[] = me?.roles ?? [];
   const isPatient = roles.includes('patient') || roles.includes('super_admin');
@@ -29,6 +32,21 @@ export function PortalLayoutClient({ children }: { children: React.ReactNode }) 
       router.replace('/dashboard');
     }
   }, [isStaff, router]);
+
+  const runPatientOnboarding = async (fullName: string) => {
+    setOnboardingError(null);
+    setOnboardingRetrying(true);
+    try {
+      await completePatientOnboarding({ variables: { fullName } });
+      await refetch();
+    } catch (err) {
+      setOnboardingError(
+        err instanceof Error ? err.message : 'Failed to complete patient setup',
+      );
+    } finally {
+      setOnboardingRetrying(false);
+    }
+  };
 
   useEffect(() => {
     const needsComplete =
@@ -47,12 +65,8 @@ export function PortalLayoutClient({ children }: { children: React.ReactNode }) 
       user.primaryEmailAddress?.emailAddress?.split('@')[0] ||
       'Patient';
 
-    completePatientOnboarding({ variables: { fullName } })
-      .then(() => refetch())
-      .catch(() => {
-        ran.current = false;
-      });
-  }, [searchParams, me, user, completePatientOnboarding, refetch]);
+    void runPatientOnboarding(fullName);
+  }, [searchParams, me, user]);
 
   if (loading && !me) {
     return (
@@ -77,6 +91,30 @@ export function PortalLayoutClient({ children }: { children: React.ReactNode }) 
     return (
       <div className="flex min-h-screen items-center justify-center bg-clay-bg text-clay-text-muted">
         Redirecting to dashboard…
+      </div>
+    );
+  }
+
+  if (onboardingError) {
+    const retryFullName =
+      (typeof user?.unsafeMetadata?.fullName === 'string' && user.unsafeMetadata.fullName) ||
+      user?.fullName ||
+      user?.primaryEmailAddress?.emailAddress?.split('@')[0] ||
+      'Patient';
+
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-clay-bg p-6">
+        <ClayCard className="max-w-md space-y-4 p-8 text-center">
+          <h1 className="text-xl font-bold text-clay-text">Setup failed</h1>
+          <p className="text-sm text-clay-error">{onboardingError}</p>
+          <ClayButton
+            type="button"
+            isLoading={onboardingRetrying}
+            onClick={() => void runPatientOnboarding(retryFullName)}
+          >
+            Try again
+          </ClayButton>
+        </ClayCard>
       </div>
     );
   }
