@@ -24,7 +24,7 @@ export default function InvoicesPage() {
   const { data: meData } = useQuery(ME_QUERY);
   const hospitalId = meData?.me?.hospitalId;
 
-  const { data, loading } = useQuery(INVOICES_QUERY, {
+  const { data, loading, error, refetch } = useQuery(INVOICES_QUERY, {
     variables: { hospitalId },
     skip: !hospitalId,
   });
@@ -53,6 +53,15 @@ export default function InvoicesPage() {
       <ClayCard padding="none" className="overflow-hidden">
         {loading ? (
           <p className="px-6 py-8 text-center text-clay-text-muted">Loading invoices...</p>
+        ) : error ? (
+          <div className="space-y-3 px-6 py-12 text-center">
+            <p className="text-sm text-clay-error">
+              We could not load invoices. Please try again.
+            </p>
+            <ClayButton type="button" size="sm" onClick={() => void refetch()}>
+              Try again
+            </ClayButton>
+          </div>
         ) : invoices.length === 0 ? (
           <div className="px-6 py-12 text-center">
             <FileText className="mx-auto mb-3 h-10 w-10 text-clay-text-muted/50" />
