@@ -209,6 +209,7 @@ export class AppointmentsService {
       where,
       relations: ['patient', 'doctor'],
       order: { scheduledAt: 'ASC' },
+      take: 200,
     });
 
     return appointments.map((a) => this.toAppointmentType(a));
@@ -265,6 +266,17 @@ export class AppointmentsService {
         assertTransition(appointment.status, status);
         appointment.status = status;
         await manager.save(appointment);
+
+        if (status === 'checked_in') {
+          const patient = await manager.findOne(Patient, {
+            where: { id: appointment.patientId, hospitalId },
+          });
+          if (patient && patient.status === 'registered') {
+            patient.status = 'checked_in';
+            await manager.save(patient);
+          }
+        }
+
         return appointment.id;
       },
     );

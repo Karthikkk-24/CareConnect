@@ -178,6 +178,16 @@ export class AuthService {
           'Hospital bootstrap is only available during first-time registration',
         );
       }
+      // Caller must already be bound to this hospital via bootstrap createHospital
+      // (prevents a second registrant from claiming an orphan hospital).
+      if (!isSuperAdmin) {
+        const fresh = await this.usersRepo.findOne({ where: { id: user.id } });
+        if (!fresh?.hospitalId || fresh.hospitalId !== hospitalId) {
+          throw new ForbiddenException(
+            'Only the user who created this hospital can become its first administrator',
+          );
+        }
+      }
       try {
         await this.usersRepo.manager.transaction(async (manager) => {
           await manager.query(

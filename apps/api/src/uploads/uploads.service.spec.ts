@@ -51,7 +51,7 @@ describe('UploadsService', () => {
       const qb = {
         where: jest.fn().mockReturnThis(),
         orWhere: jest.fn().mockReturnThis(),
-        getOne: jest.fn().mockResolvedValue(null),
+        getMany: jest.fn().mockResolvedValue([]),
       };
       return qb;
     });
@@ -151,7 +151,7 @@ describe('UploadsService', () => {
       documentsRepo.createQueryBuilder.mockImplementation(() => ({
         where: jest.fn().mockReturnThis(),
         orWhere: jest.fn().mockReturnThis(),
-        getOne: jest.fn().mockResolvedValue(doc),
+        getMany: jest.fn().mockResolvedValue(doc ? [doc] : []),
       }));
     };
 
@@ -262,10 +262,10 @@ describe('UploadsService', () => {
       documentsRepo.createQueryBuilder.mockImplementation(() => ({
         where: jest.fn().mockReturnThis(),
         orWhere: jest.fn().mockReturnThis(),
-        getOne: jest.fn().mockImplementation(() => {
+        getMany: jest.fn().mockImplementation(() => {
           lookup += 1;
           // First UUID file = orphan; second = linked document
-          return Promise.resolve(lookup === 1 ? null : { id: 'doc-1' });
+          return Promise.resolve(lookup === 1 ? [] : [{ id: 'doc-1' }]);
         }),
       }));
 

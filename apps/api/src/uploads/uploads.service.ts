@@ -207,7 +207,7 @@ export class UploadsService implements OnApplicationBootstrap {
 
     const suffix = `/uploads/${safe}`;
     // Exact suffix match via RIGHT — avoids LIKE metacharacters in user input
-    return this.documentsRepo
+    const matches = await this.documentsRepo
       .createQueryBuilder('doc')
       .where('doc.file_url = :relative', { relative: suffix })
       .orWhere('doc.file_url = :filename', { filename: safe })
@@ -215,6 +215,11 @@ export class UploadsService implements OnApplicationBootstrap {
         len: suffix.length,
         suffix,
       })
-      .getOne();
+      .getMany();
+
+    if (matches.length > 1) {
+      return null;
+    }
+    return matches[0] ?? null;
   }
 }

@@ -1,11 +1,12 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import { Bed, Department, Ward } from '../database/entities';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
@@ -18,6 +19,13 @@ import {
   UpdateBedStatusInput,
   WardType,
 } from './facility.types';
+
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    error instanceof QueryFailedError &&
+    (error as QueryFailedError & { code?: string }).code === '23505'
+  );
+}
 
 /**
  * Manual bed status machine (admit/discharge own occupied transitions):
@@ -166,14 +174,33 @@ export class FacilityService {
     });
     if (!ward) throw new NotFoundException('Ward not found');
 
-    const bed = await this.bedsRepo.save(
-      this.bedsRepo.create({
-        hospitalId,
-        wardId: input.wardId,
-        label: input.label,
-        status: 'available',
-      }),
-    );
+    const existingLabel = await this.bedsRepo.findOne({
+      where: { wardId: input.wardId, label: input.label },
+    });
+    if (existingLabel) {
+      throw new ConflictException(
+        `A bed labeled "${input.label}" already exists in this ward`,
+      );
+    }
+
+    let bed: Bed;
+    try {
+      bed = await this.bedsRepo.save(
+        this.bedsRepo.create({
+          hospitalId,
+          wardId: input.wardId,
+          label: input.label,
+          status: 'available',
+        }),
+      );
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new ConflictException(
+          `A bed labeled "${input.label}" already exists in this ward`,
+        );
+      }
+      throw error;
+    }
 
     await this.audit.log({
       actorId: actor.id,

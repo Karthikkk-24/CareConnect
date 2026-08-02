@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Hospital } from '../database/entities';
+import { Hospital, User } from '../database/entities';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { CreateHospitalInput, UpdateHospitalInput } from './hospitals.types';
 
@@ -14,6 +14,8 @@ export class HospitalsService {
   constructor(
     @InjectRepository(Hospital)
     private readonly hospitalsRepo: Repository<Hospital>,
+    @InjectRepository(User)
+    private readonly usersRepo: Repository<User>,
   ) {}
 
   private slugify(name: string): string {
@@ -23,7 +25,14 @@ export class HospitalsService {
       .replace(/(^-|-$)/g, '');
   }
 
-  async create(input: CreateHospitalInput): Promise<Hospital> {
+  /**
+   * Create a hospital. For bootstrap callers (no hospitalId yet), immediately
+   * bind the creator so only they can claim first-admin via completeOnboarding.
+   */
+  async create(
+    input: CreateHospitalInput,
+    actor?: AuthenticatedUser,
+  ): Promise<Hospital> {
     const baseSlug = this.slugify(input.name);
     let slug = baseSlug;
     let counter = 1;
@@ -32,8 +41,23 @@ export class HospitalsService {
       slug = `${baseSlug}-${counter++}`;
     }
 
-    const hospital = this.hospitalsRepo.create({ ...input, slug });
-    return this.hospitalsRepo.save(hospital);
+    return this.hospitalsRepo.manager.transaction(async (manager) => {
+      const hospitalsRepo = manager.getRepository(Hospital);
+      const usersRepo = manager.getRepository(User);
+
+      const hospital = await hospitalsRepo.save(
+        hospitalsRepo.create({ ...input, slug }),
+      );
+
+      if (actor && !actor.hospitalId && !actor.roles.includes('super_admin')) {
+        const user = await usersRepo.findOne({ where: { id: actor.id } });
+        if (user && !user.hospitalId) {
+          await usersRepo.update(user.id, { hospitalId: hospital.id });
+        }
+      }
+
+      return hospital;
+    });
   }
 
   async findById(id: string): Promise<Hospital | null> {

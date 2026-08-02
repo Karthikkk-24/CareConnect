@@ -252,14 +252,20 @@ export class PatientsService {
     }
 
     if (fields.phone?.trim()) {
-      const qb = this.patientsRepo
-        .createQueryBuilder('p')
-        .where('p.hospital_id = :hospitalId', { hospitalId })
-        .andWhere('p.phone = :phone', { phone: fields.phone.trim() });
-      if (excludePatientId) {
-        qb.andWhere('p.id != :excludePatientId', { excludePatientId });
+      const phoneDigits = fields.phone.replace(/\D/g, '');
+      if (phoneDigits) {
+        const qb = this.patientsRepo
+          .createQueryBuilder('p')
+          .where('p.hospital_id = :hospitalId', { hospitalId })
+          .andWhere(
+            `regexp_replace(p.phone, '[^0-9]', '', 'g') = :phoneDigits`,
+            { phoneDigits },
+          );
+        if (excludePatientId) {
+          qb.andWhere('p.id != :excludePatientId', { excludePatientId });
+        }
+        if (await qb.getOne()) conflicts.push('phone');
       }
-      if (await qb.getOne()) conflicts.push('phone');
     }
 
     if (fields.identificationNumber?.trim()) {
@@ -420,21 +426,30 @@ export class PatientsService {
     // Soft-delete policy: soft-remove the patient row; hard-remove linked
     // document metadata and unlink PHI files from disk. Other related rows
     // remain for audit but are unreachable via patient queries.
-    // Clear portal binding so the unique user_id index frees the account.
     const previousUserId = patient.userId;
-    patient.userId = null as unknown as string | undefined;
-    await this.patientsRepo.save(patient);
+    const fileUrlsToUnlink: string[] = [];
 
-    const documents = await this.documentsRepo.find({
-      where: { patientId: id },
+    await this.patientsRepo.manager.transaction(async (manager) => {
+      const patientsRepo = manager.getRepository(Patient);
+      const documentsRepo = manager.getRepository(PatientDocument);
+
+      patient.userId = null as unknown as string | undefined;
+      await patientsRepo.save(patient);
+
+      const documents = await documentsRepo.find({
+        where: { patientId: id },
+      });
+      for (const document of documents) {
+        if (document.fileUrl) fileUrlsToUnlink.push(document.fileUrl);
+        await documentsRepo.remove(document);
+      }
+
+      await patientsRepo.softRemove(patient);
     });
-    for (const document of documents) {
-      const fileUrl = document.fileUrl;
-      await this.documentsRepo.remove(document);
+
+    for (const fileUrl of fileUrlsToUnlink) {
       this.unlinkStoredUpload(fileUrl);
     }
-
-    await this.patientsRepo.softRemove(patient);
 
     await this.audit.log({
       actorId: actor.id,
@@ -444,7 +459,7 @@ export class PatientsService {
       resourceId: patient.id,
       metadata: {
         fullName: patient.fullName,
-        documentsRemoved: documents.length,
+        documentsRemoved: fileUrlsToUnlink.length,
         previousUserId,
       },
     });
@@ -961,10 +976,7 @@ export class PatientsService {
     });
     if (!patient) throw new NotFoundException('Patient not found');
 
-    const safeFileUrl = await this.assertOwnedUploadFileUrl(
-      input.fileUrl,
-      hospitalId,
-    );
+    const safeFileUrl = await this.assertOwnedUploadFileUrl(input.fileUrl);
 
     return this.documentsRepo.save(
       this.documentsRepo.create({
@@ -980,12 +992,9 @@ export class PatientsService {
 
   /**
    * Only allow same-origin upload paths produced by POST /uploads/patient-documents.
-   * Rejects third-party URLs and files already attached under another hospital.
+   * Rejects third-party URLs and files already attached to any patient chart.
    */
-  private async assertOwnedUploadFileUrl(
-    fileUrl: string,
-    hospitalId: string,
-  ): Promise<string> {
+  private async assertOwnedUploadFileUrl(fileUrl: string): Promise<string> {
     const trimmed = fileUrl.trim();
     let pathname: string;
     try {
@@ -1032,15 +1041,10 @@ export class PatientsService {
       take: 20,
     });
 
-    for (const doc of existingDocs) {
-      const owner = await this.patientsRepo.findOne({
-        where: { id: doc.patientId },
-      });
-      if (owner && owner.hospitalId !== hospitalId) {
-        throw new BadRequestException(
-          'Upload file is already linked to another hospital',
-        );
-      }
+    if (existingDocs.length > 0) {
+      throw new BadRequestException(
+        'Upload file is already linked to a patient document',
+      );
     }
 
     // Store a stable relative path so clients always hit this API origin

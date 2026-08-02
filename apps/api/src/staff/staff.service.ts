@@ -76,6 +76,7 @@ export class StaffService {
       where: { hospitalId },
       relations: ['user', 'user.userRoles', 'user.userRoles.role'],
       order: { createdAt: 'DESC' },
+      take: 200,
     });
   }
 

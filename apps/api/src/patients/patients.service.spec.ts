@@ -132,9 +132,23 @@ describe('PatientsService', () => {
         id: 'patient-1',
         hospitalId: 'hospital-1',
         fullName: 'Jane Doe',
+        userId: 'portal-1',
       };
       patientsRepo.findOne.mockResolvedValue(patient);
-      patientsRepo.softRemove.mockResolvedValue(patient);
+      admissionsRepo.findOne.mockResolvedValue(null);
+      patientsRepo.manager.transaction.mockImplementation(
+        (cb: (m: Record<string, unknown>) => unknown) => {
+          const manager = {
+            getRepository: () => ({
+              save: jest.fn().mockResolvedValue(patient),
+              find: jest.fn().mockResolvedValue([]),
+              remove: jest.fn(),
+              softRemove: jest.fn().mockResolvedValue(patient),
+            }),
+          };
+          return Promise.resolve(cb(manager));
+        },
+      );
 
       const result = await service.deletePatient(
         'patient-1',
@@ -143,7 +157,7 @@ describe('PatientsService', () => {
       );
 
       expect(result).toBe(true);
-      expect(patientsRepo.softRemove).toHaveBeenCalledWith(patient);
+      expect(patientsRepo.manager.transaction).toHaveBeenCalled();
       expect(audit.log).toHaveBeenCalledWith(
         expect.objectContaining({
           action: 'delete',

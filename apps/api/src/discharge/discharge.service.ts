@@ -348,6 +348,7 @@ export class DischargeService {
       where,
       relations: ['patient', 'doctor'],
       order: { scheduledAt: 'ASC' },
+      take: 200,
     });
 
     return items.map((item) => this.toFollowUpType(item));

@@ -1,10 +1,11 @@
 import { UseGuards } from '@nestjs/common';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { PERMISSIONS } from '@careconnect/types';
+import { PERMISSIONS, ROLES } from '@careconnect/types';
 import { GqlAuthGuard } from '../auth/gql-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { Permissions } from '../rbac/permissions.decorator';
+import { Roles } from '../rbac/roles.decorator';
 import { RolesGuard } from '../rbac/roles.guard';
 import { DischargeService } from './discharge.service';
 import {
@@ -52,6 +53,13 @@ export class DischargeResolver {
   }
 
   @Mutation(() => DischargeType)
+  @Roles(
+    ROLES.DOCTOR,
+    ROLES.NURSE,
+    ROLES.HOSPITAL_ADMIN,
+    ROLES.HOSPITAL_MANAGER,
+    ROLES.SUPER_ADMIN,
+  )
   @Permissions(PERMISSIONS.PATIENTS_WRITE)
   async createDischarge(
     @CurrentUser() user: AuthenticatedUser,
