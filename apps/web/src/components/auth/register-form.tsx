@@ -10,6 +10,7 @@ import { useMutation } from '@apollo/client';
 import { registerSchema, type RegisterInput } from '@careconnect/types';
 import { ClayButton, ClayCard, ClayInput } from '@careconnect/ui';
 import { COMPLETE_PATIENT_ONBOARDING } from '@/lib/graphql/queries';
+import { safeInternalPath } from '@/lib/safe-redirect';
 
 export function RegisterForm() {
   const router = useRouter();
@@ -21,7 +22,8 @@ export function RegisterForm() {
   const [code, setCode] = useState('');
   const [completePatientOnboarding] = useMutation(COMPLETE_PATIENT_ONBOARDING);
 
-  const redirectTo = searchParams.get('redirect') ?? '/onboarding';
+  const redirectTo = safeInternalPath(searchParams.get('redirect'), '/onboarding');
+  const isStaffInviteFlow = redirectTo.startsWith('/invite/');
 
   const {
     register,
@@ -31,12 +33,20 @@ export function RegisterForm() {
     formState: { errors },
   } = useForm<RegisterInput>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { accountType: 'hospital' },
+    defaultValues: {
+      accountType: 'hospital',
+      hospitalName: isStaffInviteFlow ? 'Staff invite' : undefined,
+    },
   });
 
   const accountType = watch('accountType');
 
   const finishSignup = async (fullName: string, type: RegisterInput['accountType']) => {
+    if (isStaffInviteFlow) {
+      router.push(redirectTo);
+      router.refresh();
+      return;
+    }
     if (type === 'patient') {
       try {
         await completePatientOnboarding({ variables: { fullName } });
@@ -110,7 +120,7 @@ export function RegisterForm() {
     if (!isLoaded) return;
     setError('');
     try {
-      const type = getValues('accountType');
+      const type = isStaffInviteFlow ? 'hospital' : getValues('accountType');
       const fullName = getValues('fullName');
       // Persist account type before OAuth so post-login can finish patient onboarding
       await signUp.create({
@@ -120,14 +130,15 @@ export function RegisterForm() {
           hospitalName: getValues('hospitalName'),
         },
       });
-      const dest =
-        type === 'patient'
+      const dest = isStaffInviteFlow
+        ? redirectTo
+        : type === 'patient'
           ? '/portal?completePatient=1'
           : '/onboarding';
       await signUp.authenticateWithRedirect({
         strategy: 'oauth_google',
         redirectUrl: '/auth/callback',
-        redirectUrlComplete: dest,
+        redirectUrlComplete: safeInternalPath(dest, '/onboarding'),
       });
     } catch (err) {
       setError(extractClerkError(err));
@@ -167,13 +178,22 @@ export function RegisterForm() {
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
           <label className="text-sm font-medium text-clay-text">Account Type</label>
-          <select
-            className="w-full rounded-2xl border border-white/60 bg-clay-surface px-4 py-3 text-clay-text shadow-clay-inset outline-none focus:ring-2 focus:ring-clay-primary/30"
-            {...register('accountType')}
-          >
-            <option value="hospital">Hospital Administrator</option>
-            <option value="patient">Patient</option>
-          </select>
+          {isStaffInviteFlow ? (
+            <>
+              <input type="hidden" {...register('accountType')} value="hospital" />
+              <p className="rounded-2xl bg-clay-surface px-4 py-3 text-sm text-clay-text">
+                Staff invite — you will return to accept your hospital invitation after signup.
+              </p>
+            </>
+          ) : (
+            <select
+              className="w-full rounded-2xl border border-white/60 bg-clay-surface px-4 py-3 text-clay-text shadow-clay-inset outline-none focus:ring-2 focus:ring-clay-primary/30"
+              {...register('accountType')}
+            >
+              <option value="hospital">Hospital Administrator</option>
+              <option value="patient">Patient</option>
+            </select>
+          )}
           <p className="text-xs text-clay-text-muted">
             Hospital staff join with an invite link from your administrator — not via public
             signup.
@@ -187,7 +207,7 @@ export function RegisterForm() {
           {...register('fullName')}
         />
 
-        {accountType === 'hospital' ? (
+        {accountType === 'hospital' && !isStaffInviteFlow ? (
           <ClayInput
             label="Hospital Name"
             placeholder="City General Hospital"
