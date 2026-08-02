@@ -244,5 +244,23 @@ describe('AuthService', () => {
       ).rejects.toThrow(ForbiddenException);
       expect(manager.save).not.toHaveBeenCalled();
     });
+
+    it('rejects bootstrap when actor already has roles (e.g. patient)', async () => {
+      usersRepo.findOne.mockResolvedValue({
+        id: 'user-1',
+        hospitalId: undefined,
+      });
+      hospitalsRepo.findOne.mockResolvedValue({ id: 'hospital-a' });
+
+      await expect(
+        service.completeOnboarding(
+          { ...actor, roles: ['patient'] },
+          'Patient',
+          'hospital-a',
+          true,
+        ),
+      ).rejects.toThrow(/first-time registration/);
+      expect(usersRepo.manager.transaction).not.toHaveBeenCalled();
+    });
   });
 });
