@@ -558,6 +558,12 @@ export class PatientsService {
   ): Promise<PatientType> {
     const patient = await this.findPatientOrThrow(patientId, hospitalId);
 
+    if (patient.userId) {
+      throw new ConflictException(
+        'Patient chart is already linked to a portal account. Unlink or delete before re-linking.',
+      );
+    }
+
     let targetUserId = userId;
     const lookupEmail =
       email?.trim().toLowerCase() || patient.email?.toLowerCase();
@@ -598,8 +604,32 @@ export class PatientsService {
       );
     }
 
+    const existingLink = await this.patientsRepo.findOne({
+      where: { userId: targetUserId },
+    });
+    if (existingLink && existingLink.id !== patient.id) {
+      throw new ConflictException(
+        'That portal user is already linked to another patient chart',
+      );
+    }
+
+    const previousUserId = patient.userId;
     patient.userId = targetUserId;
-    const saved = await this.patientsRepo.save(patient);
+    let saved: Patient;
+    try {
+      saved = await this.patientsRepo.save(patient);
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        (error as { code?: string }).code === '23505'
+      ) {
+        throw new ConflictException(
+          'That portal user is already linked to another patient chart',
+        );
+      }
+      throw error;
+    }
 
     await this.audit.log({
       actorId: actor.id,
@@ -607,7 +637,11 @@ export class PatientsService {
       action: 'link_account',
       resource: 'patient',
       resourceId: saved.id,
-      metadata: { userId: targetUserId, email: lookupEmail },
+      metadata: {
+        userId: targetUserId,
+        previousUserId,
+        email: lookupEmail,
+      },
     });
 
     return this.toPatientType(saved);
