@@ -244,6 +244,7 @@ export class StaffService {
     const saved = await this.staffRepo.save(staff);
     if (input.isActive === false) {
       await this.usersRepo.update(staff.userId, { isActive: false });
+      await this.invalidateOutstandingInvites(saved);
       await this.syncClerkActiveState(staff.userId, false);
     } else if (input.isActive === true) {
       await this.usersRepo.update(staff.userId, { isActive: true });
@@ -268,6 +269,7 @@ export class StaffService {
     staff.isActive = false;
     await this.staffRepo.save(staff);
     await this.usersRepo.update(staff.userId, { isActive: false });
+    await this.invalidateOutstandingInvites(staff);
     await this.syncClerkActiveState(staff.userId, false);
 
     await this.audit.log({
@@ -279,6 +281,30 @@ export class StaffService {
     });
 
     return true;
+  }
+
+  /** Expire unaccepted invites so deactivated staff cannot self-reactivate. */
+  private async invalidateOutstandingInvites(staff: StaffProfile) {
+    const now = new Date();
+    await this.invitesRepo
+      .createQueryBuilder()
+      .update(StaffInvite)
+      .set({ expiresAt: now })
+      .where('staff_profile_id = :staffId', { staffId: staff.id })
+      .andWhere('accepted_at IS NULL')
+      .execute();
+    if (staff.user?.email) {
+      await this.invitesRepo
+        .createQueryBuilder()
+        .update(StaffInvite)
+        .set({ expiresAt: now })
+        .where('LOWER(email) = LOWER(:email)', { email: staff.user.email })
+        .andWhere('hospital_id = :hospitalId', {
+          hospitalId: staff.hospitalId,
+        })
+        .andWhere('accepted_at IS NULL')
+        .execute();
+    }
   }
 
   private async syncClerkActiveState(userId: string, active: boolean) {
@@ -312,10 +338,20 @@ export class StaffService {
       ? await this.findById(invite.staffProfileId)
       : null;
     if (!staff) throw new NotFoundException('Staff profile missing for invite');
+    if (!staff.isActive) {
+      throw new ForbiddenException(
+        'This staff account has been deactivated; contact a hospital administrator',
+      );
+    }
 
     const invitee = await this.usersRepo.findOne({
       where: { id: staff.userId },
     });
+    if (invitee && invitee.isActive === false) {
+      throw new ForbiddenException(
+        'This account has been deactivated; contact a hospital administrator',
+      );
+    }
     if (invitee?.hospitalId && invitee.hospitalId !== invite.hospitalId) {
       throw new BadRequestException(
         'This user already belongs to another hospital. CareConnect users can only be staff at one hospital.',

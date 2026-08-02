@@ -43,10 +43,22 @@ describe('StaffService', () => {
     save: jest.fn(),
     create: jest.fn(),
     findOne: jest.fn(),
+    createQueryBuilder: jest.fn(() => {
+      const qb = {
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({ affected: 1 }),
+      };
+      return qb;
+    }),
   };
   const clerkAdmin = {
     isConfigured: jest.fn().mockReturnValue(false),
     inviteStaffByEmail: jest.fn(),
+    deactivateUser: jest.fn(),
+    reactivateUser: jest.fn(),
   };
   const audit = { log: jest.fn() };
 
@@ -152,6 +164,57 @@ describe('StaffService', () => {
 
       expect(userRolesRepo.save).not.toHaveBeenCalled();
       expect(staffRepo.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('acceptInvite — deactivated staff', () => {
+    it('rejects invite acceptance when staff profile is inactive', async () => {
+      invitesRepo.findOne.mockResolvedValue({
+        token: 'tok',
+        email: 'doc@example.com',
+        hospitalId: 'hospital-a',
+        staffProfileId: 'staff-1',
+        acceptedAt: null,
+        expiresAt: new Date(Date.now() + 86400000),
+      });
+      staffRepo.findOne.mockResolvedValue({
+        id: 'staff-1',
+        userId: 'user-1',
+        hospitalId: 'hospital-a',
+        isActive: false,
+        user: { email: 'doc@example.com', isActive: false },
+      });
+
+      await expect(
+        service.acceptInvite('tok', 'auth-new', 'doc@example.com'),
+      ).rejects.toThrow(ForbiddenException);
+      expect(usersRepo.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('remove — invalidate invites', () => {
+    it('expires outstanding invites when staff is deactivated', async () => {
+      staffRepo.findOne.mockResolvedValue({
+        id: 'staff-1',
+        userId: 'user-1',
+        hospitalId: 'hospital-a',
+        isActive: true,
+        user: { email: 'doc@example.com', userRoles: [] },
+      });
+      staffRepo.save.mockImplementation((row: { isActive: boolean }) =>
+        Promise.resolve(row),
+      );
+      usersRepo.findOne.mockResolvedValue({
+        id: 'user-1',
+        authId: 'pending_abc',
+      });
+
+      await service.remove('staff-1', hospitalAdmin);
+
+      expect(invitesRepo.createQueryBuilder).toHaveBeenCalled();
+      expect(usersRepo.update).toHaveBeenCalledWith('user-1', {
+        isActive: false,
+      });
     });
   });
 });
