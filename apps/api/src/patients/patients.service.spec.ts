@@ -186,20 +186,24 @@ describe('PatientsService', () => {
       };
 
       patientsRepo.manager.transaction.mockImplementation(
-        async (cb: (m: Record<string, unknown>) => unknown) => {
+        (cb: (m: Record<string, unknown>) => unknown) => {
           const manager = {
-            save: jest.fn(async (entity: unknown) =>
-              typeof entity === 'object' && entity && 'id' in (entity as object)
-                ? entity
-                : savedPatient,
+            save: jest.fn((entity: unknown) =>
+              Promise.resolve(
+                typeof entity === 'object' && entity && 'id' in entity
+                  ? entity
+                  : savedPatient,
+              ),
             ),
-            create: jest.fn((_entity: unknown, data: Record<string, unknown>) => ({
-              ...savedPatient,
-              ...data,
-            })),
+            create: jest.fn(
+              (_entity: unknown, data: Record<string, unknown>) => ({
+                ...savedPatient,
+                ...data,
+              }),
+            ),
             getRepository: () => relatedRepo,
           };
-          return cb(manager);
+          return Promise.resolve(cb(manager));
         },
       );
       patientsRepo.findOne.mockResolvedValue(savedPatient);

@@ -159,7 +159,7 @@ describe('StaffService', () => {
         authId: 'auth-1',
       };
       staffRepo.manager.transaction.mockImplementation(
-        async (cb: (m: Record<string, unknown>) => unknown) => {
+        (cb: (m: Record<string, unknown>) => unknown) => {
           const manager = {
             getRepository: (entity: unknown) => {
               if (entity === User) {
@@ -179,7 +179,7 @@ describe('StaffService', () => {
               return {};
             },
           };
-          return cb(manager);
+          return Promise.resolve(cb(manager));
         },
       );
 
@@ -218,7 +218,7 @@ describe('StaffService', () => {
         user: { email: 'doc@example.com', isActive: false },
       };
       invitesRepo.manager.transaction.mockImplementation(
-        async (cb: (m: Record<string, unknown>) => unknown) => {
+        (cb: (m: Record<string, unknown>) => unknown) => {
           const manager = {
             getRepository: (entity: unknown) => {
               if (entity === StaffInvite) {
@@ -240,7 +240,7 @@ describe('StaffService', () => {
               return {};
             },
           };
-          return cb(manager);
+          return Promise.resolve(cb(manager));
         },
       );
 
