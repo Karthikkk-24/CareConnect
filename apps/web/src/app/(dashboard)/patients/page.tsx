@@ -24,6 +24,7 @@ export default function PatientsPage() {
 
   const patients = data?.patients?.items ?? [];
   const total = data?.patients?.total ?? 0;
+  const canWritePatients = (meData?.me?.permissions ?? []).includes('patients:write');
 
   return (
     <div>
@@ -40,20 +41,22 @@ export default function PatientsPage() {
             className="w-full rounded-2xl border border-white/60 bg-clay-surface py-3 pl-11 pr-4 shadow-clay-inset outline-none focus:ring-2 focus:ring-clay-primary/30"
           />
         </div>
-        <div className="flex gap-3">
-          <Link href="/patients/import">
-            <ClayButton variant="secondary">
-              <Upload className="h-4 w-4" />
-              Bulk Import
-            </ClayButton>
-          </Link>
-          <Link href="/patients/new">
-            <ClayButton>
-              <Plus className="h-4 w-4" />
-              Add Patient
-            </ClayButton>
-          </Link>
-        </div>
+        {canWritePatients ? (
+          <div className="flex gap-3">
+            <Link href="/patients/import">
+              <ClayButton variant="secondary">
+                <Upload className="h-4 w-4" />
+                Bulk Import
+              </ClayButton>
+            </Link>
+            <Link href="/patients/new">
+              <ClayButton>
+                <Plus className="h-4 w-4" />
+                Add Patient
+              </ClayButton>
+            </Link>
+          </div>
+        ) : null}
       </div>
 
       <ClayCard padding="none" className="overflow-hidden">
@@ -75,8 +78,15 @@ export default function PatientsPage() {
             ) : patients.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-6 py-8 text-center text-clay-text-muted">
-                  No patients found.{' '}
-                  <Link href="/patients/new" className="text-clay-primary hover:underline">Register your first patient</Link>
+                  No patients found.
+                  {canWritePatients ? (
+                    <>
+                      {' '}
+                      <Link href="/patients/new" className="text-clay-primary hover:underline">
+                        Register your first patient
+                      </Link>
+                    </>
+                  ) : null}
                 </td>
               </tr>
             ) : (

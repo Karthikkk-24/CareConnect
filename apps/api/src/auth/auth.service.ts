@@ -40,14 +40,13 @@ export class AuthService {
 
     // Link invited staff who were created with a different auth_id placeholder
     if (!user && email) {
-      user = await this.usersRepo.findOne({
-        where: { email },
-        relations: [
-          'userRoles',
-          'userRoles.role',
-          'userRoles.role.permissions',
-        ],
-      });
+      user = await this.usersRepo
+        .createQueryBuilder('user')
+        .leftJoinAndSelect('user.userRoles', 'userRoles')
+        .leftJoinAndSelect('userRoles.role', 'role')
+        .leftJoinAndSelect('role.permissions', 'permissions')
+        .where('LOWER(user.email) = LOWER(:email)', { email })
+        .getOne();
       if (user) {
         // Only reclaim pending invite placeholders — never steal an active Clerk-linked account
         const isPending = user.authId.startsWith('pending_');
@@ -55,18 +54,30 @@ export class AuthService {
           await this.usersRepo.update(user.id, { authId });
           user.authId = authId;
         } else {
-          user = null;
+          // Fail closed: do not create a duplicate users row for the same email
+          throw new UnauthorizedException(
+            'An account with this email already exists. Sign in with the original identity or contact support.',
+          );
         }
       }
     }
 
     if (!user && email) {
-      user = this.usersRepo.create({
-        authId,
-        email,
-        fullName: email.split('@')[0],
-      });
-      user = await this.usersRepo.save(user);
+      try {
+        user = this.usersRepo.create({
+          authId,
+          email,
+          fullName: email.split('@')[0],
+        });
+        user = await this.usersRepo.save(user);
+      } catch (error) {
+        if (isUniqueViolation(error)) {
+          throw new UnauthorizedException(
+            'An account with this email already exists. Sign in with the original identity or contact support.',
+          );
+        }
+        throw error;
+      }
       user = await this.usersRepo.findOne({
         where: { id: user.id },
         relations: [
@@ -161,6 +172,12 @@ export class AuthService {
     // Bootstrap hospital_admin under a transaction + advisory lock so two
     // concurrent registrants cannot both observe zero admins and both win.
     if (hospitalId && assignHospitalAdmin) {
+      // Patients (and any already-roled users) must join via invite, not bootstrap
+      if (!isSuperAdmin && actor.roles.length > 0) {
+        throw new ForbiddenException(
+          'Hospital bootstrap is only available during first-time registration',
+        );
+      }
       try {
         await this.usersRepo.manager.transaction(async (manager) => {
           await manager.query(

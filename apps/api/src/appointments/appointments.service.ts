@@ -252,10 +252,24 @@ export class AppointmentsService {
       throw new BadRequestException(`Invalid appointment status: ${status}`);
     }
 
-    const appointment = await this.findAppointmentOrThrow(id, hospitalId);
-    assertTransition(appointment.status, status);
-    appointment.status = status;
-    const saved = await this.appointmentsRepo.save(appointment);
+    const appointmentId = await this.appointmentsRepo.manager.transaction(
+      async (manager) => {
+        const appointment = await manager
+          .createQueryBuilder(Appointment, 'appointment')
+          .setLock('pessimistic_write')
+          .where('appointment.id = :id', { id })
+          .andWhere('appointment.hospital_id = :hospitalId', { hospitalId })
+          .getOne();
+        if (!appointment) throw new NotFoundException('Appointment not found');
+
+        assertTransition(appointment.status, status);
+        appointment.status = status;
+        await manager.save(appointment);
+        return appointment.id;
+      },
+    );
+
+    const saved = await this.findAppointmentOrThrow(appointmentId, hospitalId);
 
     await this.audit.log({
       actorId: actor.id,
@@ -274,18 +288,31 @@ export class AppointmentsService {
     input: CancelAppointmentInput,
     actor: AuthenticatedUser,
   ): Promise<AppointmentType> {
-    const appointment = await this.findAppointmentOrThrow(input.id, hospitalId);
+    const appointmentId = await this.appointmentsRepo.manager.transaction(
+      async (manager) => {
+        const appointment = await manager
+          .createQueryBuilder(Appointment, 'appointment')
+          .setLock('pessimistic_write')
+          .where('appointment.id = :id', { id: input.id })
+          .andWhere('appointment.hospital_id = :hospitalId', { hospitalId })
+          .getOne();
+        if (!appointment) throw new NotFoundException('Appointment not found');
 
-    assertTransition(appointment.status, 'cancelled');
+        assertTransition(appointment.status, 'cancelled');
 
-    appointment.status = 'cancelled';
-    if (input.reason) {
-      appointment.notes = appointment.notes
-        ? `${appointment.notes}\nCancelled: ${input.reason}`
-        : `Cancelled: ${input.reason}`;
-    }
+        appointment.status = 'cancelled';
+        if (input.reason) {
+          appointment.notes = appointment.notes
+            ? `${appointment.notes}\nCancelled: ${input.reason}`
+            : `Cancelled: ${input.reason}`;
+        }
 
-    const saved = await this.appointmentsRepo.save(appointment);
+        await manager.save(appointment);
+        return appointment.id;
+      },
+    );
+
+    const saved = await this.findAppointmentOrThrow(appointmentId, hospitalId);
 
     await this.audit.log({
       actorId: actor.id,

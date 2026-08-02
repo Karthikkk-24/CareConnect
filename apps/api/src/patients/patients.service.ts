@@ -126,16 +126,31 @@ export class PatientsService {
     page: number;
     limit: number;
   }> {
-    const where = search
-      ? [
-          { hospitalId, fullName: ILike(`%${search}%`) },
-          { hospitalId, email: ILike(`%${search}%`) },
-          { hospitalId, phone: ILike(`%${search}%`) },
-        ]
-      : { hospitalId };
+    if (search) {
+      const literal = search.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+      const pattern = `%${literal}%`;
+      const qb = this.patientsRepo
+        .createQueryBuilder('patient')
+        .where('patient.hospital_id = :hospitalId', { hospitalId })
+        .andWhere(
+          `(patient.full_name ILIKE :pattern ESCAPE '\\' OR patient.email ILIKE :pattern ESCAPE '\\' OR patient.phone ILIKE :pattern ESCAPE '\\')`,
+          { pattern },
+        )
+        .orderBy('patient.created_at', 'DESC')
+        .skip((page - 1) * limit)
+        .take(limit);
+
+      const [patients, total] = await qb.getManyAndCount();
+      return {
+        items: patients.map((p) => this.toPatientType(p)),
+        total,
+        page,
+        limit,
+      };
+    }
 
     const [patients, total] = await this.patientsRepo.findAndCount({
-      where,
+      where: { hospitalId },
       order: { createdAt: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,

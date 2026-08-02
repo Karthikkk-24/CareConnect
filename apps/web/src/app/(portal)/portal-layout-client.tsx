@@ -5,13 +5,14 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery } from '@apollo/client';
 import { useUser } from '@clerk/nextjs';
 import { COMPLETE_PATIENT_ONBOARDING, ME_QUERY } from '@/lib/graphql/queries';
+import { ForbiddenAccess } from '@/components/auth/forbidden-access';
 import { PortalSidebar } from '@/components/layout/portal-sidebar';
 
 export function PortalLayoutClient({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useUser();
-  const { data, loading, refetch } = useQuery(ME_QUERY);
+  const { data, loading, error, refetch } = useQuery(ME_QUERY, { errorPolicy: 'all' });
   const [completePatientOnboarding] = useMutation(COMPLETE_PATIENT_ONBOARDING);
   const ran = useRef(false);
   const me = data?.me;
@@ -57,6 +58,17 @@ export function PortalLayoutClient({ children }: { children: React.ReactNode }) 
     return (
       <div className="flex min-h-screen items-center justify-center bg-clay-bg text-clay-text-muted">
         Loading portal…
+      </div>
+    );
+  }
+
+  if (error && !me) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-clay-bg p-6">
+        <ForbiddenAccess
+          title="Unable to load portal"
+          message="We could not verify your account. Please sign in again or contact support."
+        />
       </div>
     );
   }

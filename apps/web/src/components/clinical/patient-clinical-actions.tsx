@@ -25,6 +25,7 @@ import {
   CREATE_LAB_ORDER_MUTATION,
   CREATE_PRESCRIPTION_MUTATION,
   CREATE_VITAL_SIGN_MUTATION,
+  ME_QUERY,
   STAFF_MEMBERS_QUERY,
   WARDS_QUERY,
 } from '@/lib/graphql/queries';
@@ -59,6 +60,25 @@ export function PatientClinicalActions({ patientId, hospitalId }: PatientClinica
   const [error, setError] = useState('');
   const [admitWardId, setAdmitWardId] = useState('');
   const [admitBedId, setAdmitBedId] = useState('');
+
+  const { data: meData } = useQuery(ME_QUERY);
+  const permissions = meData?.me?.permissions ?? [];
+  const canWritePatients = permissions.includes('patients:write');
+  const canWriteAppointments = permissions.includes('appointments:write');
+  const canWriteLabs =
+    permissions.includes('lab:write') || permissions.includes('patients:write');
+
+  const actionPermissions: Record<ActionKey, boolean> = {
+    appointment: canWriteAppointments,
+    admit: canWritePatients,
+    vitals: canWritePatients,
+    soap: canWritePatients,
+    diagnosis: canWritePatients,
+    prescription: canWritePatients,
+    lab: canWriteLabs,
+  };
+
+  const visibleActions = actions.filter(({ key }) => actionPermissions[key]);
 
   const [createAppointment, { loading: appointmentLoading }] = useMutation(CREATE_APPOINTMENT_MUTATION);
   const [admitPatient, { loading: admitLoading }] = useMutation(ADMIT_PATIENT_MUTATION);
@@ -271,6 +291,8 @@ export function PatientClinicalActions({ patientId, hospitalId }: PatientClinica
     rxLoading ||
     labLoading;
 
+  if (visibleActions.length === 0) return null;
+
   return (
     <ClayCard className="lg:col-span-3">
       <h2 className="mb-4 text-lg font-semibold text-clay-text">Clinical Actions</h2>
@@ -285,7 +307,7 @@ export function PatientClinicalActions({ patientId, hospitalId }: PatientClinica
       ) : null}
 
       <div className="space-y-3">
-        {actions.map(({ key, label, icon: Icon }) => (
+        {visibleActions.map(({ key, label, icon: Icon }) => (
           <div key={key} className="rounded-2xl bg-clay-primary-light/20">
             <button
               type="button"

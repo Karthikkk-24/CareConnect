@@ -13,6 +13,29 @@ import {
   PATIENTS_QUERY,
   STAFF_MEMBERS_QUERY,
 } from '@/lib/graphql/queries';
+import { canAccessRoute } from '@/lib/route-access';
+
+const QUICK_ACTIONS = [
+  { label: 'Register Patient', href: '/patients/new', anyPermissions: ['patients:write'] },
+  { label: 'Bulk Import Patients', href: '/patients/import', anyPermissions: ['patients:write'] },
+  { label: 'New Appointment', href: '/appointments/new', anyPermissions: ['appointments:write'] },
+  { label: 'View Appointments', href: '/appointments' },
+  { label: 'Admit Patient', href: '/admissions' },
+  { label: 'Add Staff Member', href: '/staff/new', anyPermissions: ['staff:write'] },
+  { label: 'View Staff Directory', href: '/staff' },
+  { label: 'Lab Queue', href: '/lab' },
+] as const;
+
+function canSeeQuickAction(
+  action: (typeof QUICK_ACTIONS)[number],
+  access: { roles: string[]; permissions: string[] },
+): boolean {
+  if (!canAccessRoute(action.href, access)) return false;
+  if ('anyPermissions' in action && action.anyPermissions) {
+    return action.anyPermissions.some((perm) => access.permissions.includes(perm));
+  }
+  return true;
+}
 
 function todayDateString() {
   return new Date().toISOString().slice(0, 10);
@@ -76,6 +99,12 @@ export default function DashboardPage() {
 
   const hasAppointments = typeof appointmentsToday === 'number' && appointmentsToday > 0;
 
+  const access = {
+    roles: me?.roles ?? [],
+    permissions: me?.permissions ?? [],
+  };
+  const visibleQuickActions = QUICK_ACTIONS.filter((action) => canSeeQuickAction(action, access));
+
   return (
     <div>
       <DashboardHeader
@@ -102,16 +131,7 @@ export default function DashboardPage() {
         <ClayCard>
           <h2 className="mb-4 text-lg font-semibold text-clay-text">Quick Actions</h2>
           <div className="grid gap-3 sm:grid-cols-2">
-            {[
-              { label: 'Register Patient', href: '/patients/new' },
-              { label: 'Bulk Import Patients', href: '/patients/import' },
-              { label: 'New Appointment', href: '/appointments/new' },
-              { label: 'View Appointments', href: '/appointments' },
-              { label: 'Admit Patient', href: '/admissions' },
-              { label: 'Add Staff Member', href: '/staff/new' },
-              { label: 'View Staff Directory', href: '/staff' },
-              { label: 'Lab Queue', href: '/lab' },
-            ].map((action) => (
+            {visibleQuickActions.map((action) => (
               <Link
                 key={action.label}
                 href={action.href}

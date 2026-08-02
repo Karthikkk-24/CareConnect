@@ -290,14 +290,25 @@ export class FacilityService {
     input: UpdateBedStatusInput,
     actor: AuthenticatedUser,
   ): Promise<BedType> {
+    const bedId = await this.bedsRepo.manager.transaction(async (manager) => {
+      const bed = await manager
+        .createQueryBuilder(Bed, 'bed')
+        .setLock('pessimistic_write')
+        .where('bed.id = :id', { id: input.bedId })
+        .andWhere('bed.hospital_id = :hospitalId', { hospitalId })
+        .getOne();
+      if (!bed) throw new NotFoundException('Bed not found');
+
+      assertManualBedTransition(bed.status, input.status);
+      bed.status = input.status;
+      await manager.save(bed);
+      return bed.id;
+    });
+
     const bed = await this.bedsRepo.findOne({
-      where: { id: input.bedId, hospitalId },
+      where: { id: bedId, hospitalId },
     });
     if (!bed) throw new NotFoundException('Bed not found');
-
-    assertManualBedTransition(bed.status, input.status);
-    bed.status = input.status;
-    await this.bedsRepo.save(bed);
 
     await this.audit.log({
       actorId: actor.id,

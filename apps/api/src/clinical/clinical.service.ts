@@ -514,13 +514,6 @@ export class ClinicalService {
     input: UpdateLabOrderStatusInput,
     actor: AuthenticatedUser,
   ): Promise<LabOrderType> {
-    const order = await this.labOrdersRepo.findOne({
-      where: { id: input.labOrderId, hospitalId },
-      relations: ['patient', 'orderedBy'],
-    });
-    if (!order) throw new NotFoundException('Lab order not found');
-
-    assertLabTransition(order.status, input.status);
     // Completing requires a lab result via completeLabResult
     if (input.status === 'completed') {
       throw new BadRequestException(
@@ -528,8 +521,28 @@ export class ClinicalService {
       );
     }
 
-    order.status = input.status;
-    await this.labOrdersRepo.save(order);
+    const orderId = await this.labOrdersRepo.manager.transaction(
+      async (manager) => {
+        const order = await manager
+          .createQueryBuilder(LabOrder, 'order')
+          .setLock('pessimistic_write')
+          .where('order.id = :id', { id: input.labOrderId })
+          .andWhere('order.hospital_id = :hospitalId', { hospitalId })
+          .getOne();
+        if (!order) throw new NotFoundException('Lab order not found');
+
+        assertLabTransition(order.status, input.status);
+        order.status = input.status;
+        await manager.save(order);
+        return order.id;
+      },
+    );
+
+    const order = await this.labOrdersRepo.findOne({
+      where: { id: orderId, hospitalId },
+      relations: ['patient', 'orderedBy'],
+    });
+    if (!order) throw new NotFoundException('Lab order not found');
 
     await this.audit.log({
       actorId: actor.id,
@@ -548,15 +561,30 @@ export class ClinicalService {
     input: CancelPrescriptionInput,
     actor: AuthenticatedUser,
   ): Promise<PrescriptionType> {
+    const prescriptionId = await this.prescriptionsRepo.manager.transaction(
+      async (manager) => {
+        const prescription = await manager
+          .createQueryBuilder(Prescription, 'prescription')
+          .setLock('pessimistic_write')
+          .leftJoinAndSelect('prescription.items', 'items')
+          .where('prescription.id = :id', { id: input.prescriptionId })
+          .andWhere('prescription.hospital_id = :hospitalId', { hospitalId })
+          .getOne();
+        if (!prescription)
+          throw new NotFoundException('Prescription not found');
+
+        assertPrescriptionTransition(prescription.status, 'cancelled');
+        prescription.status = 'cancelled';
+        await manager.save(prescription);
+        return prescription.id;
+      },
+    );
+
     const prescription = await this.prescriptionsRepo.findOne({
-      where: { id: input.prescriptionId, hospitalId },
+      where: { id: prescriptionId, hospitalId },
       relations: ['items'],
     });
     if (!prescription) throw new NotFoundException('Prescription not found');
-
-    assertPrescriptionTransition(prescription.status, 'cancelled');
-    prescription.status = 'cancelled';
-    await this.prescriptionsRepo.save(prescription);
 
     await this.audit.log({
       actorId: actor.id,

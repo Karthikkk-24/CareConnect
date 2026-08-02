@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useQuery } from '@apollo/client';
-import { Calendar, Clock, FileText, Pill, FlaskConical, Users } from 'lucide-react';
+import { Calendar, Clock, FileText, FlaskConical, Users } from 'lucide-react';
 import { ClayBadge, ClayButton, ClayCard } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
 import { APPOINTMENTS_QUERY, ME_QUERY } from '@/lib/graphql/queries';
@@ -37,7 +37,6 @@ export default function DoctorDashboardPage() {
     { label: 'Patients', href: '/patients', icon: Users },
     { label: 'Admissions', href: '/admissions', icon: FileText },
     { label: 'Order Lab', href: '/lab', icon: FlaskConical },
-    { label: 'Pharmacy Queue', href: '/pharmacy', icon: Pill },
   ];
 
   return (

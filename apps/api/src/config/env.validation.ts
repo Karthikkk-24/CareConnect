@@ -115,6 +115,18 @@ export function validateEnv(config: Record<string, unknown>) {
     }
   }
 
+  if (config.NODE_ENV === 'production') {
+    if (
+      !config.CLERK_AUTHORIZED_PARTIES ||
+      typeof config.CLERK_AUTHORIZED_PARTIES !== 'string' ||
+      !config.CLERK_AUTHORIZED_PARTIES.trim()
+    ) {
+      throw new Error(
+        'CLERK_AUTHORIZED_PARTIES is required in production (comma-separated authorized party URLs for JWT azp checks).',
+      );
+    }
+  }
+
   if (
     config.CLERK_AUTHORIZED_PARTIES !== undefined &&
     config.CLERK_AUTHORIZED_PARTIES !== ''

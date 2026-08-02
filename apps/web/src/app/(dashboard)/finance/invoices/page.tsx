@@ -30,6 +30,7 @@ export default function InvoicesPage() {
   });
 
   const invoices = data?.invoices ?? [];
+  const canWriteBilling = (meData?.me?.permissions ?? []).includes('billing:write');
 
   return (
     <div>
@@ -38,14 +39,16 @@ export default function InvoicesPage() {
         subtitle="All billing invoices for your hospital"
       />
 
-      <div className="mb-6 flex justify-end">
-        <Link href="/finance/invoices/new">
-          <ClayButton>
-            <Plus className="mr-2 h-4 w-4" />
-            New Invoice
-          </ClayButton>
-        </Link>
-      </div>
+      {canWriteBilling ? (
+        <div className="mb-6 flex justify-end">
+          <Link href="/finance/invoices/new">
+            <ClayButton>
+              <Plus className="mr-2 h-4 w-4" />
+              New Invoice
+            </ClayButton>
+          </Link>
+        </div>
+      ) : null}
 
       <ClayCard padding="none" className="overflow-hidden">
         {loading ? (
@@ -54,9 +57,11 @@ export default function InvoicesPage() {
           <div className="px-6 py-12 text-center">
             <FileText className="mx-auto mb-3 h-10 w-10 text-clay-text-muted/50" />
             <p className="text-clay-text-muted">No invoices yet.</p>
-            <Link href="/finance/invoices/new" className="mt-4 inline-block">
-              <ClayButton size="sm">Create First Invoice</ClayButton>
-            </Link>
+            {canWriteBilling ? (
+              <Link href="/finance/invoices/new" className="mt-4 inline-block">
+                <ClayButton size="sm">Create First Invoice</ClayButton>
+              </Link>
+            ) : null}
           </div>
         ) : (
           <div className="divide-y divide-white/30">

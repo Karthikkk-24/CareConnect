@@ -27,8 +27,15 @@ describe('ClinicalService', () => {
     create: jest.fn(),
     find: jest.fn(),
     findOne: jest.fn(),
+    manager: {
+      transaction: jest.fn(),
+    },
   };
   const prescriptionItemsRepo = { save: jest.fn(), create: jest.fn() };
+  const rxManager = {
+    createQueryBuilder: jest.fn(),
+    save: jest.fn(),
+  };
   const labManager = {
     createQueryBuilder: jest.fn(),
     save: jest.fn(),
@@ -67,6 +74,13 @@ describe('ClinicalService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    prescriptionsRepo.manager.transaction.mockImplementation(
+      (cb: (m: typeof rxManager) => unknown) => Promise.resolve(cb(rxManager)),
+    );
+    labOrdersRepo.manager.transaction.mockImplementation(
+      (cb: (m: typeof labManager) => unknown) =>
+        Promise.resolve(cb(labManager)),
+    );
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ClinicalService,
@@ -163,10 +177,15 @@ describe('ClinicalService', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
+      const qb = {
+        setLock: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(order),
+      };
+      labManager.createQueryBuilder.mockReturnValue(qb);
+      labManager.save.mockResolvedValue(order);
       labOrdersRepo.findOne.mockResolvedValue(order);
-      labOrdersRepo.save.mockImplementation((row: typeof order) =>
-        Promise.resolve(row),
-      );
 
       const result = await service.updateLabOrderStatus(
         'hospital-a',
@@ -174,15 +193,10 @@ describe('ClinicalService', () => {
         actor,
       );
       expect(result.status).toBe('collected');
+      expect(qb.setLock).toHaveBeenCalledWith('pessimistic_write');
     });
 
     it('rejects completing via updateLabOrderStatus', async () => {
-      labOrdersRepo.findOne.mockResolvedValue({
-        id: 'lab-1',
-        hospitalId: 'hospital-a',
-        status: 'ordered',
-      });
-
       await expect(
         service.updateLabOrderStatus(
           'hospital-a',
@@ -190,6 +204,7 @@ describe('ClinicalService', () => {
           actor,
         ),
       ).rejects.toThrow('Use completeLabResult');
+      expect(labOrdersRepo.manager.transaction).not.toHaveBeenCalled();
     });
   });
 
@@ -204,9 +219,20 @@ describe('ClinicalService', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      prescriptionsRepo.findOne.mockResolvedValue(rx);
-      prescriptionsRepo.save.mockImplementation((row: typeof rx) =>
-        Promise.resolve(row),
+      const qb = {
+        setLock: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue({ ...rx }),
+      };
+      rxManager.createQueryBuilder.mockReturnValue(qb);
+      rxManager.save.mockImplementation((row: typeof rx) => {
+        Object.assign(rx, row);
+        return Promise.resolve(rx);
+      });
+      prescriptionsRepo.findOne.mockImplementation(() =>
+        Promise.resolve({ ...rx }),
       );
 
       const result = await service.cancelPrescription(
@@ -215,15 +241,23 @@ describe('ClinicalService', () => {
         actor,
       );
       expect(result.status).toBe('cancelled');
+      expect(qb.setLock).toHaveBeenCalledWith('pessimistic_write');
     });
 
     it('rejects cancelling a dispensed prescription', async () => {
-      prescriptionsRepo.findOne.mockResolvedValue({
-        id: 'rx-1',
-        hospitalId: 'hospital-a',
-        status: 'dispensed',
-        items: [],
-      });
+      const qb = {
+        setLock: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue({
+          id: 'rx-1',
+          hospitalId: 'hospital-a',
+          status: 'dispensed',
+          items: [],
+        }),
+      };
+      rxManager.createQueryBuilder.mockReturnValue(qb);
 
       await expect(
         service.cancelPrescription(

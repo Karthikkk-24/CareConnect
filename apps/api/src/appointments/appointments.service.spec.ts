@@ -10,12 +10,21 @@ import { AppointmentsService } from './appointments.service';
 describe('AppointmentsService status machine', () => {
   let service: AppointmentsService;
 
+  const apptManager = {
+    createQueryBuilder: jest.fn(),
+    save: jest.fn(),
+  };
   const appointmentsRepo = {
     findOne: jest.fn(),
     save: jest.fn((a: Appointment) => Promise.resolve(a)),
     find: jest.fn(),
     create: jest.fn(),
     createQueryBuilder: jest.fn(),
+    manager: {
+      transaction: jest.fn((cb: (m: typeof apptManager) => unknown) =>
+        Promise.resolve(cb(apptManager)),
+      ),
+    },
   };
   const patientsRepo = { findOne: jest.fn() };
   const departmentsRepo = { findOne: jest.fn() };
@@ -37,6 +46,10 @@ describe('AppointmentsService status machine', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    appointmentsRepo.manager.transaction.mockImplementation(
+      (cb: (m: typeof apptManager) => unknown) =>
+        Promise.resolve(cb(apptManager)),
+    );
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AppointmentsService,
@@ -53,8 +66,27 @@ describe('AppointmentsService status machine', () => {
     service = module.get(AppointmentsService);
   });
 
+  const mockLockedAppointment = (row: Record<string, unknown>) => {
+    const state = { ...row };
+    const qb = {
+      setLock: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getOne: jest.fn().mockResolvedValue(state),
+    };
+    apptManager.createQueryBuilder.mockReturnValue(qb);
+    apptManager.save.mockImplementation((a: typeof state) => {
+      Object.assign(state, a);
+      return Promise.resolve(state);
+    });
+    appointmentsRepo.findOne.mockImplementation(() =>
+      Promise.resolve({ ...state }),
+    );
+    return qb;
+  };
+
   it('allows scheduled → checked_in', async () => {
-    appointmentsRepo.findOne.mockResolvedValue({
+    mockLockedAppointment({
       id: 'appt-1',
       hospitalId: 'hospital-a',
       status: 'scheduled',
@@ -69,7 +101,7 @@ describe('AppointmentsService status machine', () => {
   });
 
   it('rejects completed → scheduled', async () => {
-    appointmentsRepo.findOne.mockResolvedValue({
+    mockLockedAppointment({
       id: 'appt-1',
       hospitalId: 'hospital-a',
       status: 'completed',
@@ -80,7 +112,7 @@ describe('AppointmentsService status machine', () => {
   });
 
   it('rejects cancelling a completed appointment', async () => {
-    appointmentsRepo.findOne.mockResolvedValue({
+    mockLockedAppointment({
       id: 'appt-1',
       hospitalId: 'hospital-a',
       status: 'completed',
@@ -91,7 +123,13 @@ describe('AppointmentsService status machine', () => {
   });
 
   it('throws NotFound when appointment missing', async () => {
-    appointmentsRepo.findOne.mockResolvedValue(null);
+    const qb = {
+      setLock: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getOne: jest.fn().mockResolvedValue(null),
+    };
+    apptManager.createQueryBuilder.mockReturnValue(qb);
     await expect(
       service.updateStatus('missing', 'checked_in', 'hospital-a', actor),
     ).rejects.toThrow(NotFoundException);

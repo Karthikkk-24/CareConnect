@@ -19,6 +19,7 @@ export default function ImportPatientsPage() {
     errors: { row: number; message: string }[];
     dryRun: boolean;
   } | null>(null);
+  const [importError, setImportError] = useState('');
   const { data: meData } = useQuery(ME_QUERY);
   const [importPatients, { loading }] = useMutation(IMPORT_PATIENTS_MUTATION);
 
@@ -29,16 +30,21 @@ export default function ImportPatientsPage() {
   };
 
   const runImport = async (dryRun: boolean) => {
-    const { data } = await importPatients({
-      variables: {
-        rows: preview,
-        dryRun,
-        hospitalId: meData?.me?.hospitalId,
-      },
-    });
-    setResult(data.importPatients);
-    if (!dryRun && data.importPatients.errorCount === 0) {
-      router.push('/patients');
+    setImportError('');
+    try {
+      const { data } = await importPatients({
+        variables: {
+          rows: preview,
+          dryRun,
+          hospitalId: meData?.me?.hospitalId,
+        },
+      });
+      setResult(data.importPatients);
+      if (!dryRun && data.importPatients.errorCount === 0) {
+        router.push('/patients');
+      }
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : 'Import failed');
     }
   };
 
@@ -105,6 +111,9 @@ export default function ImportPatientsPage() {
                   Import Patients
                 </ClayButton>
               </div>
+              {importError ? (
+                <p className="mt-4 text-sm text-clay-error">{importError}</p>
+              ) : null}
             </>
           )}
 

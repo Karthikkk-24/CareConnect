@@ -58,14 +58,19 @@ const SORTED_RULES = [...ROUTE_RULES].sort(
   (a, b) => b.prefix.length - a.prefix.length,
 );
 
+/** Routes any authenticated non-patient staff may open without a specific rule */
+const STAFF_PUBLIC_ROUTES = ['/dashboard'];
+
 export function canAccessRoute(pathname: string, ctx: AccessContext): boolean {
   if (ctx.roles.includes('super_admin')) return true;
   if (ctx.roles.includes('patient')) return false;
 
+  if (STAFF_PUBLIC_ROUTES.some((route) => pathname === route)) return true;
+
   const rule = SORTED_RULES.find(
     (r) => pathname === r.prefix || pathname.startsWith(`${r.prefix}/`),
   );
-  if (!rule) return true;
+  if (!rule) return false;
 
   if (rule.anyRoles?.some((role) => ctx.roles.includes(role))) return true;
   if (rule.anyPermissions?.some((perm) => ctx.permissions.includes(perm))) {

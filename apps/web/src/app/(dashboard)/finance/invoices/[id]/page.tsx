@@ -32,6 +32,7 @@ export default function InvoiceDetailPage() {
   });
 
   const invoice = data?.invoice;
+  const canWriteBilling = (meData?.me?.permissions ?? []).includes('billing:write');
 
   if (loading) return <p className="text-clay-text-muted">Loading invoice...</p>;
   if (!invoice) return <p className="text-clay-error">Invoice not found</p>;
@@ -59,7 +60,7 @@ export default function InvoiceDetailPage() {
           <div className="flex items-center justify-between">
             <ClayBadge>{invoice.status}</ClayBadge>
             <div className="flex items-center gap-3">
-              {invoice.status !== 'void' && invoice.status !== 'paid' ? (
+              {canWriteBilling && invoice.status !== 'void' && invoice.status !== 'paid' ? (
                 <ClayButton
                   size="sm"
                   variant="ghost"
@@ -114,7 +115,7 @@ export default function InvoiceDetailPage() {
               </div>
             ),
           )}
-          {balance > 0 && invoice.status !== 'void' ? (
+          {canWriteBilling && balance > 0 && invoice.status !== 'void' ? (
             <form
               className="space-y-3 border-t border-white/40 pt-4"
               onSubmit={(e) => {
