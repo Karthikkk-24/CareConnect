@@ -60,7 +60,7 @@ export class UsersResolver {
     @CurrentUser() user: AuthenticatedUser,
     @Args('fullName') fullName: string,
   ): Promise<UserType> {
-    await this.authService.completePatientOnboarding(user.id, fullName);
+    await this.authService.completePatientOnboarding(user, fullName);
     const refreshed = await this.authService.syncAndGetUser(
       user.authId,
       user.email,
