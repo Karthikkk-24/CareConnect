@@ -13,6 +13,7 @@ describe('AppointmentsService status machine', () => {
   const apptManager = {
     createQueryBuilder: jest.fn(),
     save: jest.fn(),
+    findOne: jest.fn().mockResolvedValue(null),
   };
   const appointmentsRepo = {
     findOne: jest.fn(),
@@ -89,7 +90,13 @@ describe('AppointmentsService status machine', () => {
     mockLockedAppointment({
       id: 'appt-1',
       hospitalId: 'hospital-a',
+      patientId: 'patient-1',
       status: 'scheduled',
+    });
+    apptManager.findOne.mockResolvedValue({
+      id: 'patient-1',
+      hospitalId: 'hospital-a',
+      status: 'registered',
     });
     const result = await service.updateStatus(
       'appt-1',
@@ -98,6 +105,7 @@ describe('AppointmentsService status machine', () => {
       actor,
     );
     expect(result.status).toBe('checked_in');
+    expect(apptManager.save).toHaveBeenCalled();
   });
 
   it('rejects completed → scheduled', async () => {
