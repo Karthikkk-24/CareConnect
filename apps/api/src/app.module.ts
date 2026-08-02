@@ -79,61 +79,77 @@ import { UploadsModule } from './uploads/uploads.module';
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        type: 'postgres',
-        url: config.get<string>('DATABASE_URL'),
-        entities: [
-          Hospital,
-          Role,
-          Permission,
-          User,
-          UserRole,
-          StaffProfile,
-          StaffInvite,
-          AuditLog,
-          Patient,
-          PatientEmergencyContact,
-          PatientInsurance,
-          PatientAllergy,
-          PatientMedication,
-          PatientMedicalHistory,
-          PatientDocument,
-          PatientConsent,
-          PatientImportJob,
-          Department,
-          Ward,
-          Bed,
-          Appointment,
-          Admission,
-          VitalSign,
-          Diagnosis,
-          ClinicalNote,
-          Prescription,
-          PrescriptionItem,
-          LabOrder,
-          LabResult,
-          Discharge,
-          FollowUp,
-          Invoice,
-          InvoiceItem,
-          Payment,
-          InventoryItem,
-          PharmacyStock,
-        ],
-        synchronize: false,
-        logging: config.get('NODE_ENV') === 'development',
-        ssl:
-          config.get('DATABASE_SSL') === 'true'
-            ? { rejectUnauthorized: false }
-            : false,
-      }),
+      useFactory: (config: ConfigService) => {
+        const nodeEnv = config.get<string>('NODE_ENV');
+        return {
+          type: 'postgres',
+          url: config.get<string>('DATABASE_URL'),
+          entities: [
+            Hospital,
+            Role,
+            Permission,
+            User,
+            UserRole,
+            StaffProfile,
+            StaffInvite,
+            AuditLog,
+            Patient,
+            PatientEmergencyContact,
+            PatientInsurance,
+            PatientAllergy,
+            PatientMedication,
+            PatientMedicalHistory,
+            PatientDocument,
+            PatientConsent,
+            PatientImportJob,
+            Department,
+            Ward,
+            Bed,
+            Appointment,
+            Admission,
+            VitalSign,
+            Diagnosis,
+            ClinicalNote,
+            Prescription,
+            PrescriptionItem,
+            LabOrder,
+            LabResult,
+            Discharge,
+            FollowUp,
+            Invoice,
+            InvoiceItem,
+            Payment,
+            InventoryItem,
+            PharmacyStock,
+          ],
+          synchronize: false,
+          logging: config.get('NODE_ENV') === 'development',
+          // DATABASE_SSL=true relaxes pg TLS verification (rejectUnauthorized: false)
+          // for providers like Neon. Never relax verification in production.
+          ssl:
+            config.get('DATABASE_SSL') === 'true'
+              ? nodeEnv === 'production'
+                ? true // pg default: full certificate verification against system CAs
+                : { rejectUnauthorized: false }
+              : false,
+        };
+      },
     }),
-    GraphQLModule.forRoot<ApolloDriverConfig>({
+    GraphQLModule.forRootAsync<ApolloDriverConfig>({
       driver: ApolloDriver,
-      autoSchemaFile: join(process.cwd(), 'src/schema.gql'),
-      sortSchema: true,
-      playground: true,
-      context: ({ req }: { req: Request }) => ({ req }),
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const isProduction = config.get('NODE_ENV') === 'production';
+        return {
+          autoSchemaFile: join(process.cwd(), 'src/schema.gql'),
+          sortSchema: true,
+          // Playground + introspection only outside production.
+          playground: !isProduction,
+          introspection: !isProduction,
+          context: ({ req }: { req: Request }) => ({ req }),
+        };
+      },
     }),
     AuthModule,
     RbacModule,

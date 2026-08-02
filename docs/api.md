@@ -44,4 +44,11 @@ Hospital-scoped data is filtered by the authenticated user's `hospitalId` unless
 
 ## Local docs
 
-Open Apollo Sandbox / Playground at `http://localhost:4000/graphql` while the API is running.
+When `NODE_ENV` is not `production`, open Apollo Sandbox / Playground at `http://localhost:4000/graphql` while the API is running. In production the GraphQL Playground and schema introspection are disabled.
+
+## Database TLS policy
+
+- Set `DATABASE_SSL=true` to enable TLS for the Postgres connection (recommended for hosted providers such as Neon).
+- Outside production (`NODE_ENV != production`), `DATABASE_SSL=true` connects with `rejectUnauthorized: false` because local/dev environments usually lack the provider CA certificates. Do not expose such an instance publicly.
+- In production (`NODE_ENV=production`), `DATABASE_SSL=true` uses pg's default TLS settings — the server certificate chain is fully verified against the system CA store. For providers whose CA is not in the system store, set `PGSSLROOTCERT` (and related `PGSSL*` env vars) to the CA bundle instead of relaxing verification.
+- When `DATABASE_SSL` is unset or `false`, the connection is plaintext — only suitable for local databases.
