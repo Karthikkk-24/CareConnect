@@ -146,6 +146,11 @@ export class ClinicalService {
         'Admission does not belong to the given patient',
       );
     }
+    if (admission.status !== 'active') {
+      throw new BadRequestException(
+        'Clinical records can only be linked to an active admission',
+      );
+    }
   }
 
   toVitalType(vital: VitalSign): VitalSignType {

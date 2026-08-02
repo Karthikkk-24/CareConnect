@@ -135,6 +135,11 @@ export class BillingService {
         'Admission does not belong to the given patient',
       );
     }
+    if (admission.status !== 'active') {
+      throw new BadRequestException(
+        'Invoices can only be linked to an active admission',
+      );
+    }
   }
 
   async createInvoice(
