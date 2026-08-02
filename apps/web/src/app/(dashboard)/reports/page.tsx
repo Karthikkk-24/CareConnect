@@ -18,7 +18,7 @@ export default function ReportsPage() {
   const { data: meData } = useQuery(ME_QUERY);
   const hospitalId = meData?.me?.hospitalId;
 
-  const { data, loading } = useQuery(HOSPITAL_REPORTS_QUERY, {
+  const { data, loading, error } = useQuery(HOSPITAL_REPORTS_QUERY, {
     variables: { hospitalId },
     skip: !hospitalId,
   });
@@ -39,7 +39,23 @@ export default function ReportsPage() {
   const totalBeds = wards.reduce((sum, w) => sum + Number(w.totalBeds), 0);
   const occupiedBeds = wards.reduce((sum, w) => sum + Number(w.occupiedBeds), 0);
   const occupancyRate =
-    totalBeds > 0 ? Math.round((occupiedBeds / totalBeds) * 100) : 0;
+    occupancyQuery.error || !occupancyQuery.data
+      ? '—'
+      : totalBeds > 0
+        ? Math.round((occupiedBeds / totalBeds) * 100)
+        : 0;
+
+  const stat = (value: number | undefined) =>
+    error || value == null ? '—' : value;
+  const revenueDisplay =
+    error || reports?.revenueTotal == null
+      ? '—'
+      : `$${Number(reports.revenueTotal).toLocaleString(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })}`;
+  const occupancyDisplay =
+    occupancyRate === '—' ? '—' : `${occupancyRate}%`;
 
   const asOf = new Date().toLocaleString(undefined, {
     dateStyle: 'medium',
@@ -55,37 +71,41 @@ export default function ReportsPage() {
 
       {loading ? (
         <p className="text-clay-text-muted">Loading reports...</p>
+      ) : error ? (
+        <p className="text-sm text-clay-error">
+          We could not load hospital reports. Please try again.
+        </p>
       ) : (
         <>
           <div className="mb-6 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             <ClayStatCard
               title="Total Patients"
-              value={reports?.patientCount ?? 0}
+              value={stat(reports?.patientCount)}
               icon={<Users className="h-5 w-5" />}
             />
             <ClayStatCard
               title="Staff Members"
-              value={reports?.staffCount ?? 0}
+              value={stat(reports?.staffCount)}
               icon={<UserCog className="h-5 w-5" />}
             />
             <ClayStatCard
               title="Appointments Today"
-              value={reports?.appointmentsToday ?? 0}
+              value={stat(reports?.appointmentsToday)}
               icon={<Calendar className="h-5 w-5" />}
             />
             <ClayStatCard
               title="Active Admissions"
-              value={reports?.activeAdmissions ?? 0}
+              value={stat(reports?.activeAdmissions)}
               icon={<Activity className="h-5 w-5" />}
             />
             <ClayStatCard
               title="Bed Occupancy"
-              value={`${occupancyRate}%`}
+              value={occupancyDisplay}
               icon={<BedDouble className="h-5 w-5" />}
             />
             <ClayStatCard
               title="Total Revenue"
-              value={`$${(reports?.revenueTotal ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              value={revenueDisplay}
               icon={<DollarSign className="h-5 w-5" />}
             />
           </div>
