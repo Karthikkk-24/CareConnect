@@ -97,20 +97,27 @@ export class InventoryService {
     input: UpdateInventoryQuantityInput,
     actor: AuthenticatedUser,
   ): Promise<InventoryItemType> {
-    const item = await this.inventoryRepo.findOne({
-      where: { id: input.id, hospitalId },
-    });
-    if (!item) throw new NotFoundException('Inventory item not found');
+    const saved = await this.inventoryRepo.manager.transaction(
+      async (manager) => {
+        const item = await manager
+          .createQueryBuilder(InventoryItem, 'item')
+          .setLock('pessimistic_write')
+          .where('item.id = :id', { id: input.id })
+          .andWhere('item.hospital_id = :hospitalId', { hospitalId })
+          .getOne();
+        if (!item) throw new NotFoundException('Inventory item not found');
 
-    item.quantity = input.quantity.toFixed(2);
-    const saved = await this.inventoryRepo.save(item);
+        item.quantity = input.quantity.toFixed(2);
+        return manager.save(item);
+      },
+    );
 
     await this.audit.log({
       actorId: actor.id,
       hospitalId,
       action: 'update',
       resource: 'inventory_item',
-      resourceId: item.id,
+      resourceId: saved.id,
       metadata: { quantity: input.quantity },
     });
 
