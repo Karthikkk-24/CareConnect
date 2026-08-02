@@ -20,18 +20,30 @@ export function PortalLayoutClient({ children }: { children: React.ReactNode }) 
   const [onboardingRetrying, setOnboardingRetrying] = useState(false);
   const me = data?.me;
   const roles: string[] = me?.roles ?? [];
-  const isPatient = roles.includes('patient') || roles.includes('super_admin');
-  const isStaff =
-    roles.length > 0 &&
-    !roles.includes('patient') &&
-    me?.onboardingCompleted;
+  const isPatient = roles.includes('patient');
+  const isSuperAdmin = roles.includes('super_admin');
+  const accountType =
+    typeof user?.unsafeMetadata?.accountType === 'string'
+      ? user.unsafeMetadata.accountType
+      : undefined;
+  const isPatientOnboarding =
+    searchParams.get('completePatient') === '1' || accountType === 'patient';
+  const isStaffCompleted =
+    roles.length > 0 && !roles.includes('patient') && me?.onboardingCompleted;
+  const isIncompleteNonPatient =
+    !!me &&
+    !isPatient &&
+    !isSuperAdmin &&
+    !me.onboardingCompleted &&
+    !isPatientOnboarding;
 
   useEffect(() => {
-    // Staff/admin with completed onboarding must stay on the hospital dashboard
-    if (isStaff) {
+    if (isStaffCompleted) {
       router.replace('/dashboard');
+    } else if (isIncompleteNonPatient) {
+      router.replace('/onboarding');
     }
-  }, [isStaff, router]);
+  }, [isStaffCompleted, isIncompleteNonPatient, router]);
 
   const runPatientOnboarding = async (fullName: string) => {
     setOnboardingError(null);
@@ -54,7 +66,7 @@ export function PortalLayoutClient({ children }: { children: React.ReactNode }) 
       (me &&
         !me.roles?.includes('patient') &&
         !me.onboardingCompleted &&
-        user?.unsafeMetadata?.accountType === 'patient');
+        accountType === 'patient');
 
     if (!needsComplete || ran.current || !user) return;
     ran.current = true;
@@ -66,7 +78,7 @@ export function PortalLayoutClient({ children }: { children: React.ReactNode }) 
       'Patient';
 
     void runPatientOnboarding(fullName);
-  }, [searchParams, me, user]);
+  }, [searchParams, me, user, accountType]);
 
   if (loading && !me) {
     return (
@@ -82,22 +94,34 @@ export function PortalLayoutClient({ children }: { children: React.ReactNode }) 
         <ForbiddenAccess
           title="Unable to load portal"
           message="We could not verify your account. Please sign in again or contact support."
+          homeHref="/login"
         />
       </div>
     );
   }
 
-  if (isStaff) {
+  // Fail closed when session exists but me never resolved.
+  if (!loading && !error && !me) {
+    return (
+      <ForbiddenAccess
+        title="Unable to load portal"
+        message="We could not verify your account. Please sign in again or contact support."
+        homeHref="/login"
+      />
+    );
+  }
+
+  if (isStaffCompleted || isIncompleteNonPatient) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-clay-bg text-clay-text-muted">
-        Redirecting to dashboard…
+        Redirecting…
       </div>
     );
   }
 
-  // Fail closed: non-patient authenticated users must not mount portal PHI pages.
-  if (me && !isPatient && me.onboardingCompleted) {
-    return <ForbiddenAccess />;
+  // Completed non-patients (and non–patient-onboarding) may not mount portal PHI pages.
+  if (me && !isPatient && !isSuperAdmin && me.onboardingCompleted) {
+    return <ForbiddenAccess homeHref="/dashboard" />;
   }
 
   if (onboardingError) {
@@ -120,6 +144,15 @@ export function PortalLayoutClient({ children }: { children: React.ReactNode }) 
             Try again
           </ClayButton>
         </ClayCard>
+      </div>
+    );
+  }
+
+  // Only verified patients (or super_admin) mount portal PHI pages.
+  if (!isPatient && !isSuperAdmin) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-clay-bg text-clay-text-muted">
+        Setting up your portal…
       </div>
     );
   }
