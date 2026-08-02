@@ -378,34 +378,48 @@ export class ClinicalService {
     input: CreatePrescriptionInput,
     actor: AuthenticatedUser,
   ): Promise<PrescriptionType> {
+    if (!input.items?.length) {
+      throw new BadRequestException('Prescription must have at least one item');
+    }
+
     await this.assertPatient(hospitalId, input.patientId);
     await this.assertAdmission(hospitalId, input.patientId, input.admissionId);
 
-    const prescription = await this.prescriptionsRepo.save(
-      this.prescriptionsRepo.create({
-        hospitalId,
-        patientId: input.patientId,
-        admissionId: input.admissionId,
-        doctorId: actor.id,
-        notes: input.notes,
-        status: 'pending',
-      }),
+    const prescriptionId = await this.prescriptionsRepo.manager.transaction(
+      async (manager) => {
+        const prescription = await manager.save(
+          manager.create(Prescription, {
+            hospitalId,
+            patientId: input.patientId,
+            admissionId: input.admissionId,
+            doctorId: actor.id,
+            notes: input.notes,
+            status: 'pending',
+          }),
+        );
+
+        await manager.save(
+          input.items.map((item) =>
+            manager.create(PrescriptionItem, {
+              prescriptionId: prescription.id,
+              drugName: item.drugName,
+              dosage: item.dosage,
+              frequency: item.frequency,
+              duration: item.duration,
+              instructions: item.instructions,
+            }),
+          ),
+        );
+
+        return prescription.id;
+      },
     );
 
-    const items = await this.prescriptionItemsRepo.save(
-      input.items.map((item) =>
-        this.prescriptionItemsRepo.create({
-          prescriptionId: prescription.id,
-          drugName: item.drugName,
-          dosage: item.dosage,
-          frequency: item.frequency,
-          duration: item.duration,
-          instructions: item.instructions,
-        }),
-      ),
-    );
-
-    prescription.items = items;
+    const prescription = await this.prescriptionsRepo.findOne({
+      where: { id: prescriptionId, hospitalId },
+      relations: ['items'],
+    });
+    if (!prescription) throw new NotFoundException('Prescription not found');
 
     await this.audit.log({
       actorId: actor.id,
@@ -413,7 +427,10 @@ export class ClinicalService {
       action: 'create',
       resource: 'prescription',
       resourceId: prescription.id,
-      metadata: { patientId: prescription.patientId, itemCount: items.length },
+      metadata: {
+        patientId: prescription.patientId,
+        itemCount: prescription.items?.length ?? 0,
+      },
     });
 
     return this.toPrescriptionType(prescription);

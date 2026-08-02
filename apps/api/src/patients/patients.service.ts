@@ -9,7 +9,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { existsSync, unlinkSync } from 'fs';
 import { basename, join } from 'path';
-import { ILike, Repository } from 'typeorm';
+import { ILike, EntityManager, Repository } from 'typeorm';
 import {
   Patient,
   PatientAllergy,
@@ -126,6 +126,8 @@ export class PatientsService {
     page: number;
     limit: number;
   }> {
+    const safePage = Math.max(1, Math.floor(page) || 1);
+    const safeLimit = Math.min(100, Math.max(1, Math.floor(limit) || 20));
     if (search) {
       const literal = search.replace(/[\\%_]/g, (ch) => `\\${ch}`);
       const pattern = `%${literal}%`;
@@ -137,30 +139,30 @@ export class PatientsService {
           { pattern },
         )
         .orderBy('patient.created_at', 'DESC')
-        .skip((page - 1) * limit)
-        .take(limit);
+        .skip((safePage - 1) * safeLimit)
+        .take(safeLimit);
 
       const [patients, total] = await qb.getManyAndCount();
       return {
         items: patients.map((p) => this.toPatientType(p)),
         total,
-        page,
-        limit,
+        page: safePage,
+        limit: safeLimit,
       };
     }
 
     const [patients, total] = await this.patientsRepo.findAndCount({
       where: { hospitalId },
       order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
+      skip: (safePage - 1) * safeLimit,
+      take: safeLimit,
     });
 
     return {
       items: patients.map((p) => this.toPatientType(p)),
       total,
-      page,
-      limit,
+      page: safePage,
+      limit: safeLimit,
     };
   }
 
@@ -291,28 +293,35 @@ export class PatientsService {
       identificationNumber: input.identificationNumber,
     });
 
-    const patient = await this.patientsRepo.save(
-      this.patientsRepo.create({
-        hospitalId,
-        fullName: input.fullName,
-        email: input.email || undefined,
-        phone: input.phone,
-        dateOfBirth: input.dateOfBirth,
-        gender: input.gender,
-        bloodGroup: input.bloodGroup,
-        address: input.address,
-        city: input.city,
-        state: input.state,
-        zipCode: input.zipCode,
-        country: input.country,
-        occupation: input.occupation,
-        identificationType: input.identificationType,
-        identificationNumber: input.identificationNumber,
-        primaryCarePhysician: input.primaryCarePhysician,
-      }),
+    const patientId = await this.patientsRepo.manager.transaction(
+      async (manager) => {
+        const patient = await manager.save(
+          manager.create(Patient, {
+            hospitalId,
+            fullName: input.fullName,
+            email: input.email || undefined,
+            phone: input.phone,
+            dateOfBirth: input.dateOfBirth,
+            gender: input.gender,
+            bloodGroup: input.bloodGroup,
+            address: input.address,
+            city: input.city,
+            state: input.state,
+            zipCode: input.zipCode,
+            country: input.country,
+            occupation: input.occupation,
+            identificationType: input.identificationType,
+            identificationNumber: input.identificationNumber,
+            primaryCarePhysician: input.primaryCarePhysician,
+          }),
+        );
+
+        await this.saveRelatedRecords(patient.id, input, manager);
+        return patient.id;
+      },
     );
 
-    await this.saveRelatedRecords(patient.id, input);
+    const patient = await this.findPatientOrThrow(patientId, hospitalId);
 
     await this.audit.log({
       actorId: actor.id,
@@ -373,8 +382,13 @@ export class PatientsService {
         input.primaryCarePhysician ?? patient.primaryCarePhysician,
     });
 
-    const saved = await this.patientsRepo.save(patient);
-    await this.replaceRelatedRecords(saved.id, input);
+    const saved = await this.patientsRepo.manager.transaction(
+      async (manager) => {
+        const row = await manager.save(patient);
+        await this.replaceRelatedRecords(row.id, input, manager);
+        return row;
+      },
+    );
 
     await this.audit.log({
       actorId: actor.id,
@@ -596,11 +610,31 @@ export class PatientsService {
   private async saveRelatedRecords(
     patientId: string,
     input: PatientRelatedInput,
+    manager?: EntityManager,
   ) {
+    const emergencyRepo = manager
+      ? manager.getRepository(PatientEmergencyContact)
+      : this.emergencyRepo;
+    const insuranceRepo = manager
+      ? manager.getRepository(PatientInsurance)
+      : this.insuranceRepo;
+    const allergiesRepo = manager
+      ? manager.getRepository(PatientAllergy)
+      : this.allergiesRepo;
+    const medicationsRepo = manager
+      ? manager.getRepository(PatientMedication)
+      : this.medicationsRepo;
+    const historyRepo = manager
+      ? manager.getRepository(PatientMedicalHistory)
+      : this.historyRepo;
+    const consentsRepo = manager
+      ? manager.getRepository(PatientConsent)
+      : this.consentsRepo;
+
     if (input.emergencyContacts?.length) {
-      await this.emergencyRepo.save(
+      await emergencyRepo.save(
         input.emergencyContacts.map((c) =>
-          this.emergencyRepo.create({ patientId, ...c }),
+          emergencyRepo.create({ patientId, ...c }),
         ),
       );
     }
@@ -609,8 +643,8 @@ export class PatientsService {
       input.insurance &&
       (input.insurance.provider || input.insurance.policyNumber)
     ) {
-      await this.insuranceRepo.save(
-        this.insuranceRepo.create({
+      await insuranceRepo.save(
+        insuranceRepo.create({
           patientId,
           provider: input.insurance.provider,
           policyNumber: input.insurance.policyNumber,
@@ -620,33 +654,31 @@ export class PatientsService {
     }
 
     if (input.allergies?.length) {
-      await this.allergiesRepo.save(
-        input.allergies.map((a) =>
-          this.allergiesRepo.create({ patientId, ...a }),
-        ),
+      await allergiesRepo.save(
+        input.allergies.map((a) => allergiesRepo.create({ patientId, ...a })),
       );
     }
 
     if (input.medications?.length) {
-      await this.medicationsRepo.save(
+      await medicationsRepo.save(
         input.medications.map((m) =>
-          this.medicationsRepo.create({ patientId, ...m }),
+          medicationsRepo.create({ patientId, ...m }),
         ),
       );
     }
 
     if (input.medicalHistory?.length) {
-      await this.historyRepo.save(
+      await historyRepo.save(
         input.medicalHistory.map((h) =>
-          this.historyRepo.create({ patientId, ...h }),
+          historyRepo.create({ patientId, ...h }),
         ),
       );
     }
 
     if (input.consents?.length) {
-      await this.consentsRepo.save(
+      await consentsRepo.save(
         input.consents.map((c) =>
-          this.consentsRepo.create({
+          consentsRepo.create({
             patientId,
             consentType: c.consentType,
             granted: c.granted,
@@ -660,27 +692,47 @@ export class PatientsService {
   private async replaceRelatedRecords(
     patientId: string,
     input: UpdatePatientInput,
+    manager?: EntityManager,
   ) {
+    const emergencyRepo = manager
+      ? manager.getRepository(PatientEmergencyContact)
+      : this.emergencyRepo;
+    const insuranceRepo = manager
+      ? manager.getRepository(PatientInsurance)
+      : this.insuranceRepo;
+    const allergiesRepo = manager
+      ? manager.getRepository(PatientAllergy)
+      : this.allergiesRepo;
+    const medicationsRepo = manager
+      ? manager.getRepository(PatientMedication)
+      : this.medicationsRepo;
+    const historyRepo = manager
+      ? manager.getRepository(PatientMedicalHistory)
+      : this.historyRepo;
+    const consentsRepo = manager
+      ? manager.getRepository(PatientConsent)
+      : this.consentsRepo;
+
     if (input.emergencyContacts !== undefined) {
-      await this.emergencyRepo.delete({ patientId });
+      await emergencyRepo.delete({ patientId });
       if (input.emergencyContacts.length) {
-        await this.emergencyRepo.save(
+        await emergencyRepo.save(
           input.emergencyContacts.map((c) =>
-            this.emergencyRepo.create({ patientId, ...c }),
+            emergencyRepo.create({ patientId, ...c }),
           ),
         );
       }
     }
 
     if (input.insurance !== undefined) {
-      await this.insuranceRepo.delete({ patientId });
+      await insuranceRepo.delete({ patientId });
       if (
         input.insurance.provider ||
         input.insurance.policyNumber ||
         input.insurance.groupNumber
       ) {
-        await this.insuranceRepo.save(
-          this.insuranceRepo.create({
+        await insuranceRepo.save(
+          insuranceRepo.create({
             patientId,
             provider: input.insurance.provider,
             policyNumber: input.insurance.policyNumber,
@@ -691,44 +743,42 @@ export class PatientsService {
     }
 
     if (input.allergies !== undefined) {
-      await this.allergiesRepo.delete({ patientId });
+      await allergiesRepo.delete({ patientId });
       if (input.allergies.length) {
-        await this.allergiesRepo.save(
-          input.allergies.map((a) =>
-            this.allergiesRepo.create({ patientId, ...a }),
-          ),
+        await allergiesRepo.save(
+          input.allergies.map((a) => allergiesRepo.create({ patientId, ...a })),
         );
       }
     }
 
     if (input.medications !== undefined) {
-      await this.medicationsRepo.delete({ patientId });
+      await medicationsRepo.delete({ patientId });
       if (input.medications.length) {
-        await this.medicationsRepo.save(
+        await medicationsRepo.save(
           input.medications.map((m) =>
-            this.medicationsRepo.create({ patientId, ...m }),
+            medicationsRepo.create({ patientId, ...m }),
           ),
         );
       }
     }
 
     if (input.medicalHistory !== undefined) {
-      await this.historyRepo.delete({ patientId });
+      await historyRepo.delete({ patientId });
       if (input.medicalHistory.length) {
-        await this.historyRepo.save(
+        await historyRepo.save(
           input.medicalHistory.map((h) =>
-            this.historyRepo.create({ patientId, ...h }),
+            historyRepo.create({ patientId, ...h }),
           ),
         );
       }
     }
 
     if (input.consents !== undefined) {
-      await this.consentsRepo.delete({ patientId });
+      await consentsRepo.delete({ patientId });
       if (input.consents.length) {
-        await this.consentsRepo.save(
+        await consentsRepo.save(
           input.consents.map((c) =>
-            this.consentsRepo.create({
+            consentsRepo.create({
               patientId,
               consentType: c.consentType,
               granted: c.granted,
@@ -746,6 +796,11 @@ export class PatientsService {
     userId: string,
     dryRun = false,
   ) {
+    if (rows.length > 500) {
+      throw new BadRequestException(
+        'Bulk import is limited to 500 rows per request',
+      );
+    }
     const actor = { id: userId } as AuthenticatedUser;
     const errors: { row: number; message: string }[] = [];
     let successCount = 0;
