@@ -690,4 +690,37 @@ export class ClinicalService {
     });
     return rows.map((p) => this.toPrescriptionType(p));
   }
+
+  /** Lab result attachments must use same-origin /uploads paths. */
+  private assertLocalUploadUrl(fileUrl?: string): string | undefined {
+    if (fileUrl == null || fileUrl.trim() === '') return undefined;
+    const trimmed = fileUrl.trim();
+    let pathname: string;
+    try {
+      if (trimmed.startsWith('/uploads/')) {
+        pathname = trimmed.split('?')[0] ?? trimmed;
+      } else {
+        pathname = new URL(trimmed).pathname;
+      }
+    } catch {
+      throw new BadRequestException(
+        'Lab result fileUrl must be a valid /uploads/... path from this API',
+      );
+    }
+    const match = pathname.match(/^\/uploads\/([^/]+)$/);
+    if (!match) {
+      throw new BadRequestException(
+        'Lab result fileUrl must be an /uploads/<filename> path from this API',
+      );
+    }
+    const filename = basename(match[1]);
+    if (!filename || filename !== match[1] || filename.includes('..')) {
+      throw new BadRequestException('Invalid upload filename');
+    }
+    const diskPath = join(process.cwd(), 'uploads', filename);
+    if (!existsSync(diskPath)) {
+      throw new BadRequestException('Upload file not found on server');
+    }
+    return `/uploads/${filename}`;
+  }
 }
