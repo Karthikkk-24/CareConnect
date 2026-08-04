@@ -137,6 +137,8 @@ export class StaffService {
 
         const existingByEmail = await usersRepo
           .createQueryBuilder('user')
+          .leftJoinAndSelect('user.userRoles', 'userRoles')
+          .leftJoinAndSelect('userRoles.role', 'role')
           .where('LOWER(user.email) = LOWER(:email)', { email })
           .getOne();
 
@@ -146,6 +148,14 @@ export class StaffService {
           if (user.hospitalId && user.hospitalId !== hospitalId) {
             throw new BadRequestException(
               'This user already belongs to another hospital. CareConnect users can only be staff at one hospital.',
+            );
+          }
+          const hasPatientRole = (user.userRoles ?? []).some(
+            (ur) => ur.role?.slug === 'patient',
+          );
+          if (hasPatientRole) {
+            throw new BadRequestException(
+              'This email belongs to a patient portal account and cannot be invited as staff. Use a different email.',
             );
           }
           if (!user.hospitalId) {
