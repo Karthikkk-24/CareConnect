@@ -4,13 +4,18 @@ import Link from 'next/link';
 import { useQuery } from '@apollo/client';
 import { ClayCard } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
+import { QueryError } from '@/components/query-error';
 import { BED_OCCUPANCY_QUERY, ME_QUERY } from '@/lib/graphql/queries';
+import { canAccessRoute } from '@/lib/route-access';
 
 export default function BedOccupancyPage() {
   const { data: meData } = useQuery(ME_QUERY);
   const hospitalId = meData?.me?.hospitalId;
+  const roles: string[] = meData?.me?.roles ?? [];
+  const permissions: string[] = meData?.me?.permissions ?? [];
+  const canManageFacility = canAccessRoute('/settings', { roles, permissions });
 
-  const { data, loading } = useQuery(BED_OCCUPANCY_QUERY, {
+  const { data, loading, error, refetch } = useQuery(BED_OCCUPANCY_QUERY, {
     variables: { hospitalId },
     skip: !hospitalId,
   });
@@ -39,7 +44,9 @@ export default function BedOccupancyPage() {
           { label: 'Occupied', value: summary.occupied },
         ].map((stat) => (
           <ClayCard key={stat.label} className="text-center">
-            <p className="text-2xl font-bold text-clay-text">{loading ? '—' : stat.value}</p>
+            <p className="text-2xl font-bold text-clay-text">
+              {loading || error ? '—' : stat.value}
+            </p>
             <p className="text-sm text-clay-text-muted">{stat.label}</p>
           </ClayCard>
         ))}
@@ -62,16 +69,29 @@ export default function BedOccupancyPage() {
                   Loading...
                 </td>
               </tr>
+            ) : error ? (
+              <tr>
+                <td colSpan={4} className="px-6 py-8">
+                  <QueryError
+                    message="We could not load bed occupancy. Please try again."
+                    onRetry={() => void refetch()}
+                  />
+                </td>
+              </tr>
             ) : wards.length === 0 ? (
               <tr>
                 <td colSpan={4} className="px-6 py-8 text-center text-clay-text-muted">
                   <p>No wards configured yet.</p>
-                  <Link
-                    href="/settings/facility"
-                    className="mt-2 inline-block text-sm text-clay-primary hover:underline"
-                  >
-                    Set up departments, wards, and beds →
-                  </Link>
+                  {canManageFacility ? (
+                    <Link
+                      href="/settings/facility"
+                      className="mt-2 inline-block text-sm text-clay-primary hover:underline"
+                    >
+                      Set up departments, wards, and beds →
+                    </Link>
+                  ) : (
+                    <p className="mt-2 text-sm">Ask an administrator to configure wards and beds.</p>
+                  )}
                 </td>
               </tr>
             ) : (
