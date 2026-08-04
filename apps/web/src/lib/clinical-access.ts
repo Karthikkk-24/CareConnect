@@ -54,3 +54,17 @@ export function canActAsClinician(roles: string[] | undefined): boolean {
 export function canAdminPatients(roles: string[] | undefined): boolean {
   return hasAnyRole(roles, PATIENT_ADMIN_ROLES);
 }
+
+/** Roles that may schedule and update follow-ups (matches API @Roles). */
+export const FOLLOW_UP_WRITE_ROLES = [
+  'doctor',
+  'nurse',
+  'receptionist',
+  'hospital_admin',
+  'hospital_manager',
+  'super_admin',
+] as const;
+
+export function canWriteFollowUps(roles: string[] | undefined): boolean {
+  return hasAnyRole(roles, FOLLOW_UP_WRITE_ROLES);
+}

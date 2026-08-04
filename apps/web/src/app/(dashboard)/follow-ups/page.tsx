@@ -13,6 +13,7 @@ import {
   UPDATE_FOLLOW_UP_STATUS_MUTATION,
 } from '@/lib/graphql/queries';
 import { QueryError } from '@/components/query-error';
+import { canWriteFollowUps } from '@/lib/clinical-access';
 
 function formatDateTime(iso: string) {
   return new Date(iso).toLocaleString(undefined, {
@@ -40,7 +41,9 @@ const statusVariant = (status: string) => {
 export default function FollowUpsPage() {
   const { data: meData } = useQuery(ME_QUERY);
   const hospitalId = meData?.me?.hospitalId;
-  const canWritePatients = (meData?.me?.permissions ?? []).includes('patients:write');
+  const roles: string[] = meData?.me?.roles ?? [];
+  const canWriteFollowUp =
+    (meData?.me?.permissions ?? []).includes('patients:write') && canWriteFollowUps(roles);
   const [showForm, setShowForm] = useState(false);
   const [patientSearch, setPatientSearch] = useState('');
   const [patientId, setPatientId] = useState('');
@@ -110,7 +113,7 @@ export default function FollowUpsPage() {
       />
 
       <div className="mb-6 flex justify-end">
-        {canWritePatients ? (
+        {canWriteFollowUp ? (
         <ClayButton onClick={() => setShowForm((v) => !v)}>
           <Plus className="mr-2 h-4 w-4" />
           {showForm ? 'Hide form' : 'Schedule follow-up'}
@@ -194,7 +197,7 @@ export default function FollowUpsPage() {
           <div className="px-6 py-12 text-center">
             <CalendarClock className="mx-auto mb-3 h-10 w-10 text-clay-text-muted/50" />
             <p className="text-clay-text-muted">No follow-ups scheduled.</p>
-            {canWritePatients ? (
+            {canWriteFollowUp ? (
             <ClayButton className="mt-4" size="sm" onClick={() => setShowForm(true)}>
               Schedule one
             </ClayButton>
@@ -230,7 +233,7 @@ export default function FollowUpsPage() {
                   <ClayBadge variant={statusVariant(item.status)}>
                     {item.status.replace(/_/g, ' ')}
                   </ClayBadge>
-                  {item.status === 'scheduled' && canWritePatients ? (
+                  {item.status === 'scheduled' && canWriteFollowUp ? (
                     <div className="flex gap-2">
                       <ClayButton size="sm" onClick={() => handleStatus(item.id, 'completed')}>
                         Complete
