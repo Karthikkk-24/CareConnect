@@ -49,6 +49,14 @@ export class AdmissionsResolver {
   }
 
   @Mutation(() => AdmissionType)
+  @Roles(
+    ROLES.DOCTOR,
+    ROLES.NURSE,
+    ROLES.RECEPTIONIST,
+    ROLES.HOSPITAL_ADMIN,
+    ROLES.HOSPITAL_MANAGER,
+    ROLES.SUPER_ADMIN,
+  )
   @Permissions(PERMISSIONS.PATIENTS_WRITE)
   async admitPatient(
     @CurrentUser() user: AuthenticatedUser,
@@ -88,6 +96,14 @@ export class AdmissionsResolver {
   }
 
   @Mutation(() => AdmissionType)
+  @Roles(
+    ROLES.DOCTOR,
+    ROLES.NURSE,
+    ROLES.RECEPTIONIST,
+    ROLES.HOSPITAL_ADMIN,
+    ROLES.HOSPITAL_MANAGER,
+    ROLES.SUPER_ADMIN,
+  )
   @Permissions(PERMISSIONS.PATIENTS_WRITE)
   async transferAdmission(
     @CurrentUser() user: AuthenticatedUser,
