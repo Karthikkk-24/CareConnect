@@ -24,9 +24,20 @@ const WRITE_ROUTE_RULES: RouteRule[] = [
   { prefix: '/staff/new', anyPermissions: ['staff:write'] },
 ];
 
-const WRITE_ROUTE_PATTERNS: { pattern: RegExp; anyPermissions: string[] }[] = [
+const WRITE_ROUTE_PATTERNS: {
+  pattern: RegExp;
+  anyPermissions?: string[];
+  anyRoles?: string[];
+  /** When both are set, require permission AND role (e.g. discharge). */
+  requireAll?: boolean;
+}[] = [
   { pattern: /^\/patients\/[^/]+\/edit$/, anyPermissions: ['patients:write'] },
-  { pattern: /^\/patients\/[^/]+\/discharge$/, anyPermissions: ['patients:write'] },
+  {
+    pattern: /^\/patients\/[^/]+\/discharge$/,
+    anyPermissions: ['patients:write'],
+    anyRoles: ['doctor', 'nurse', 'hospital_admin', 'hospital_manager'],
+    requireAll: true,
+  },
   { pattern: /^\/staff\/[^/]+\/edit$/, anyPermissions: ['staff:write'] },
 ];
 
@@ -77,15 +88,31 @@ const SORTED_WRITE_RULES = [...WRITE_ROUTE_RULES].sort(
   (a, b) => b.prefix.length - a.prefix.length,
 );
 
-function hasWriteAccess(anyPermissions: string[], ctx: AccessContext): boolean {
+function hasWriteAccess(
+  rule: {
+    anyPermissions?: string[];
+    anyRoles?: string[];
+    requireAll?: boolean;
+  },
+  ctx: AccessContext,
+): boolean {
   if (ctx.roles.includes('super_admin')) return true;
-  return anyPermissions.some((perm) => ctx.permissions.includes(perm));
+  const hasPerm = rule.anyPermissions
+    ? rule.anyPermissions.some((perm) => ctx.permissions.includes(perm))
+    : false;
+  const hasRole = rule.anyRoles
+    ? rule.anyRoles.some((role) => ctx.roles.includes(role))
+    : false;
+  if (rule.requireAll && rule.anyPermissions && rule.anyRoles) {
+    return hasPerm && hasRole;
+  }
+  return hasPerm || hasRole;
 }
 
 function matchesWriteRoute(pathname: string, ctx: AccessContext): boolean | null {
-  for (const { pattern, anyPermissions } of WRITE_ROUTE_PATTERNS) {
-    if (pattern.test(pathname)) {
-      return hasWriteAccess(anyPermissions, ctx);
+  for (const rule of WRITE_ROUTE_PATTERNS) {
+    if (rule.pattern.test(pathname)) {
+      return hasWriteAccess(rule, ctx);
     }
   }
 
@@ -93,7 +120,7 @@ function matchesWriteRoute(pathname: string, ctx: AccessContext): boolean | null
     (r) => pathname === r.prefix || pathname.startsWith(`${r.prefix}/`),
   );
   if (!writeRule?.anyPermissions) return null;
-  return hasWriteAccess(writeRule.anyPermissions, ctx);
+  return hasWriteAccess(writeRule, ctx);
 }
 
 /** Routes any authenticated non-patient staff may open without a specific rule */
