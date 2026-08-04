@@ -9,7 +9,14 @@ import { ClayBadge, ClayButton, ClayCard } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
 import { ADD_PATIENT_DOCUMENT_MUTATION, DELETE_PATIENT_DOCUMENT, DELETE_PATIENT_MUTATION, DISCHARGES_QUERY, LINK_PATIENT_ACCOUNT, ME_QUERY, PATIENT_DIAGNOSES_QUERY, PATIENT_NOTES_QUERY, PATIENT_PRESCRIPTIONS_QUERY, PATIENT_QUERY, PATIENT_VITALS_QUERY, UPDATE_PATIENT_STATUS } from '@/lib/graphql/queries';
 import { PatientClinicalActions } from '@/components/clinical/patient-clinical-actions';
+import {
+  canAdminPatients,
+  canDischargePatients,
+} from '@/lib/clinical-access';
 import { useAuth } from '@clerk/nextjs';
+
+/** Free-form status values — admission/discharge flows own admitted/discharged. */
+const EDITABLE_PATIENT_STATUSES = ['registered', 'checked_in', 'inactive'] as const;
 
 const DOCUMENT_TYPES = [
   { value: 'identification', label: 'Identification' },
@@ -121,7 +128,10 @@ export default function PatientDetailPage() {
   });
 
   const patient = data?.patient;
+  const roles: string[] = meData?.me?.roles ?? [];
   const canWritePatients = (meData?.me?.permissions ?? []).includes('patients:write');
+  const canDischarge = canWritePatients && canDischargePatients(roles);
+  const canLinkPortal = canWritePatients && canAdminPatients(roles);
 
   const apiBase = (
     process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/graphql'
@@ -221,7 +231,7 @@ export default function PatientDetailPage() {
             Full History
           </ClayButton>
         </Link>
-        {patient.status === 'admitted' && canWritePatients ? (
+        {patient.status === 'admitted' && canDischarge ? (
           <Link href={`/patients/${id}/discharge`}>
             <ClayButton size="sm">Discharge</ClayButton>
           </Link>
@@ -230,17 +240,27 @@ export default function PatientDetailPage() {
           <select
             aria-label="Update patient status"
             className="rounded-2xl border border-white/60 bg-clay-surface px-3 py-2 text-sm shadow-clay-inset"
-            value={patient.status}
+            value={
+              (EDITABLE_PATIENT_STATUSES as readonly string[]).includes(patient.status)
+                ? patient.status
+                : 'registered'
+            }
             onChange={(e) => handleStatusChange(e.target.value)}
           >
-            {['registered', 'checked_in', 'admitted', 'discharged', 'inactive'].map((s) => (
+            {/* Show current admission/discharge status as read-only context when applicable */}
+            {!(EDITABLE_PATIENT_STATUSES as readonly string[]).includes(patient.status) ? (
+              <option value={patient.status} disabled>
+                {patient.status.replace(/_/g, ' ')} (via admission/discharge)
+              </option>
+            ) : null}
+            {EDITABLE_PATIENT_STATUSES.map((s) => (
               <option key={s} value={s}>
                 {s.replace(/_/g, ' ')}
               </option>
             ))}
           </select>
         ) : null}
-        {canWritePatients ? (
+        {canLinkPortal ? (
           <ClayButton
             size="sm"
             variant="ghost"
@@ -249,7 +269,7 @@ export default function PatientDetailPage() {
             Link portal account
           </ClayButton>
         ) : null}
-        {canWritePatients ? (
+        {canLinkPortal ? (
           <ClayButton
             size="sm"
             variant="ghost"
