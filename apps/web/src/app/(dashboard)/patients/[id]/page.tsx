@@ -240,12 +240,14 @@ export default function PatientDetailPage() {
           <select
             aria-label="Update patient status"
             className="rounded-2xl border border-white/60 bg-clay-surface px-3 py-2 text-sm shadow-clay-inset"
-            value={
-              (EDITABLE_PATIENT_STATUSES as readonly string[]).includes(patient.status)
-                ? patient.status
-                : 'registered'
-            }
-            onChange={(e) => handleStatusChange(e.target.value)}
+            value={patient.status}
+            onChange={(e) => {
+              const next = e.target.value;
+              if (!(EDITABLE_PATIENT_STATUSES as readonly string[]).includes(next)) {
+                return;
+              }
+              handleStatusChange(next);
+            }}
           >
             {/* Show current admission/discharge status as read-only context when applicable */}
             {!(EDITABLE_PATIENT_STATUSES as readonly string[]).includes(patient.status) ? (
