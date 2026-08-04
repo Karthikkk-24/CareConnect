@@ -106,6 +106,13 @@ export class AdmissionsResolver {
   }
 
   @Mutation(() => AdmissionType)
+  @Roles(
+    ROLES.DOCTOR,
+    ROLES.NURSE,
+    ROLES.HOSPITAL_ADMIN,
+    ROLES.HOSPITAL_MANAGER,
+    ROLES.SUPER_ADMIN,
+  )
   @Permissions(PERMISSIONS.PATIENTS_WRITE)
   async transferOutAdmission(
     @CurrentUser() user: AuthenticatedUser,
