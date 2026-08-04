@@ -11,7 +11,7 @@ export default function FinancePage() {
   const { data: meData } = useQuery(ME_QUERY);
   const hospitalId = meData?.me?.hospitalId;
 
-  const { data: invoicesData } = useQuery(INVOICES_QUERY, {
+  const { data: invoicesData, error: invoicesError } = useQuery(INVOICES_QUERY, {
     variables: { hospitalId },
     skip: !hospitalId,
   });
@@ -22,10 +22,14 @@ export default function FinancePage() {
   });
 
   const invoices = invoicesData?.invoices ?? [];
-  const outstanding = invoices.filter(
-    (inv: { status: string }) => inv.status === 'draft' || inv.status === 'issued',
-  ).length;
-  const paid = invoices.filter((inv: { status: string }) => inv.status === 'paid').length;
+  const outstanding = invoicesError
+    ? null
+    : invoices.filter(
+        (inv: { status: string }) => inv.status === 'draft' || inv.status === 'issued',
+      ).length;
+  const paid = invoicesError
+    ? null
+    : invoices.filter((inv: { status: string }) => inv.status === 'paid').length;
   const revenueTotal = reportsData?.hospitalReports?.revenueTotal;
   const revenueDisplay =
     reportsError || revenueTotal == null
@@ -34,6 +38,8 @@ export default function FinancePage() {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
         })}`;
+  const invoiceCountDisplay = (value: number | null) =>
+    value == null ? '—' : value;
   const canWriteBilling = (meData?.me?.permissions ?? []).includes('billing:write');
 
   return (
@@ -60,8 +66,16 @@ export default function FinancePage() {
           value={revenueDisplay}
           icon={<DollarSign className="h-5 w-5" />}
         />
-        <ClayStatCard title="Outstanding Invoices" value={outstanding} icon={<FileText className="h-5 w-5" />} />
-        <ClayStatCard title="Paid Invoices" value={paid} icon={<FileText className="h-5 w-5" />} />
+        <ClayStatCard
+          title="Outstanding Invoices"
+          value={invoiceCountDisplay(outstanding)}
+          icon={<FileText className="h-5 w-5" />}
+        />
+        <ClayStatCard
+          title="Paid Invoices"
+          value={invoiceCountDisplay(paid)}
+          icon={<FileText className="h-5 w-5" />}
+        />
       </div>
 
       <ClayCard>

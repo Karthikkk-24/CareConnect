@@ -29,6 +29,13 @@ import {
   STAFF_MEMBERS_QUERY,
   WARDS_QUERY,
 } from '@/lib/graphql/queries';
+import {
+  canAccessRoute,
+} from '@/lib/route-access';
+import {
+  canActAsClinician,
+  canAuthorClinical,
+} from '@/lib/clinical-access';
 
 interface PatientClinicalActionsProps {
   patientId: string;
@@ -63,19 +70,21 @@ export function PatientClinicalActions({ patientId, hospitalId }: PatientClinica
 
   const { data: meData } = useQuery(ME_QUERY);
   const permissions = meData?.me?.permissions ?? [];
+  const roles: string[] = meData?.me?.roles ?? [];
   const canWritePatients = permissions.includes('patients:write');
   const canWriteAppointments = permissions.includes('appointments:write');
-  const canWriteLabs =
-    permissions.includes('lab:write') || permissions.includes('patients:write');
+  const canAuthor = canAuthorClinical(roles);
+  const canClinician = canActAsClinician(roles);
+  const canManageFacility = canAccessRoute('/settings', { roles, permissions });
 
   const actionPermissions: Record<ActionKey, boolean> = {
     appointment: canWriteAppointments,
     admit: canWritePatients,
-    vitals: canWritePatients,
-    soap: canWritePatients,
-    diagnosis: canWritePatients,
-    prescription: canWritePatients,
-    lab: canWriteLabs,
+    vitals: canWritePatients && canAuthor,
+    soap: canWritePatients && canAuthor,
+    diagnosis: canWritePatients && canClinician,
+    prescription: canWritePatients && canClinician,
+    lab: canWritePatients && canAuthor,
   };
 
   const visibleActions = actions.filter(({ key }) => actionPermissions[key]);
@@ -379,12 +388,18 @@ export function PatientClinicalActions({ patientId, hospitalId }: PatientClinica
                         ))}
                       </select>
                       {wards.length === 0 && !wardsQuery.loading ? (
-                        <Link
-                          href="/settings/facility"
-                          className="text-xs text-clay-primary hover:underline"
-                        >
-                          No wards yet — set them up →
-                        </Link>
+                        canManageFacility ? (
+                          <Link
+                            href="/settings/facility"
+                            className="text-xs text-clay-primary hover:underline"
+                          >
+                            No wards yet — set them up →
+                          </Link>
+                        ) : (
+                          <p className="text-xs text-clay-text-muted">
+                            No wards yet — ask an administrator to set them up.
+                          </p>
+                        )
                       ) : null}
                     </div>
                     <div className="flex flex-col gap-2">

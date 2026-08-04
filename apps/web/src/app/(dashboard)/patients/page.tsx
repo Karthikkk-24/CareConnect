@@ -6,13 +6,14 @@ import { Plus, Upload, Search } from 'lucide-react';
 import { useState } from 'react';
 import { ClayBadge, ClayButton, ClayCard } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
+import { QueryError } from '@/components/query-error';
 import { ME_QUERY, PATIENTS_QUERY } from '@/lib/graphql/queries';
 
 export default function PatientsPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const { data: meData } = useQuery(ME_QUERY);
-  const { data, loading } = useQuery(PATIENTS_QUERY, {
+  const { data, loading, error, refetch } = useQuery(PATIENTS_QUERY, {
     variables: {
       page,
       limit: 20,
@@ -23,12 +24,15 @@ export default function PatientsPage() {
   });
 
   const patients = data?.patients?.items ?? [];
-  const total = data?.patients?.total ?? 0;
+  const total = error ? 0 : (data?.patients?.total ?? 0);
   const canWritePatients = (meData?.me?.permissions ?? []).includes('patients:write');
 
   return (
     <div>
-      <DashboardHeader title="Patients" subtitle={`${total} patients registered`} />
+      <DashboardHeader
+        title="Patients"
+        subtitle={error ? 'Unable to load patients' : `${total} patients registered`}
+      />
 
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div className="relative flex-1 max-w-md">
@@ -74,6 +78,15 @@ export default function PatientsPage() {
             {loading ? (
               <tr>
                 <td colSpan={5} className="px-6 py-8 text-center text-clay-text-muted">Loading patients...</td>
+              </tr>
+            ) : error ? (
+              <tr>
+                <td colSpan={5} className="px-6 py-8">
+                  <QueryError
+                    message="We could not load patients. Please try again."
+                    onRetry={() => void refetch()}
+                  />
+                </td>
               </tr>
             ) : patients.length === 0 ? (
               <tr>

@@ -19,7 +19,7 @@ export function LoginForm() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const redirectTo = safeInternalPath(searchParams.get('redirect'), '/dashboard');
+  const redirectTo = safeInternalPath(searchParams.get('redirect'), '/onboarding');
 
   const {
     register,

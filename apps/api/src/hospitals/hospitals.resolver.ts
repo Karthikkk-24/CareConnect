@@ -40,7 +40,7 @@ export class HospitalsResolver {
     return this.hospitalsService.findByIdForUser(id, user);
   }
 
-  /** Bootstrap: only unassigned non-patient/non-staff users may create a hospital during admin onboarding. */
+  /** Bootstrap: only unassigned non-patient/non-staff users, or super_admin. */
   @Mutation(() => HospitalType)
   async createHospital(
     @CurrentUser() user: AuthenticatedUser,
@@ -53,11 +53,10 @@ export class HospitalsResolver {
     const hasStaffRole = user.roles.some((role) => STAFF_ROLES.includes(role));
 
     const canBootstrap = !user.hospitalId && !hasStaffRole;
-    const canWrite =
-      user.roles.includes('super_admin') ||
-      user.permissions.includes(PERMISSIONS.HOSPITALS_WRITE);
+    const isSuperAdmin = user.roles.includes('super_admin');
 
-    if (!canBootstrap && !canWrite) {
+    // hospitals:write alone must not mint a second/orphan tenant (#145).
+    if (!canBootstrap && !isSuperAdmin) {
       throw new ForbiddenException('Not allowed to create hospitals');
     }
 

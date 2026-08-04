@@ -12,6 +12,7 @@ import {
   PATIENTS_QUERY,
   UPDATE_FOLLOW_UP_STATUS_MUTATION,
 } from '@/lib/graphql/queries';
+import { QueryError } from '@/components/query-error';
 
 function formatDateTime(iso: string) {
   return new Date(iso).toLocaleString(undefined, {
@@ -47,7 +48,7 @@ export default function FollowUpsPage() {
   const [type, setType] = useState('outpatient');
   const [error, setError] = useState('');
 
-  const { data, loading, refetch } = useQuery(FOLLOW_UPS_QUERY, {
+  const { data, loading, error: listError, refetch } = useQuery(FOLLOW_UPS_QUERY, {
     variables: { hospitalId },
     skip: !hospitalId,
   });
@@ -182,6 +183,13 @@ export default function FollowUpsPage() {
       <ClayCard padding="none" className="overflow-hidden">
         {loading ? (
           <p className="px-6 py-8 text-center text-clay-text-muted">Loading follow-ups...</p>
+        ) : listError ? (
+          <div className="px-6 py-8">
+            <QueryError
+              message="We could not load follow-ups. Please try again."
+              onRetry={() => void refetch()}
+            />
+          </div>
         ) : followUps.length === 0 ? (
           <div className="px-6 py-12 text-center">
             <CalendarClock className="mx-auto mb-3 h-10 w-10 text-clay-text-muted/50" />

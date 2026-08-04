@@ -189,12 +189,21 @@ export class DischargeService {
           );
 
           if (input.followUpScheduledAt) {
+            const followUpDoctorId =
+              input.followUpDoctorId ?? admission.attendingDoctorId;
+            if (followUpDoctorId) {
+              await this.doctorValidator.assertHospitalDoctor(
+                hospitalId,
+                followUpDoctorId,
+                'Follow-up doctor',
+              );
+            }
             await manager.save(
               manager.create(FollowUp, {
                 hospitalId,
                 patientId: admission.patientId,
                 dischargeId: discharge.id,
-                doctorId: input.followUpDoctorId ?? admission.attendingDoctorId,
+                doctorId: followUpDoctorId,
                 scheduledAt: new Date(input.followUpScheduledAt),
                 type: input.followUpType ?? 'post_discharge',
                 status: 'scheduled',

@@ -121,6 +121,7 @@ export class ClinicalResolver {
   }
 
   @Mutation(() => VitalSignType, { name: 'createVitalSign' })
+  @Roles(...CLINICAL_AUTHOR_ROLES)
   @Permissions(PERMISSIONS.PATIENTS_WRITE)
   async createVital(
     @CurrentUser() user: AuthenticatedUser,

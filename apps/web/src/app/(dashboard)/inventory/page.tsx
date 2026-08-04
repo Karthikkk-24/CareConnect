@@ -11,6 +11,7 @@ import {
   ME_QUERY,
   UPDATE_INVENTORY_QUANTITY_MUTATION,
 } from '@/lib/graphql/queries';
+import { QueryError } from '@/components/query-error';
 
 export default function InventoryPage() {
   const [showForm, setShowForm] = useState(false);
@@ -25,7 +26,7 @@ export default function InventoryPage() {
   const hospitalId = meData?.me?.hospitalId;
   const canWrite = (meData?.me?.permissions ?? []).includes('patients:write');
 
-  const { data, loading, refetch } = useQuery(INVENTORY_ITEMS_QUERY, {
+  const { data, loading, error: listError, refetch } = useQuery(INVENTORY_ITEMS_QUERY, {
     variables: { hospitalId },
     skip: !hospitalId,
   });
@@ -154,6 +155,13 @@ export default function InventoryPage() {
       <ClayCard padding="none" className="overflow-hidden">
         {loading ? (
           <p className="px-6 py-8 text-center text-clay-text-muted">Loading inventory...</p>
+        ) : listError ? (
+          <div className="px-6 py-8">
+            <QueryError
+              message="We could not load inventory. Please try again."
+              onRetry={() => void refetch()}
+            />
+          </div>
         ) : items.length === 0 ? (
           <div className="px-6 py-12 text-center">
             <Package className="mx-auto mb-3 h-10 w-10 text-clay-text-muted/50" />

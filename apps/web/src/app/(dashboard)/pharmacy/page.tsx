@@ -12,6 +12,7 @@ import {
   PHARMACY_STOCK_QUERY,
   UPSERT_PHARMACY_STOCK_MUTATION,
 } from '@/lib/graphql/queries';
+import { QueryError } from '@/components/query-error';
 
 export default function PharmacyPage() {
   const [drugName, setDrugName] = useState('');
@@ -23,12 +24,12 @@ export default function PharmacyPage() {
   const hospitalId = meData?.me?.hospitalId;
   const canWrite = (meData?.me?.permissions ?? []).includes('patients:write');
 
-  const { data: rxData, loading: rxLoading, refetch: refetchRx } = useQuery(
+  const { data: rxData, loading: rxLoading, error: rxError, refetch: refetchRx } = useQuery(
     PENDING_PRESCRIPTIONS_QUERY,
     { variables: { hospitalId }, skip: !hospitalId },
   );
 
-  const { data: stockData, loading: stockLoading, refetch: refetchStock } = useQuery(
+  const { data: stockData, loading: stockLoading, error: stockError, refetch: refetchStock } = useQuery(
     PHARMACY_STOCK_QUERY,
     { variables: { hospitalId }, skip: !hospitalId },
   );
@@ -99,6 +100,13 @@ export default function PharmacyPage() {
           </div>
           {rxLoading ? (
             <p className="px-6 py-8 text-center text-clay-text-muted">Loading...</p>
+          ) : rxError ? (
+            <div className="px-6 py-8">
+              <QueryError
+                message="We could not load pending prescriptions. Please try again."
+                onRetry={() => void refetchRx()}
+              />
+            </div>
           ) : prescriptions.length === 0 ? (
             <div className="px-6 py-12 text-center">
               <Pill className="mx-auto mb-3 h-10 w-10 text-clay-text-muted/50" />
@@ -186,6 +194,13 @@ export default function PharmacyPage() {
             </div>
             {stockLoading ? (
               <p className="px-6 py-8 text-center text-clay-text-muted">Loading...</p>
+            ) : stockError ? (
+              <div className="px-6 py-8">
+                <QueryError
+                  message="We could not load pharmacy stock. Please try again."
+                  onRetry={() => void refetchStock()}
+                />
+              </div>
             ) : stock.length === 0 ? (
               <p className="px-6 py-8 text-center text-clay-text-muted">No stock entries yet.</p>
             ) : (

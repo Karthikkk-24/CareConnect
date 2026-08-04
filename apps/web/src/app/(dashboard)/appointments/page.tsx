@@ -12,6 +12,7 @@ import {
   ME_QUERY,
   UPDATE_APPOINTMENT_STATUS_MUTATION,
 } from '@/lib/graphql/queries';
+import { QueryError } from '@/components/query-error';
 
 function todayDateString() {
   return new Date().toISOString().slice(0, 10);
@@ -49,7 +50,7 @@ export default function AppointmentsPage() {
       ['hospital_admin', 'hospital_manager', 'super_admin', 'receptionist', 'nurse'].includes(r),
     );
 
-  const { data, loading, refetch } = useQuery(APPOINTMENTS_QUERY, {
+  const { data, loading, error, refetch } = useQuery(APPOINTMENTS_QUERY, {
     variables: {
       hospitalId,
       date: selectedDate,
@@ -120,6 +121,13 @@ export default function AppointmentsPage() {
       <ClayCard padding="none" className="overflow-hidden">
         {loading ? (
           <p className="px-6 py-8 text-center text-clay-text-muted">Loading appointments...</p>
+        ) : error ? (
+          <div className="px-6 py-8">
+            <QueryError
+              message="We could not load appointments. Please try again."
+              onRetry={() => void refetch()}
+            />
+          </div>
         ) : appointments.length === 0 ? (
           <div className="px-6 py-12 text-center">
             <Calendar className="mx-auto mb-3 h-10 w-10 text-clay-text-muted/50" />

@@ -13,6 +13,7 @@ import {
 import { ClayButton, ClayCard, ClayStatCard } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
 import { BED_OCCUPANCY_QUERY, HOSPITAL_REPORTS_QUERY, ME_QUERY } from '@/lib/graphql/queries';
+import { canAccessRoute } from '@/lib/route-access';
 
 export default function ReportsPage() {
   const { data: meData } = useQuery(ME_QUERY);
@@ -132,12 +133,35 @@ export default function ReportsPage() {
             <h2 className="mb-4 text-lg font-semibold text-clay-text">Beds by ward</h2>
             {occupancyQuery.loading ? (
               <p className="text-sm text-clay-text-muted">Loading occupancy...</p>
+            ) : occupancyQuery.error ? (
+              <div className="space-y-3">
+                <p className="text-sm text-clay-error">
+                  We could not load bed occupancy. Please try again.
+                </p>
+                <ClayButton
+                  type="button"
+                  size="sm"
+                  onClick={() => void occupancyQuery.refetch()}
+                >
+                  Try again
+                </ClayButton>
+              </div>
             ) : wards.length === 0 ? (
               <p className="text-sm text-clay-text-muted">
-                No wards configured yet.{' '}
-                <Link href="/settings/facility" className="text-clay-primary hover:underline">
-                  Set up facility
-                </Link>
+                No wards configured yet.
+                {canAccessRoute('/settings', {
+                  roles: meData?.me?.roles ?? [],
+                  permissions: meData?.me?.permissions ?? [],
+                }) ? (
+                  <>
+                    {' '}
+                    <Link href="/settings/facility" className="text-clay-primary hover:underline">
+                      Set up facility
+                    </Link>
+                  </>
+                ) : (
+                  ' Ask an administrator to configure wards and beds.'
+                )}
               </p>
             ) : (
               <div className="overflow-x-auto">

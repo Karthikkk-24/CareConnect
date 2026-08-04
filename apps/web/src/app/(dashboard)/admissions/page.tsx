@@ -16,6 +16,9 @@ import {
   PATIENTS_QUERY,
   WARDS_QUERY,
 } from '@/lib/graphql/queries';
+import { canDischargePatients } from '@/lib/clinical-access';
+import { canAccessRoute } from '@/lib/route-access';
+import { QueryError } from '@/components/query-error';
 
 export default function AdmissionsPage() {
   const router = useRouter();
@@ -29,9 +32,13 @@ export default function AdmissionsPage() {
 
   const { data: meData } = useQuery(ME_QUERY);
   const hospitalId = meData?.me?.hospitalId;
-  const canWritePatients = (meData?.me?.permissions ?? []).includes('patients:write');
+  const roles: string[] = meData?.me?.roles ?? [];
+  const permissions: string[] = meData?.me?.permissions ?? [];
+  const canWritePatients = permissions.includes('patients:write');
+  const canDischarge = canWritePatients && canDischargePatients(roles);
+  const canManageFacility = canAccessRoute('/settings', { roles, permissions });
 
-  const { data, loading, refetch } = useQuery(ACTIVE_ADMISSIONS_QUERY, {
+  const { data, loading, error: listError, refetch } = useQuery(ACTIVE_ADMISSIONS_QUERY, {
     variables: { hospitalId },
     skip: !hospitalId,
   });
@@ -183,12 +190,18 @@ export default function AdmissionsPage() {
                   ))}
                 </select>
                 {wards.length === 0 ? (
-                  <Link
-                    href="/settings/facility"
-                    className="text-xs text-clay-primary hover:underline"
-                  >
-                    No wards yet — set them up →
-                  </Link>
+                  canManageFacility ? (
+                    <Link
+                      href="/settings/facility"
+                      className="text-xs text-clay-primary hover:underline"
+                    >
+                      No wards yet — set them up →
+                    </Link>
+                  ) : (
+                    <p className="text-xs text-clay-text-muted">
+                      No wards yet — ask an administrator to set them up.
+                    </p>
+                  )
                 ) : null}
               </div>
               <div className="flex flex-col gap-2">
@@ -249,6 +262,15 @@ export default function AdmissionsPage() {
                   Loading admissions...
                 </td>
               </tr>
+            ) : listError ? (
+              <tr>
+                <td colSpan={6} className="px-6 py-8">
+                  <QueryError
+                    message="We could not load admissions. Please try again."
+                    onRetry={() => void refetch()}
+                  />
+                </td>
+              </tr>
             ) : admissions.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-6 py-12 text-center">
@@ -283,7 +305,7 @@ export default function AdmissionsPage() {
                       <ClayBadge variant="success">{adm.status}</ClayBadge>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      {canWritePatients ? (
+                      {canDischarge ? (
                       <ClayButton
                         size="sm"
                         variant="secondary"

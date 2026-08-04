@@ -13,6 +13,7 @@ import {
   ME_QUERY,
   PATIENTS_QUERY,
 } from '@/lib/graphql/queries';
+import { QueryError } from '@/components/query-error';
 
 const statusVariant = (status: string) => {
   switch (status) {
@@ -45,7 +46,7 @@ export default function LabPage() {
   const canCreateOrders = (meData?.me?.permissions ?? []).includes('patients:write');
   const canWriteLab = (meData?.me?.permissions ?? []).includes('lab:write');
 
-  const { data, loading, refetch } = useQuery(LAB_ORDERS_QUERY, {
+  const { data, loading, error: listError, refetch } = useQuery(LAB_ORDERS_QUERY, {
     variables: { hospitalId, status: undefined },
     skip: !hospitalId,
   });
@@ -203,6 +204,13 @@ export default function LabPage() {
           </div>
           {loading ? (
             <p className="px-6 py-8 text-center text-clay-text-muted">Loading orders...</p>
+          ) : listError ? (
+            <div className="px-6 py-8">
+              <QueryError
+                message="We could not load lab orders. Please try again."
+                onRetry={() => void refetch()}
+              />
+            </div>
           ) : orders.length === 0 ? (
             <div className="px-6 py-12 text-center">
               <FlaskConical className="mx-auto mb-3 h-10 w-10 text-clay-text-muted/50" />

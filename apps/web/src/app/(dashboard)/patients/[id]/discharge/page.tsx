@@ -15,6 +15,7 @@ import {
   ME_QUERY,
   PATIENT_QUERY,
 } from '@/lib/graphql/queries';
+import { canDischargePatients } from '@/lib/clinical-access';
 
 export default function PatientDischargePage() {
   const { id } = useParams<{ id: string }>();
@@ -27,7 +28,9 @@ export default function PatientDischargePage() {
 
   const { data: meData } = useQuery(ME_QUERY);
   const hospitalId = meData?.me?.hospitalId;
+  const roles: string[] = meData?.me?.roles ?? [];
   const canWritePatients = (meData?.me?.permissions ?? []).includes('patients:write');
+  const canDischarge = canWritePatients && canDischargePatients(roles);
 
   const { data: patientData, loading: patientLoading } = useQuery(PATIENT_QUERY, {
     variables: { id, hospitalId },
@@ -79,7 +82,7 @@ export default function PatientDischargePage() {
     return null;
   }
 
-  if (!canWritePatients) {
+  if (!canDischarge) {
     return (
       <ForbiddenAccess message="You do not have permission to discharge patients." />
     );

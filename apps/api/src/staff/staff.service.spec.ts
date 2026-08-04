@@ -146,18 +146,9 @@ describe('StaffService', () => {
   });
 
   describe('create — cross-hospital invite', () => {
-    it('rejects inviting a user who already belongs to another hospital', async () => {
-      rolesRepo.findOne.mockResolvedValue({
-        id: 'role-doctor',
-        slug: 'doctor',
-      });
-      const existingUser = {
-        id: 'user-1',
-        email: 'doc@example.com',
-        hospitalId: 'hospital-b',
-        fullName: 'Existing Doc',
-        authId: 'auth-1',
-      };
+    function mockCreateTransaction(
+      existingUser: Record<string, unknown> | null,
+    ) {
       staffRepo.manager.transaction.mockImplementation(
         (cb: (m: Record<string, unknown>) => unknown) => {
           const manager = {
@@ -165,6 +156,7 @@ describe('StaffService', () => {
               if (entity === User) {
                 return {
                   createQueryBuilder: () => ({
+                    leftJoinAndSelect: jest.fn().mockReturnThis(),
                     where: jest.fn().mockReturnThis(),
                     getOne: jest.fn().mockResolvedValue(existingUser),
                   }),
@@ -182,6 +174,21 @@ describe('StaffService', () => {
           return Promise.resolve(cb(manager));
         },
       );
+    }
+
+    it('rejects inviting a user who already belongs to another hospital', async () => {
+      rolesRepo.findOne.mockResolvedValue({
+        id: 'role-doctor',
+        slug: 'doctor',
+      });
+      mockCreateTransaction({
+        id: 'user-1',
+        email: 'doc@example.com',
+        hospitalId: 'hospital-b',
+        fullName: 'Existing Doc',
+        authId: 'auth-1',
+        userRoles: [],
+      });
 
       await expect(
         service.create(
@@ -197,6 +204,83 @@ describe('StaffService', () => {
 
       expect(userRolesRepo.save).not.toHaveBeenCalled();
       expect(staffRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('rejects inviting a patient portal user as staff', async () => {
+      rolesRepo.findOne.mockResolvedValue({
+        id: 'role-doctor',
+        slug: 'doctor',
+      });
+      mockCreateTransaction({
+        id: 'user-1',
+        email: 'patient@example.com',
+        hospitalId: null,
+        fullName: 'Portal Patient',
+        authId: 'user_live',
+        userRoles: [{ role: { slug: 'patient' } }],
+      });
+
+      await expect(
+        service.create(
+          'hospital-a',
+          {
+            email: 'patient@example.com',
+            fullName: 'Portal Patient',
+            roleSlug: 'doctor',
+          },
+          hospitalAdmin,
+        ),
+      ).rejects.toThrow(/patient portal account/i);
+
+      expect(usersRepo.update).not.toHaveBeenCalled();
+      expect(staffRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('preserves a live Clerk authId when inviting a hospital-less user', async () => {
+      rolesRepo.findOne.mockResolvedValue({
+        id: 'role-doctor',
+        slug: 'doctor',
+      });
+      staffRepo.findOne.mockResolvedValue(null);
+      userRolesRepo.findOne.mockResolvedValue(null);
+      staffRepo.create.mockImplementation((row: unknown) => row);
+      staffRepo.save.mockResolvedValue({ id: 'staff-1' });
+      invitesRepo.create.mockImplementation((row: unknown) => row);
+      invitesRepo.save.mockResolvedValue({});
+      staffRepo.findOne.mockResolvedValueOnce(null).mockResolvedValue({
+        id: 'staff-1',
+        userId: 'user-1',
+        hospitalId: 'hospital-a',
+        user: {
+          fullName: 'Existing User',
+          email: 'free@example.com',
+          userRoles: [{ role: { slug: 'doctor' } }],
+        },
+      });
+      mockCreateTransaction({
+        id: 'user-1',
+        email: 'free@example.com',
+        hospitalId: null,
+        fullName: 'Existing User',
+        authId: 'user_live_clerk',
+        userRoles: [],
+      });
+
+      await service.create(
+        'hospital-a',
+        {
+          email: 'free@example.com',
+          fullName: 'Existing User',
+          roleSlug: 'doctor',
+        },
+        hospitalAdmin,
+      );
+
+      expect(usersRepo.update).toHaveBeenCalledWith('user-1', {
+        hospitalId: 'hospital-a',
+        fullName: 'Existing User',
+        authId: 'user_live_clerk',
+      });
     });
   });
 

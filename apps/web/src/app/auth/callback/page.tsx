@@ -12,7 +12,7 @@ export default function AuthCallbackPage() {
     <div className="flex min-h-screen items-center justify-center bg-clay-bg px-6">
       <p className="text-clay-text-muted">Finishing sign in…</p>
       <AuthenticateWithRedirectCallback
-        signInFallbackRedirectUrl="/dashboard"
+        signInFallbackRedirectUrl="/onboarding"
         signUpFallbackRedirectUrl="/onboarding"
       />
     </div>

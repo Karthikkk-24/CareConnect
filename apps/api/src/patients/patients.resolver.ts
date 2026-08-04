@@ -1,10 +1,11 @@
 import { UseGuards } from '@nestjs/common';
 import { Args, Int, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { PERMISSIONS } from '@careconnect/types';
+import { PERMISSIONS, ROLES } from '@careconnect/types';
 import { GqlAuthGuard } from '../auth/gql-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { Permissions } from '../rbac/permissions.decorator';
+import { Roles } from '../rbac/roles.decorator';
 import { RolesGuard } from '../rbac/roles.guard';
 import { PatientsService } from './patients.service';
 import {
@@ -94,6 +95,7 @@ export class PatientsResolver {
   }
 
   @Mutation(() => Boolean)
+  @Roles(ROLES.HOSPITAL_ADMIN, ROLES.HOSPITAL_MANAGER, ROLES.SUPER_ADMIN)
   @Permissions(PERMISSIONS.PATIENTS_WRITE)
   async deletePatient(
     @CurrentUser() user: AuthenticatedUser,
@@ -197,6 +199,7 @@ export class PatientsResolver {
   }
 
   @Mutation(() => PatientType)
+  @Roles(ROLES.HOSPITAL_ADMIN, ROLES.HOSPITAL_MANAGER, ROLES.SUPER_ADMIN)
   @Permissions(PERMISSIONS.PATIENTS_WRITE)
   async linkPatientAccount(
     @CurrentUser() user: AuthenticatedUser,
