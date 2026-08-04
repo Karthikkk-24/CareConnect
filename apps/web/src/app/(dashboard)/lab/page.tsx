@@ -200,7 +200,9 @@ export default function LabPage() {
         <ClayCard padding="none" className="overflow-hidden">
           <div className="border-b border-white/40 bg-clay-primary-light/30 px-6 py-4">
             <h2 className="text-lg font-semibold text-clay-text">Order Queue</h2>
-            <p className="text-sm text-clay-text-muted">{pendingOrders.length} pending</p>
+            <p className="text-sm text-clay-text-muted">
+              {listError ? '—' : `${pendingOrders.length} pending`}
+            </p>
           </div>
           {loading ? (
             <p className="px-6 py-8 text-center text-clay-text-muted">Loading orders...</p>

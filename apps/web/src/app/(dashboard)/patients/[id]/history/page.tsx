@@ -6,18 +6,29 @@ import { useQuery } from '@apollo/client';
 import { ArrowLeft } from 'lucide-react';
 import { ClayBadge, ClayCard } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
+import { QueryError } from '@/components/query-error';
 import { ME_QUERY, PATIENT_QUERY } from '@/lib/graphql/queries';
 
 export default function PatientHistoryPage() {
   const { id } = useParams<{ id: string }>();
   const { data: meData } = useQuery(ME_QUERY);
-  const { data, loading } = useQuery(PATIENT_QUERY, {
+  const { data, loading, error, refetch } = useQuery(PATIENT_QUERY, {
     variables: { id, hospitalId: meData?.me?.hospitalId },
   });
 
   const patient = data?.patient;
 
   if (loading) return <p className="text-clay-text-muted">Loading...</p>;
+  if (error) {
+    return (
+      <div className="py-8">
+        <QueryError
+          message="We could not load this patient. Please try again."
+          onRetry={() => void refetch()}
+        />
+      </div>
+    );
+  }
   if (!patient) return <p className="text-clay-error">Patient not found</p>;
 
   const history = patient.medicalHistory ?? [];

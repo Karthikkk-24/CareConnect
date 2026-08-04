@@ -96,7 +96,9 @@ export default function PharmacyPage() {
         <ClayCard padding="none" className="overflow-hidden">
           <div className="border-b border-white/40 bg-clay-primary-light/30 px-6 py-4">
             <h2 className="text-lg font-semibold text-clay-text">Pending Prescriptions</h2>
-            <p className="text-sm text-clay-text-muted">{prescriptions.length} awaiting dispense</p>
+            <p className="text-sm text-clay-text-muted">
+              {rxError ? '—' : `${prescriptions.length} awaiting dispense`}
+            </p>
           </div>
           {rxLoading ? (
             <p className="px-6 py-8 text-center text-clay-text-muted">Loading...</p>
