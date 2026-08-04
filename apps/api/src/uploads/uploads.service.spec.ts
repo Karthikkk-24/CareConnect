@@ -144,6 +144,16 @@ describe('UploadsService', () => {
         }),
       ).toThrow(ForbiddenException);
     });
+
+    it('allows lab technicians with lab:write', () => {
+      expect(() =>
+        service.assertCanUpload({
+          ...staffUser,
+          roles: ['lab_technician'],
+          permissions: ['lab:write'],
+        }),
+      ).not.toThrow();
+    });
   });
 
   describe('assertCanDownload', () => {

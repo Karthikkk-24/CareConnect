@@ -210,12 +210,13 @@ export class UploadsService implements OnApplicationBootstrap {
     throw new ForbiddenException('Access denied');
   }
 
-  /** Staff with patients:write may upload PHI documents. */
+  /** Staff with patients:write or lab:write may upload files. */
   assertCanUpload(user: AuthenticatedUser): void {
     if (user.roles.includes('super_admin')) return;
     if (user.permissions.includes(PERMISSIONS.PATIENTS_WRITE)) return;
+    if (user.permissions.includes(PERMISSIONS.LAB_WRITE)) return;
     throw new ForbiddenException(
-      'patients:write permission required to upload documents',
+      'patients:write or lab:write permission required to upload documents',
     );
   }
 
