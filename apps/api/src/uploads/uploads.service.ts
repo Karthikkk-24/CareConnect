@@ -11,7 +11,12 @@ import { basename, extname, join } from 'path';
 import { DataSource, Repository } from 'typeorm';
 import { PERMISSIONS } from '@careconnect/types';
 import type { AuthenticatedUser } from '../auth/auth.types';
-import { Patient, PatientDocument } from '../database/entities';
+import {
+  LabOrder,
+  LabResult,
+  Patient,
+  PatientDocument,
+} from '../database/entities';
 
 @Injectable()
 export class UploadsService implements OnApplicationBootstrap {
@@ -28,15 +33,19 @@ export class UploadsService implements OnApplicationBootstrap {
     private readonly documentsRepo: Repository<PatientDocument>,
     @InjectRepository(Patient)
     private readonly patientsRepo: Repository<Patient>,
+    @InjectRepository(LabResult)
+    private readonly labResultsRepo: Repository<LabResult>,
+    @InjectRepository(LabOrder)
+    private readonly labOrdersRepo: Repository<LabOrder>,
     @InjectDataSource()
     private readonly dataSource: DataSource,
   ) {}
 
   /**
    * Delete uploads/ files that are older than the TTL and have never been
-   * linked to a patient_documents row (abandoned PHI uploads). Runs on
-   * application bootstrap; a Postgres advisory lock prevents concurrent
-   * sweeps when multiple instances boot together.
+   * linked to a patient_documents or lab_results row. Runs on application
+   * bootstrap; a Postgres advisory lock prevents concurrent sweeps when
+   * multiple instances boot together.
    *
    * Uses a dedicated QueryRunner so lock + unlock share one pooled connection
    * (session advisory locks are connection-scoped).
@@ -82,8 +91,10 @@ export class UploadsService implements OnApplicationBootstrap {
         }
         if (!stat.isFile() || stat.mtimeMs > cutoffMs) continue;
 
-        const linked = await this.findDocumentByFilename(entry);
-        if (linked) continue; // referenced by a document row — keep
+        const linkedDoc = await this.findDocumentByFilename(entry);
+        if (linkedDoc) continue;
+        const linkedLab = await this.findLabResultByFilename(entry);
+        if (linkedLab) continue;
         try {
           await fs.unlink(path);
           removed++;
@@ -139,44 +150,60 @@ export class UploadsService implements OnApplicationBootstrap {
   }
 
   /**
-   * Authorize download of a stored file by resolving it to a patient_documents
-   * row and checking hospital membership / patient ownership.
+   * Authorize download of a stored file via patient_documents or lab_results.
    */
   async assertCanDownload(
     filename: string,
     user: AuthenticatedUser,
-  ): Promise<PatientDocument> {
+  ): Promise<void> {
     const document = await this.findDocumentByFilename(filename);
-    if (!document) {
+    if (document) {
+      await this.assertCanAccessPatientChart(document.patientId, user);
+      return;
+    }
+
+    const labResult = await this.findLabResultByFilename(filename);
+    if (!labResult) {
       throw new NotFoundException('File not found');
     }
 
+    const order = await this.labOrdersRepo.findOne({
+      where: { id: labResult.labOrderId },
+    });
+    if (!order) {
+      throw new NotFoundException('File not found');
+    }
+
+    await this.assertCanAccessPatientChart(order.patientId, user, {
+      allowLabWrite: true,
+    });
+  }
+
+  private async assertCanAccessPatientChart(
+    patientId: string,
+    user: AuthenticatedUser,
+    opts?: { allowLabWrite?: boolean },
+  ): Promise<void> {
     const patient = await this.patientsRepo.findOne({
-      where: { id: document.patientId },
+      where: { id: patientId },
     });
     if (!patient) {
       throw new NotFoundException('File not found');
     }
 
-    if (user.roles.includes('super_admin')) {
-      return document;
-    }
+    if (user.roles.includes('super_admin')) return;
 
-    // Hospital staff (including dual-role patient+staff): same hospital + patients read/write
     const isHospitalStaff =
       !!user.hospitalId &&
       user.hospitalId === patient.hospitalId &&
       (user.permissions.includes(PERMISSIONS.PATIENTS_READ) ||
-        user.permissions.includes(PERMISSIONS.PATIENTS_WRITE));
-    if (isHospitalStaff) {
-      return document;
-    }
+        user.permissions.includes(PERMISSIONS.PATIENTS_WRITE) ||
+        (opts?.allowLabWrite === true &&
+          user.permissions.includes(PERMISSIONS.LAB_WRITE)));
+    if (isHospitalStaff) return;
 
-    // Pure patient portal user: only their linked chart's documents
     if (user.roles.includes('patient')) {
-      if (patient.userId && patient.userId === user.id) {
-        return document;
-      }
+      if (patient.userId && patient.userId === user.id) return;
       throw new ForbiddenException('Access denied');
     }
 
@@ -195,6 +222,25 @@ export class UploadsService implements OnApplicationBootstrap {
   private async findDocumentByFilename(
     filename: string,
   ): Promise<PatientDocument | null> {
+    const safe = this.sanitizeUploadFilename(filename);
+    if (!safe) return null;
+    return this.findUploadUrlMatch(this.documentsRepo, 'doc', 'file_url', safe);
+  }
+
+  private async findLabResultByFilename(
+    filename: string,
+  ): Promise<LabResult | null> {
+    const safe = this.sanitizeUploadFilename(filename);
+    if (!safe) return null;
+    return this.findUploadUrlMatch(
+      this.labResultsRepo,
+      'result',
+      'result_file_url',
+      safe,
+    );
+  }
+
+  private sanitizeUploadFilename(filename: string): string | null {
     const safe = basename(filename);
     if (
       !safe ||
@@ -204,14 +250,21 @@ export class UploadsService implements OnApplicationBootstrap {
     ) {
       return null;
     }
+    return safe;
+  }
 
-    const suffix = `/uploads/${safe}`;
-    // Exact suffix match via RIGHT — avoids LIKE metacharacters in user input
-    const matches = await this.documentsRepo
-      .createQueryBuilder('doc')
-      .where('doc.file_url = :relative', { relative: suffix })
-      .orWhere('doc.file_url = :filename', { filename: safe })
-      .orWhere('RIGHT(doc.file_url, :len) = :suffix', {
+  private async findUploadUrlMatch<T extends object>(
+    repo: Repository<T>,
+    alias: string,
+    column: string,
+    filename: string,
+  ): Promise<T | null> {
+    const suffix = `/uploads/${filename}`;
+    const matches = await repo
+      .createQueryBuilder(alias)
+      .where(`${alias}.${column} = :relative`, { relative: suffix })
+      .orWhere(`${alias}.${column} = :filename`, { filename })
+      .orWhere(`RIGHT(${alias}.${column}, :len) = :suffix`, {
         len: suffix.length,
         suffix,
       })
