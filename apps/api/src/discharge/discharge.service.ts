@@ -351,7 +351,12 @@ export class DischargeService {
     status?: string,
   ): Promise<FollowUpType[]> {
     const where: { hospitalId: string; status?: string } = { hospitalId };
-    if (status) where.status = status;
+    if (status) {
+      if (!(status in FOLLOW_UP_TRANSITIONS)) {
+        throw new BadRequestException(`Invalid follow-up status "${status}"`);
+      }
+      where.status = status;
+    }
 
     const items = await this.followUpsRepo.find({
       where,

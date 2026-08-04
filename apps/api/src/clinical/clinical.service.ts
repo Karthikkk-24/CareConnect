@@ -633,7 +633,12 @@ export class ClinicalService {
     status?: string,
   ): Promise<LabOrderType[]> {
     const where: { hospitalId: string; status?: string } = { hospitalId };
-    if (status) where.status = status;
+    if (status) {
+      if (!(status in LAB_ALLOWED_TRANSITIONS)) {
+        throw new BadRequestException(`Invalid lab order status "${status}"`);
+      }
+      where.status = status;
+    }
     const orders = await this.labOrdersRepo.find({
       where,
       relations: ['patient', 'orderedBy'],
