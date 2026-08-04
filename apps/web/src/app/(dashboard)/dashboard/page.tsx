@@ -20,7 +20,7 @@ const QUICK_ACTIONS = [
   { label: 'Bulk Import Patients', href: '/patients/import', anyPermissions: ['patients:write'] },
   { label: 'New Appointment', href: '/appointments/new', anyPermissions: ['appointments:write'] },
   { label: 'View Appointments', href: '/appointments' },
-  { label: 'Admit Patient', href: '/admissions' },
+  { label: 'Admit Patient', href: '/admissions', anyPermissions: ['patients:write'] },
   { label: 'Add Staff Member', href: '/staff/new', anyPermissions: ['staff:write'] },
   { label: 'View Staff Directory', href: '/staff' },
   { label: 'Lab Queue', href: '/lab' },
