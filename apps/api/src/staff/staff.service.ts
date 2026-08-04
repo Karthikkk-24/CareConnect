@@ -159,13 +159,18 @@ export class StaffService {
             );
           }
           if (!user.hospitalId) {
+            // Preserve a live Clerk identity; only set authId when missing or still pending.
+            const nextAuthId =
+              !user.authId || user.authId.startsWith('pending_')
+                ? authId
+                : user.authId;
             await usersRepo.update(user.id, {
               hospitalId,
               fullName: input.fullName,
-              authId,
+              authId: nextAuthId,
             });
             user.hospitalId = hospitalId;
-            user.authId = authId;
+            user.authId = nextAuthId;
           }
         } else {
           user = await usersRepo.save(
