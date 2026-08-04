@@ -5,13 +5,14 @@ import { useQuery } from '@apollo/client';
 import { Activity, HeartPulse, BedDouble, Users } from 'lucide-react';
 import { ClayBadge, ClayButton, ClayCard } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
+import { QueryError } from '@/components/query-error';
 import { ACTIVE_ADMISSIONS_QUERY, ME_QUERY } from '@/lib/graphql/queries';
 
 export default function NurseDashboardPage() {
   const { data: meData } = useQuery(ME_QUERY);
   const hospitalId = meData?.me?.hospitalId;
 
-  const { data, loading } = useQuery(ACTIVE_ADMISSIONS_QUERY, {
+  const { data, loading, error, refetch } = useQuery(ACTIVE_ADMISSIONS_QUERY, {
     variables: { hospitalId },
     skip: !hospitalId,
   });
@@ -34,12 +35,14 @@ export default function NurseDashboardPage() {
 
       <div className="mb-8 grid gap-4 sm:grid-cols-2">
         <ClayCard className="text-center">
-          <p className="text-3xl font-bold text-clay-primary">{loading ? '—' : admissions.length}</p>
+          <p className="text-3xl font-bold text-clay-primary">
+            {loading || error ? '—' : admissions.length}
+          </p>
           <p className="text-sm text-clay-text-muted">Active Admissions</p>
         </ClayCard>
         <ClayCard className="text-center">
           <p className="text-3xl font-bold text-clay-warning">
-            {loading
+            {loading || error
               ? '—'
               : admissions.filter((a: { bed?: { label: string } }) => !a.bed?.label).length}
           </p>
@@ -52,6 +55,11 @@ export default function NurseDashboardPage() {
           <h2 className="mb-4 text-lg font-semibold text-clay-text">Active Admissions</h2>
           {loading ? (
             <p className="text-sm text-clay-text-muted">Loading...</p>
+          ) : error ? (
+            <QueryError
+              message="We could not load admissions. Please try again."
+              onRetry={() => void refetch()}
+            />
           ) : admissions.length === 0 ? (
             <p className="text-sm text-clay-text-muted">No active admissions.</p>
           ) : (

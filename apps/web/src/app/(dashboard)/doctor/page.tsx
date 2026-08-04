@@ -5,6 +5,7 @@ import { useQuery } from '@apollo/client';
 import { Calendar, Clock, FileText, FlaskConical, Users } from 'lucide-react';
 import { ClayBadge, ClayButton, ClayCard } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
+import { QueryError } from '@/components/query-error';
 import { APPOINTMENTS_QUERY, ME_QUERY } from '@/lib/graphql/queries';
 
 function todayDateString() {
@@ -22,7 +23,7 @@ export default function DoctorDashboardPage() {
   const doctorId = meData?.me?.id;
   const canWriteAppointments = (meData?.me?.permissions ?? []).includes('appointments:write');
 
-  const { data, loading } = useQuery(APPOINTMENTS_QUERY, {
+  const { data, loading, error, refetch } = useQuery(APPOINTMENTS_QUERY, {
     variables: { hospitalId, date: today, doctorId },
     skip: !hospitalId || !doctorId,
   });
@@ -51,16 +52,22 @@ export default function DoctorDashboardPage() {
 
       <div className="mb-8 grid gap-4 sm:grid-cols-3">
         <ClayCard className="text-center">
-          <p className="text-3xl font-bold text-clay-primary">{loading ? '—' : appointments.length}</p>
+          <p className="text-3xl font-bold text-clay-primary">
+            {loading || error ? '—' : appointments.length}
+          </p>
           <p className="text-sm text-clay-text-muted">Appointments Today</p>
         </ClayCard>
         <ClayCard className="text-center">
-          <p className="text-3xl font-bold text-clay-warning">{loading ? '—' : pending.length}</p>
+          <p className="text-3xl font-bold text-clay-warning">
+            {loading || error ? '—' : pending.length}
+          </p>
           <p className="text-sm text-clay-text-muted">Pending / In Progress</p>
         </ClayCard>
         <ClayCard className="text-center">
           <p className="text-3xl font-bold text-clay-success">
-            {loading ? '—' : appointments.filter((a: { status: string }) => a.status === 'completed').length}
+            {loading || error
+              ? '—'
+              : appointments.filter((a: { status: string }) => a.status === 'completed').length}
           </p>
           <p className="text-sm text-clay-text-muted">Completed</p>
         </ClayCard>
@@ -71,6 +78,11 @@ export default function DoctorDashboardPage() {
           <h2 className="mb-4 text-lg font-semibold text-clay-text">Today&apos;s Appointments</h2>
           {loading ? (
             <p className="text-sm text-clay-text-muted">Loading...</p>
+          ) : error ? (
+            <QueryError
+              message="We could not load appointments. Please try again."
+              onRetry={() => void refetch()}
+            />
           ) : appointments.length === 0 ? (
             <p className="text-sm text-clay-text-muted">No appointments today.</p>
           ) : (
