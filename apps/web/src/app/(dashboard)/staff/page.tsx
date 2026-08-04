@@ -6,6 +6,7 @@ import { useQuery, useMutation } from '@apollo/client';
 import { Plus, Pencil, Trash2, RotateCcw } from 'lucide-react';
 import { ClayBadge, ClayButton, ClayCard } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
+import { QueryError } from '@/components/query-error';
 import {
   DELETE_STAFF_MUTATION,
   ME_QUERY,
@@ -15,7 +16,7 @@ import {
 
 export default function StaffPage() {
   const { data: meData } = useQuery(ME_QUERY);
-  const { data, loading, refetch } = useQuery(STAFF_MEMBERS_QUERY, {
+  const { data, loading, error, refetch } = useQuery(STAFF_MEMBERS_QUERY, {
     variables: { hospitalId: meData?.me?.hospitalId },
     skip: !meData?.me?.hospitalId,
   });
@@ -94,6 +95,15 @@ export default function StaffPage() {
               <tr>
                 <td colSpan={8} className="px-6 py-8 text-center text-clay-text-muted">
                   Loading staff...
+                </td>
+              </tr>
+            ) : error ? (
+              <tr>
+                <td colSpan={8} className="px-6 py-8">
+                  <QueryError
+                    message="We could not load staff members. Please try again."
+                    onRetry={() => void refetch()}
+                  />
                 </td>
               </tr>
             ) : staff.length === 0 ? (

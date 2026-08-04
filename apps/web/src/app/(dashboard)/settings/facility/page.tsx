@@ -6,6 +6,7 @@ import { useMutation, useQuery } from '@apollo/client';
 import { BedDouble, Building, DoorClosed, Layers, Plus, Trash2 } from 'lucide-react';
 import { ClayBadge, ClayButton, ClayCard, ClayInput } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
+import { QueryError } from '@/components/query-error';
 import {
   BEDS_QUERY,
   CREATE_BED_MUTATION,
@@ -250,6 +251,12 @@ export default function FacilitySettingsPage() {
           <div className="space-y-2">
             {departmentsQuery.loading ? (
               <p className="text-sm text-clay-text-muted">Loading...</p>
+            ) : departmentsQuery.error ? (
+              <QueryError
+                message="We could not load departments."
+                onRetry={() => void departmentsQuery.refetch()}
+                className="text-left"
+              />
             ) : departments.length === 0 ? (
               <p className="text-sm text-clay-text-muted">No departments yet.</p>
             ) : (
@@ -336,6 +343,12 @@ export default function FacilitySettingsPage() {
           <div className="space-y-2">
             {wardsQuery.loading ? (
               <p className="text-sm text-clay-text-muted">Loading...</p>
+            ) : wardsQuery.error ? (
+              <QueryError
+                message="We could not load wards."
+                onRetry={() => void wardsQuery.refetch()}
+                className="text-left"
+              />
             ) : wards.length === 0 ? (
               <p className="text-sm text-clay-text-muted">No wards yet.</p>
             ) : (
@@ -416,6 +429,12 @@ export default function FacilitySettingsPage() {
           <div className="space-y-2">
             {bedsQuery.loading ? (
               <p className="text-sm text-clay-text-muted">Loading...</p>
+            ) : bedsQuery.error ? (
+              <QueryError
+                message="We could not load beds."
+                onRetry={() => void bedsQuery.refetch()}
+                className="text-left"
+              />
             ) : visibleBeds.length === 0 ? (
               <p className="text-sm text-clay-text-muted">
                 {selectedWardId

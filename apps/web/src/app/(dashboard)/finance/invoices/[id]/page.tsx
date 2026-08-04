@@ -6,13 +6,14 @@ import { useMutation, useQuery } from '@apollo/client';
 import { useState } from 'react';
 import { ClayBadge, ClayButton, ClayCard, ClayInput } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
+import { QueryError } from '@/components/query-error';
 import { INVOICE_QUERY, ME_QUERY, RECORD_PAYMENT_MUTATION, VOID_INVOICE_MUTATION } from '@/lib/graphql/queries';
 
 export default function InvoiceDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data: meData } = useQuery(ME_QUERY);
   const hospitalId = meData?.me?.hospitalId;
-  const { data, loading, refetch } = useQuery(INVOICE_QUERY, {
+  const { data, loading, error: invoiceError, refetch } = useQuery(INVOICE_QUERY, {
     variables: { id, hospitalId },
     skip: !id || !hospitalId,
   });
@@ -35,6 +36,22 @@ export default function InvoiceDetailPage() {
   const canWriteBilling = (meData?.me?.permissions ?? []).includes('billing:write');
 
   if (loading) return <p className="text-clay-text-muted">Loading invoice...</p>;
+  if (invoiceError) {
+    return (
+      <div>
+        <DashboardHeader title="Invoice" subtitle="Invoice details" />
+        <div className="mb-4">
+          <Link href="/finance/invoices" className="text-sm text-clay-primary hover:underline">
+            ← Back to invoices
+          </Link>
+        </div>
+        <QueryError
+          message="We could not load this invoice. Please try again."
+          onRetry={() => void refetch()}
+        />
+      </div>
+    );
+  }
   if (!invoice) return <p className="text-clay-error">Invoice not found</p>;
 
   const paid = (invoice.payments ?? []).reduce(
