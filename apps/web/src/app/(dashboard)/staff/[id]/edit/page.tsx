@@ -30,7 +30,7 @@ export default function EditStaffPage() {
   const [error, setError] = useState('');
 
   const { data: meData } = useQuery(ME_QUERY);
-  const { data, loading: fetching } = useQuery(STAFF_MEMBER_QUERY, {
+  const { data, loading: fetching, error: fetchError } = useQuery(STAFF_MEMBER_QUERY, {
     variables: { id },
   });
 
@@ -73,11 +73,22 @@ export default function EditStaffPage() {
     return <p className="text-clay-text-muted">Loading...</p>;
   }
 
+  if (fetchError) {
+    return (
+      <p className="text-sm text-clay-error">
+        We could not load this staff member. Please try again.
+      </p>
+    );
+  }
+
   const member = data?.staffMember;
+  if (!member) {
+    return <p className="text-clay-error">Staff member not found</p>;
+  }
 
   return (
     <div>
-      <DashboardHeader title="Edit Staff Member" subtitle={member?.fullName} />
+      <DashboardHeader title="Edit Staff Member" subtitle={member.fullName} />
       {error ? <p className="mb-4 text-sm text-clay-error">{error}</p> : null}
       <StaffForm
         defaultValues={member}
