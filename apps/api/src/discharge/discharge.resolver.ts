@@ -78,6 +78,14 @@ export class DischargeResolver {
   }
 
   @Mutation(() => FollowUpType)
+  @Roles(
+    ROLES.DOCTOR,
+    ROLES.NURSE,
+    ROLES.RECEPTIONIST,
+    ROLES.HOSPITAL_ADMIN,
+    ROLES.HOSPITAL_MANAGER,
+    ROLES.SUPER_ADMIN,
+  )
   @Permissions(PERMISSIONS.PATIENTS_WRITE)
   async createFollowUp(
     @CurrentUser() user: AuthenticatedUser,
@@ -96,6 +104,14 @@ export class DischargeResolver {
   }
 
   @Mutation(() => FollowUpType)
+  @Roles(
+    ROLES.DOCTOR,
+    ROLES.NURSE,
+    ROLES.RECEPTIONIST,
+    ROLES.HOSPITAL_ADMIN,
+    ROLES.HOSPITAL_MANAGER,
+    ROLES.SUPER_ADMIN,
+  )
   @Permissions(PERMISSIONS.PATIENTS_WRITE)
   async updateFollowUpStatus(
     @CurrentUser() user: AuthenticatedUser,
