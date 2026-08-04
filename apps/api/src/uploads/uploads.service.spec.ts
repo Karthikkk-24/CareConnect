@@ -178,7 +178,9 @@ describe('UploadsService', () => {
       }));
     };
 
-    const mockLabLookup = (result: { id: string; labOrderId: string } | null) => {
+    const mockLabLookup = (
+      result: { id: string; labOrderId: string } | null,
+    ) => {
       labResultsRepo.createQueryBuilder.mockImplementation(() => ({
         where: jest.fn().mockReturnThis(),
         orWhere: jest.fn().mockReturnThis(),
