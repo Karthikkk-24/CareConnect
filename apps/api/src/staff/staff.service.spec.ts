@@ -146,7 +146,9 @@ describe('StaffService', () => {
   });
 
   describe('create — cross-hospital invite', () => {
-    function mockCreateTransaction(existingUser: Record<string, unknown> | null) {
+    function mockCreateTransaction(
+      existingUser: Record<string, unknown> | null,
+    ) {
       staffRepo.manager.transaction.mockImplementation(
         (cb: (m: Record<string, unknown>) => unknown) => {
           const manager = {
@@ -245,18 +247,16 @@ describe('StaffService', () => {
       staffRepo.save.mockResolvedValue({ id: 'staff-1' });
       invitesRepo.create.mockImplementation((row: unknown) => row);
       invitesRepo.save.mockResolvedValue({});
-      staffRepo.findOne
-        .mockResolvedValueOnce(null)
-        .mockResolvedValue({
-          id: 'staff-1',
-          userId: 'user-1',
-          hospitalId: 'hospital-a',
-          user: {
-            fullName: 'Existing User',
-            email: 'free@example.com',
-            userRoles: [{ role: { slug: 'doctor' } }],
-          },
-        });
+      staffRepo.findOne.mockResolvedValueOnce(null).mockResolvedValue({
+        id: 'staff-1',
+        userId: 'user-1',
+        hospitalId: 'hospital-a',
+        user: {
+          fullName: 'Existing User',
+          email: 'free@example.com',
+          userRoles: [{ role: { slug: 'doctor' } }],
+        },
+      });
       mockCreateTransaction({
         id: 'user-1',
         email: 'free@example.com',
