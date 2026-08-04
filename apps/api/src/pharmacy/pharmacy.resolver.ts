@@ -27,6 +27,7 @@ export class PharmacyResolver {
   constructor(private readonly pharmacyService: PharmacyService) {}
 
   @Query(() => [PharmacyStockType])
+  @Roles(...PHARMACY_ROLES)
   @Permissions(PERMISSIONS.PATIENTS_READ)
   async pharmacyStock(
     @CurrentUser() user: AuthenticatedUser,
@@ -40,6 +41,7 @@ export class PharmacyResolver {
   }
 
   @Query(() => [PendingPrescriptionType])
+  @Roles(...PHARMACY_ROLES)
   @Permissions(PERMISSIONS.PATIENTS_READ)
   async pendingPrescriptions(
     @CurrentUser() user: AuthenticatedUser,
