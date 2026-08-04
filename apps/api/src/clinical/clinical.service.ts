@@ -7,7 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { existsSync } from 'fs';
 import { basename, join } from 'path';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import {
   Admission,
   ClinicalNote,
@@ -15,6 +15,7 @@ import {
   LabOrder,
   LabResult,
   Patient,
+  PatientDocument,
   Prescription,
   PrescriptionItem,
   VitalSign,
@@ -497,7 +498,8 @@ export class ClinicalService {
         }
         assertLabTransition(order.status, 'completed');
 
-        const safeResultFileUrl = this.assertLocalUploadUrl(
+        const safeResultFileUrl = await this.assertExclusiveLabUploadUrl(
+          manager,
           input.resultFileUrl,
         );
 
@@ -631,7 +633,12 @@ export class ClinicalService {
     status?: string,
   ): Promise<LabOrderType[]> {
     const where: { hospitalId: string; status?: string } = { hospitalId };
-    if (status) where.status = status;
+    if (status) {
+      if (!(status in LAB_ALLOWED_TRANSITIONS)) {
+        throw new BadRequestException(`Invalid lab order status "${status}"`);
+      }
+      where.status = status;
+    }
     const orders = await this.labOrdersRepo.find({
       where,
       relations: ['patient', 'orderedBy'],
@@ -725,5 +732,50 @@ export class ClinicalService {
       throw new BadRequestException('Upload file not found on server');
     }
     return `/uploads/${filename}`;
+  }
+
+  /** Reject uploads already bound to a patient document or another lab result. */
+  private async assertExclusiveLabUploadUrl(
+    manager: EntityManager,
+    fileUrl?: string,
+  ): Promise<string | undefined> {
+    const safe = this.assertLocalUploadUrl(fileUrl);
+    if (!safe) return undefined;
+    const filename = basename(safe);
+    const suffix = `/uploads/${filename}`;
+
+    const docs = await manager
+      .getRepository(PatientDocument)
+      .createQueryBuilder('doc')
+      .where('doc.file_url = :relative', { relative: suffix })
+      .orWhere('doc.file_url = :filename', { filename })
+      .orWhere('RIGHT(doc.file_url, :len) = :suffix', {
+        len: suffix.length,
+        suffix,
+      })
+      .getMany();
+    if (docs.length > 0) {
+      throw new BadRequestException(
+        'Upload file is already linked to a patient document',
+      );
+    }
+
+    const labs = await manager
+      .getRepository(LabResult)
+      .createQueryBuilder('result')
+      .where('result.result_file_url = :relative', { relative: suffix })
+      .orWhere('result.result_file_url = :filename', { filename })
+      .orWhere('RIGHT(result.result_file_url, :len) = :suffix', {
+        len: suffix.length,
+        suffix,
+      })
+      .getMany();
+    if (labs.length > 0) {
+      throw new BadRequestException(
+        'Upload file is already linked to a lab result',
+      );
+    }
+
+    return safe;
   }
 }

@@ -8,6 +8,7 @@ import { ArrowLeft } from 'lucide-react';
 import { ClayButton, ClayCard } from '@careconnect/ui';
 import { ClayTextarea } from '@/components/clinical/clay-textarea';
 import { ForbiddenAccess } from '@/components/auth/forbidden-access';
+import { QueryError } from '@/components/query-error';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
 import {
   ACTIVE_ADMISSIONS_QUERY,
@@ -32,12 +33,17 @@ export default function PatientDischargePage() {
   const canWritePatients = (meData?.me?.permissions ?? []).includes('patients:write');
   const canDischarge = canWritePatients && canDischargePatients(roles);
 
-  const { data: patientData, loading: patientLoading } = useQuery(PATIENT_QUERY, {
+  const { data: patientData, loading: patientLoading, error: patientError, refetch: refetchPatient } = useQuery(PATIENT_QUERY, {
     variables: { id, hospitalId },
     skip: !id,
   });
 
-  const { data: admissionsData, loading: admissionsLoading } = useQuery(ACTIVE_ADMISSIONS_QUERY, {
+  const {
+    data: admissionsData,
+    loading: admissionsLoading,
+    error: admissionsError,
+    refetch: refetchAdmissions,
+  } = useQuery(ACTIVE_ADMISSIONS_QUERY, {
     variables: { hospitalId },
     skip: !hospitalId,
   });
@@ -92,8 +98,43 @@ export default function PatientDischargePage() {
     return <p className="text-clay-text-muted">Loading discharge form...</p>;
   }
 
+  if (patientError) {
+    return (
+      <div className="py-8">
+        <QueryError
+          message="We could not load this patient. Please try again."
+          onRetry={() => void refetchPatient()}
+        />
+      </div>
+    );
+  }
+
   const patient = patientData?.patient;
   if (!patient) return <p className="text-clay-error">Patient not found</p>;
+
+  if (admissionsError) {
+    return (
+      <div>
+        <DashboardHeader
+          title="Discharge Patient"
+          subtitle={`Complete discharge summary for ${patient.fullName}`}
+        />
+        <Link
+          href={`/patients/${id}`}
+          className="mb-6 inline-flex items-center gap-2 text-sm text-clay-primary hover:underline"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to patient
+        </Link>
+        <ClayCard>
+          <QueryError
+            message="We could not load active admissions. Please try again."
+            onRetry={() => void refetchAdmissions()}
+          />
+        </ClayCard>
+      </div>
+    );
+  }
 
   return (
     <div>

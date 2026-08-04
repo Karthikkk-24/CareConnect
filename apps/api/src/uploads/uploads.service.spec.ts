@@ -3,7 +3,12 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { promises as fs } from 'fs';
 import { join } from 'path';
-import { Patient, PatientDocument } from '../database/entities';
+import {
+  LabOrder,
+  LabResult,
+  Patient,
+  PatientDocument,
+} from '../database/entities';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { UploadsService } from './uploads.service';
 
@@ -36,6 +41,12 @@ describe('UploadsService', () => {
   const patientsRepo = {
     findOne: jest.fn(),
   };
+  const labResultsRepo = {
+    createQueryBuilder: jest.fn(),
+  };
+  const labOrdersRepo = {
+    findOne: jest.fn(),
+  };
   const queryRunner = {
     connect: jest.fn().mockResolvedValue(undefined),
     release: jest.fn().mockResolvedValue(undefined),
@@ -45,16 +56,16 @@ describe('UploadsService', () => {
     createQueryRunner: jest.fn(() => queryRunner),
   };
 
+  const emptyQb = () => ({
+    where: jest.fn().mockReturnThis(),
+    orWhere: jest.fn().mockReturnThis(),
+    getMany: jest.fn().mockResolvedValue([]),
+  });
+
   beforeEach(async () => {
     jest.clearAllMocks();
-    documentsRepo.createQueryBuilder.mockImplementation(() => {
-      const qb = {
-        where: jest.fn().mockReturnThis(),
-        orWhere: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([]),
-      };
-      return qb;
-    });
+    documentsRepo.createQueryBuilder.mockImplementation(emptyQb);
+    labResultsRepo.createQueryBuilder.mockImplementation(emptyQb);
     queryRunner.connect.mockResolvedValue(undefined);
     queryRunner.release.mockResolvedValue(undefined);
     queryRunner.query.mockImplementation((sql: string) => {
@@ -73,6 +84,8 @@ describe('UploadsService', () => {
           useValue: documentsRepo,
         },
         { provide: getRepositoryToken(Patient), useValue: patientsRepo },
+        { provide: getRepositoryToken(LabResult), useValue: labResultsRepo },
+        { provide: getRepositoryToken(LabOrder), useValue: labOrdersRepo },
         { provide: getDataSourceToken(), useValue: dataSource },
       ],
     }).compile();
@@ -131,6 +144,16 @@ describe('UploadsService', () => {
         }),
       ).toThrow(ForbiddenException);
     });
+
+    it('allows lab technicians with lab:write', () => {
+      expect(() =>
+        service.assertCanUpload({
+          ...staffUser,
+          roles: ['lab_technician'],
+          permissions: ['lab:write'],
+        }),
+      ).not.toThrow();
+    });
   });
 
   describe('assertCanDownload', () => {
@@ -155,8 +178,19 @@ describe('UploadsService', () => {
       }));
     };
 
-    it('throws NotFound when no document row matches', async () => {
+    const mockLabLookup = (
+      result: { id: string; labOrderId: string } | null,
+    ) => {
+      labResultsRepo.createQueryBuilder.mockImplementation(() => ({
+        where: jest.fn().mockReturnThis(),
+        orWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(result ? [result] : []),
+      }));
+    };
+
+    it('throws NotFound when no document or lab result matches', async () => {
       mockDocLookup(null);
+      mockLabLookup(null);
       await expect(
         service.assertCanDownload('missing.pdf', staffUser),
       ).rejects.toThrow(NotFoundException);
@@ -175,7 +209,26 @@ describe('UploadsService', () => {
 
       await expect(
         service.assertCanDownload('abc.pdf', staffUser),
-      ).resolves.toEqual(document);
+      ).resolves.toBeUndefined();
+    });
+
+    it('allows lab result download for staff with lab:write', async () => {
+      mockDocLookup(null);
+      mockLabLookup({ id: 'lr-1', labOrderId: 'lo-1' });
+      labOrdersRepo.findOne.mockResolvedValue({
+        id: 'lo-1',
+        patientId: 'patient-1',
+        hospitalId: 'hospital-a',
+      });
+      patientsRepo.findOne.mockResolvedValue(patient);
+
+      await expect(
+        service.assertCanDownload('abc.pdf', {
+          ...staffUser,
+          roles: ['lab_technician'],
+          permissions: ['lab:write', 'patients:read'],
+        }),
+      ).resolves.toBeUndefined();
     });
 
     it('denies staff from another hospital', async () => {
@@ -196,7 +249,7 @@ describe('UploadsService', () => {
 
       await expect(
         service.assertCanDownload('abc.pdf', patientUser),
-      ).resolves.toEqual(document);
+      ).resolves.toBeUndefined();
     });
 
     it('denies patient for another patient document', async () => {
@@ -223,7 +276,7 @@ describe('UploadsService', () => {
           ...staffUser,
           roles: ['doctor', 'patient'],
         }),
-      ).resolves.toEqual(document);
+      ).resolves.toBeUndefined();
     });
 
     it('allows super_admin across hospitals', async () => {
@@ -237,7 +290,7 @@ describe('UploadsService', () => {
           hospitalId: undefined,
           permissions: [],
         }),
-      ).resolves.toEqual(document);
+      ).resolves.toBeUndefined();
     });
   });
 
@@ -255,7 +308,7 @@ describe('UploadsService', () => {
     const oldEnough = NOW.getTime() - 48 * 60 * 60 * 1000; // 48h ago (TTL is 24h)
     const tooRecent = NOW.getTime() - 60 * 60 * 1000; // 1h ago
 
-    it('removes old uploads that have no document row', async () => {
+    it('removes old uploads that have no document or lab result row', async () => {
       mockedFs.readdir.mockResolvedValue([ORPHAN, LINKED, NOT_UUID, DOTFILE]);
       mockedFs.stat.mockResolvedValue(statFor(oldEnough));
       let lookup = 0;
@@ -268,6 +321,7 @@ describe('UploadsService', () => {
           return Promise.resolve(lookup === 1 ? [] : [{ id: 'doc-1' }]);
         }),
       }));
+      labResultsRepo.createQueryBuilder.mockImplementation(emptyQb);
 
       await service.removeOrphanUploads(NOW);
 
@@ -275,6 +329,21 @@ describe('UploadsService', () => {
       expect(mockedFs.unlink).toHaveBeenCalledWith(
         join(process.cwd(), 'uploads', ORPHAN),
       );
+    });
+
+    it('keeps files referenced by lab results', async () => {
+      mockedFs.readdir.mockResolvedValue([ORPHAN]);
+      mockedFs.stat.mockResolvedValue(statFor(oldEnough));
+      documentsRepo.createQueryBuilder.mockImplementation(emptyQb);
+      labResultsRepo.createQueryBuilder.mockImplementation(() => ({
+        where: jest.fn().mockReturnThis(),
+        orWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([{ id: 'lr-1' }]),
+      }));
+
+      await service.removeOrphanUploads(NOW);
+
+      expect(mockedFs.unlink).not.toHaveBeenCalled();
     });
 
     it('keeps files newer than the TTL even when unlinked', async () => {

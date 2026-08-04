@@ -6,6 +6,7 @@ import { useQuery, useMutation } from '@apollo/client';
 import { BedDouble, Building2 } from 'lucide-react';
 import { ClayButton, ClayCard } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
+import { QueryError } from '@/components/query-error';
 import { HospitalForm } from '@/components/hospital/hospital-form';
 import { HOSPITAL_QUERY, ME_QUERY, UPDATE_HOSPITAL_MUTATION } from '@/lib/graphql/queries';
 
@@ -17,7 +18,7 @@ export default function SettingsPage() {
   const hospitalId = meData?.me?.hospitalId;
   const canWriteHospital = (meData?.me?.permissions ?? []).includes('hospitals:write');
 
-  const { data, loading: fetching } = useQuery(HOSPITAL_QUERY, {
+  const { data, loading: fetching, error: hospitalError, refetch } = useQuery(HOSPITAL_QUERY, {
     variables: { id: hospitalId },
     skip: !hospitalId,
   });
@@ -72,6 +73,35 @@ export default function SettingsPage() {
 
   if (fetching) {
     return <p className="text-clay-text-muted">Loading settings...</p>;
+  }
+
+  if (hospitalError) {
+    return (
+      <div>
+        <DashboardHeader
+          title="Settings"
+          subtitle="Hospital profile and facility setup"
+        />
+        <div className="py-8">
+          <QueryError
+            message="We could not load hospital settings. Please try again."
+            onRetry={() => void refetch()}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (!hospital) {
+    return (
+      <div>
+        <DashboardHeader
+          title="Settings"
+          subtitle="Hospital profile and facility setup"
+        />
+        <p className="text-clay-error">Hospital not found</p>
+      </div>
+    );
   }
 
   return (

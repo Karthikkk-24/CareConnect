@@ -84,17 +84,20 @@ export class PortalService {
     const appointments = await this.appointmentsRepo.find({
       where: { patientId: patient.id, hospitalId: patient.hospitalId },
       order: { scheduledAt: 'DESC' },
+      take: 100,
     });
 
     const prescriptions = await this.prescriptionsRepo.find({
       where: { patientId: patient.id, hospitalId: patient.hospitalId },
       relations: ['items'],
       order: { createdAt: 'DESC' },
+      take: 100,
     });
 
     const labOrders = await this.labOrdersRepo.find({
       where: { patientId: patient.id, hospitalId: patient.hospitalId },
       order: { createdAt: 'DESC' },
+      take: 100,
     });
 
     const labResults: PortalLabResultType[] = [];
@@ -102,6 +105,7 @@ export class PortalService {
       const results = await this.labResultsRepo.find({
         where: { labOrderId: order.id, hospitalId: patient.hospitalId },
         order: { createdAt: 'DESC' },
+        take: 20,
       });
 
       for (const result of results) {

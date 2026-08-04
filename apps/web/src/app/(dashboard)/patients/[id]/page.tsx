@@ -9,6 +9,7 @@ import { ClayBadge, ClayButton, ClayCard } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
 import { ADD_PATIENT_DOCUMENT_MUTATION, DELETE_PATIENT_DOCUMENT, DELETE_PATIENT_MUTATION, DISCHARGES_QUERY, LINK_PATIENT_ACCOUNT, ME_QUERY, PATIENT_DIAGNOSES_QUERY, PATIENT_NOTES_QUERY, PATIENT_PRESCRIPTIONS_QUERY, PATIENT_QUERY, PATIENT_VITALS_QUERY, UPDATE_PATIENT_STATUS } from '@/lib/graphql/queries';
 import { PatientClinicalActions } from '@/components/clinical/patient-clinical-actions';
+import { QueryError } from '@/components/query-error';
 import {
   canAdminPatients,
   canDischargePatients,
@@ -34,7 +35,7 @@ export default function PatientDetailPage() {
   const [mutationError, setMutationError] = useState('');
   const [documentType, setDocumentType] = useState('identification');
   const { data: meData } = useQuery(ME_QUERY);
-  const { data, loading, refetch } = useQuery(PATIENT_QUERY, {
+  const { data, loading, error: patientError, refetch } = useQuery(PATIENT_QUERY, {
     variables: { id, hospitalId: meData?.me?.hospitalId },
     skip: !id,
   });
@@ -205,6 +206,16 @@ export default function PatientDetailPage() {
   };
 
   if (loading) return <p className="text-clay-text-muted">Loading patient...</p>;
+  if (patientError) {
+    return (
+      <div className="py-8">
+        <QueryError
+          message="We could not load this patient. Please try again."
+          onRetry={() => void refetch()}
+        />
+      </div>
+    );
+  }
   if (!patient) return <p className="text-clay-error">Patient not found</p>;
 
   return (
@@ -422,7 +433,13 @@ export default function PatientDetailPage() {
           <div className="grid gap-6 md:grid-cols-2">
             <div>
               <h3 className="mb-2 text-sm font-medium text-clay-text">Vitals</h3>
-              {(vitalsQuery.data?.vitalSigns ?? []).length === 0 ? (
+              {vitalsQuery.error ? (
+                <QueryError
+                  message="We could not load vitals."
+                  onRetry={() => void vitalsQuery.refetch()}
+                  className="text-left"
+                />
+              ) : (vitalsQuery.data?.vitalSigns ?? []).length === 0 ? (
                 <p className="text-sm text-clay-text-muted">None yet</p>
               ) : (
                 <ul className="space-y-2 text-sm">
@@ -444,7 +461,13 @@ export default function PatientDetailPage() {
             </div>
             <div>
               <h3 className="mb-2 text-sm font-medium text-clay-text">Diagnoses</h3>
-              {(diagnosesQuery.data?.diagnoses ?? []).length === 0 ? (
+              {diagnosesQuery.error ? (
+                <QueryError
+                  message="We could not load diagnoses."
+                  onRetry={() => void diagnosesQuery.refetch()}
+                  className="text-left"
+                />
+              ) : (diagnosesQuery.data?.diagnoses ?? []).length === 0 ? (
                 <p className="text-sm text-clay-text-muted">None yet</p>
               ) : (
                 <ul className="space-y-2 text-sm">
@@ -461,7 +484,13 @@ export default function PatientDetailPage() {
             </div>
             <div>
               <h3 className="mb-2 text-sm font-medium text-clay-text">Notes</h3>
-              {(notesQuery.data?.clinicalNotes ?? []).length === 0 ? (
+              {notesQuery.error ? (
+                <QueryError
+                  message="We could not load clinical notes."
+                  onRetry={() => void notesQuery.refetch()}
+                  className="text-left"
+                />
+              ) : (notesQuery.data?.clinicalNotes ?? []).length === 0 ? (
                 <p className="text-sm text-clay-text-muted">None yet</p>
               ) : (
                 <ul className="space-y-2 text-sm">
@@ -477,7 +506,13 @@ export default function PatientDetailPage() {
             </div>
             <div>
               <h3 className="mb-2 text-sm font-medium text-clay-text">Prescriptions</h3>
-              {(rxQuery.data?.prescriptions ?? []).length === 0 ? (
+              {rxQuery.error ? (
+                <QueryError
+                  message="We could not load prescriptions."
+                  onRetry={() => void rxQuery.refetch()}
+                  className="text-left"
+                />
+              ) : (rxQuery.data?.prescriptions ?? []).length === 0 ? (
                 <p className="text-sm text-clay-text-muted">None yet</p>
               ) : (
                 <ul className="space-y-2 text-sm">
@@ -500,7 +535,13 @@ export default function PatientDetailPage() {
 
         <ClayCard className="lg:col-span-3">
           <h2 className="mb-4 text-lg font-semibold text-clay-text">Discharge summaries</h2>
-          {(dischargesQuery.data?.discharges ?? []).length === 0 ? (
+          {dischargesQuery.error ? (
+            <QueryError
+              message="We could not load discharge summaries."
+              onRetry={() => void dischargesQuery.refetch()}
+              className="text-left"
+            />
+          ) : (dischargesQuery.data?.discharges ?? []).length === 0 ? (
             <p className="text-sm text-clay-text-muted">No discharges recorded</p>
           ) : (
             <ul className="space-y-3 text-sm">
