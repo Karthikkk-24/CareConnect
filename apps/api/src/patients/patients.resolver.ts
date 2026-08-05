@@ -61,6 +61,14 @@ export class PatientsResolver {
   }
 
   @Mutation(() => PatientType)
+  @Roles(
+    ROLES.DOCTOR,
+    ROLES.NURSE,
+    ROLES.RECEPTIONIST,
+    ROLES.HOSPITAL_ADMIN,
+    ROLES.HOSPITAL_MANAGER,
+    ROLES.SUPER_ADMIN,
+  )
   @Permissions(PERMISSIONS.PATIENTS_WRITE)
   async createPatient(
     @CurrentUser() user: AuthenticatedUser,
@@ -75,6 +83,14 @@ export class PatientsResolver {
   }
 
   @Mutation(() => PatientType)
+  @Roles(
+    ROLES.DOCTOR,
+    ROLES.NURSE,
+    ROLES.RECEPTIONIST,
+    ROLES.HOSPITAL_ADMIN,
+    ROLES.HOSPITAL_MANAGER,
+    ROLES.SUPER_ADMIN,
+  )
   @Permissions(PERMISSIONS.PATIENTS_WRITE)
   async updatePatient(
     @CurrentUser() user: AuthenticatedUser,
@@ -110,6 +126,14 @@ export class PatientsResolver {
   }
 
   @Mutation(() => PatientType)
+  @Roles(
+    ROLES.DOCTOR,
+    ROLES.NURSE,
+    ROLES.RECEPTIONIST,
+    ROLES.HOSPITAL_ADMIN,
+    ROLES.HOSPITAL_MANAGER,
+    ROLES.SUPER_ADMIN,
+  )
   @Permissions(PERMISSIONS.PATIENTS_WRITE)
   async updatePatientStatus(
     @CurrentUser() user: AuthenticatedUser,
@@ -130,6 +154,14 @@ export class PatientsResolver {
   }
 
   @Mutation(() => BulkImportResultType)
+  @Roles(
+    ROLES.DOCTOR,
+    ROLES.NURSE,
+    ROLES.RECEPTIONIST,
+    ROLES.HOSPITAL_ADMIN,
+    ROLES.HOSPITAL_MANAGER,
+    ROLES.SUPER_ADMIN,
+  )
   @Permissions(PERMISSIONS.PATIENTS_WRITE)
   async importPatients(
     @CurrentUser() user: AuthenticatedUser,
@@ -151,6 +183,14 @@ export class PatientsResolver {
   }
 
   @Mutation(() => PatientDocumentType)
+  @Roles(
+    ROLES.DOCTOR,
+    ROLES.NURSE,
+    ROLES.RECEPTIONIST,
+    ROLES.HOSPITAL_ADMIN,
+    ROLES.HOSPITAL_MANAGER,
+    ROLES.SUPER_ADMIN,
+  )
   @Permissions(PERMISSIONS.PATIENTS_WRITE)
   async addPatientDocument(
     @CurrentUser() user: AuthenticatedUser,
@@ -179,6 +219,14 @@ export class PatientsResolver {
   }
 
   @Mutation(() => Boolean)
+  @Roles(
+    ROLES.DOCTOR,
+    ROLES.NURSE,
+    ROLES.RECEPTIONIST,
+    ROLES.HOSPITAL_ADMIN,
+    ROLES.HOSPITAL_MANAGER,
+    ROLES.SUPER_ADMIN,
+  )
   @Permissions(PERMISSIONS.PATIENTS_WRITE)
   async deletePatientDocument(
     @CurrentUser() user: AuthenticatedUser,
