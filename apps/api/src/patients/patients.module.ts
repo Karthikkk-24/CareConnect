@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
   Admission,
+  LabOrder,
+  LabResult,
   Patient,
   PatientAllergy,
   PatientConsent,
@@ -30,6 +32,8 @@ import { PatientsService } from './patients.service';
       PatientImportJob,
       User,
       Admission,
+      LabOrder,
+      LabResult,
     ]),
   ],
   providers: [PatientsResolver, PatientsService],

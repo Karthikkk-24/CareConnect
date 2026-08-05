@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import {
   Appointment,
+  Hospital,
   LabOrder,
   LabResult,
   Patient,
@@ -20,6 +21,7 @@ describe('PortalService', () => {
   const prescriptionsRepo = { find: jest.fn() };
   const labOrdersRepo = { find: jest.fn() };
   const labResultsRepo = { find: jest.fn() };
+  const hospitalsRepo = { findOne: jest.fn() };
   const appointmentsService = {
     toAppointmentType: jest.fn((a: unknown) => a),
   };
@@ -40,6 +42,10 @@ describe('PortalService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    hospitalsRepo.findOne.mockResolvedValue({
+      id: 'hospital-a',
+      isActive: true,
+    });
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PortalService,
@@ -54,6 +60,7 @@ describe('PortalService', () => {
         },
         { provide: getRepositoryToken(LabOrder), useValue: labOrdersRepo },
         { provide: getRepositoryToken(LabResult), useValue: labResultsRepo },
+        { provide: getRepositoryToken(Hospital), useValue: hospitalsRepo },
         { provide: AppointmentsService, useValue: appointmentsService },
         { provide: ClinicalService, useValue: clinicalService },
       ],

@@ -8,6 +8,7 @@ import { ForbiddenAccess } from '@/components/auth/forbidden-access';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
 import { PatientWizard } from '@/components/patients/patient-wizard';
 import { ME_QUERY, PATIENT_QUERY, UPDATE_PATIENT_MUTATION } from '@/lib/graphql/queries';
+import { QueryError } from '@/components/query-error';
 
 type PatientDetail = {
   fullName: string;
@@ -98,9 +99,9 @@ export default function EditPatientPage() {
   const [error, setError] = useState('');
 
   const { data: meData } = useQuery(ME_QUERY);
-  const { data, loading: fetching } = useQuery(PATIENT_QUERY, {
+  const { data, loading: fetching, error: fetchError, refetch } = useQuery(PATIENT_QUERY, {
     variables: { id, hospitalId: meData?.me?.hospitalId },
-    skip: !id,
+    skip: !id || !meData?.me?.hospitalId,
   });
 
   const [updatePatient, { loading }] = useMutation(UPDATE_PATIENT_MUTATION);
@@ -131,6 +132,17 @@ export default function EditPatientPage() {
 
   if (fetching) {
     return <p className="text-clay-text-muted">Loading patient...</p>;
+  }
+
+  if (fetchError) {
+    return (
+      <div className="py-8">
+        <QueryError
+          message="We could not load this patient. Please try again."
+          onRetry={() => void refetch()}
+        />
+      </div>
+    );
   }
 
   const patient = data?.patient;

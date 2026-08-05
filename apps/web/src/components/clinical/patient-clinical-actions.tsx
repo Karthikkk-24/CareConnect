@@ -34,6 +34,7 @@ import {
 } from '@/lib/route-access';
 import {
   canActAsClinician,
+  canAdmitPatients,
   canAuthorClinical,
 } from '@/lib/clinical-access';
 
@@ -75,11 +76,12 @@ export function PatientClinicalActions({ patientId, hospitalId }: PatientClinica
   const canWriteAppointments = permissions.includes('appointments:write');
   const canAuthor = canAuthorClinical(roles);
   const canClinician = canActAsClinician(roles);
+  const canAdmit = canWritePatients && canAdmitPatients(roles);
   const canManageFacility = canAccessRoute('/settings', { roles, permissions });
 
   const actionPermissions: Record<ActionKey, boolean> = {
     appointment: canWriteAppointments,
-    admit: canWritePatients,
+    admit: canAdmit,
     vitals: canWritePatients && canAuthor,
     soap: canWritePatients && canAuthor,
     diagnosis: canWritePatients && canClinician,

@@ -215,6 +215,9 @@ export class LabOrderType {
 
   @Field()
   updatedAt: Date;
+
+  @Field(() => LabResultType, { nullable: true })
+  result?: LabResultType;
 }
 
 @ObjectType()

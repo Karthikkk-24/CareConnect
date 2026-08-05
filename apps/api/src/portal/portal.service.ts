@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
   Appointment,
+  Hospital,
   LabOrder,
   LabResult,
   Patient,
@@ -30,6 +31,8 @@ export class PortalService {
     private readonly labOrdersRepo: Repository<LabOrder>,
     @InjectRepository(LabResult)
     private readonly labResultsRepo: Repository<LabResult>,
+    @InjectRepository(Hospital)
+    private readonly hospitalsRepo: Repository<Hospital>,
     private readonly appointmentsService: AppointmentsService,
     private readonly clinicalService: ClinicalService,
   ) {}
@@ -79,6 +82,15 @@ export class PortalService {
         prescriptions: [],
         labResults: [],
       };
+    }
+
+    const hospital = await this.hospitalsRepo.findOne({
+      where: { id: patient.hospitalId },
+    });
+    if (!hospital || !hospital.isActive) {
+      throw new ForbiddenException(
+        'This hospital is currently inactive; portal records are unavailable',
+      );
     }
 
     const appointments = await this.appointmentsRepo.find({

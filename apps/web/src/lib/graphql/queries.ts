@@ -657,6 +657,14 @@ export const LAB_ORDERS_QUERY = gql`
       status
       notes
       createdAt
+      result {
+        id
+        resultValue
+        referenceRange
+        unit
+        resultFileUrl
+        completedAt
+      }
     }
   }
 `;
@@ -678,6 +686,7 @@ export const COMPLETE_LAB_RESULT_MUTATION = gql`
       id
       labOrderId
       resultValue
+      resultFileUrl
       completedAt
     }
   }

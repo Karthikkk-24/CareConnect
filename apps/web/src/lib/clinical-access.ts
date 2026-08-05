@@ -1,3 +1,13 @@
+/** Roles that may admit patients / transfer beds (matches API @Roles). */
+export const ADMIT_ROLES = [
+  'doctor',
+  'nurse',
+  'receptionist',
+  'hospital_admin',
+  'hospital_manager',
+  'super_admin',
+] as const;
+
 /** Roles that may discharge / transfer-out (matches API @Roles). */
 export const DISCHARGE_ROLES = [
   'doctor',
@@ -37,6 +47,10 @@ export function hasAnyRole(
 ): boolean {
   if (!roles?.length) return false;
   return allowed.some((role) => roles.includes(role));
+}
+
+export function canAdmitPatients(roles: string[] | undefined): boolean {
+  return hasAnyRole(roles, ADMIT_ROLES);
 }
 
 export function canDischargePatients(roles: string[] | undefined): boolean {

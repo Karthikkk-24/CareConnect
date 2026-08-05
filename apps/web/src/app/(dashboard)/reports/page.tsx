@@ -63,6 +63,17 @@ export default function ReportsPage() {
     timeStyle: 'short',
   });
 
+  const accessCtx = {
+    roles: meData?.me?.roles ?? [],
+    permissions: meData?.me?.permissions ?? [],
+  };
+
+  const secondaryLinks = [
+    { href: '/admissions/occupancy', label: 'Ward occupancy detail' },
+    { href: '/finance', label: 'Finance overview' },
+    { href: '/appointments', label: "Today's appointments" },
+  ].filter((link) => canAccessRoute(link.href, accessCtx));
+
   return (
     <div>
       <DashboardHeader
@@ -112,21 +123,13 @@ export default function ReportsPage() {
           </div>
 
           <div className="mb-6 flex flex-wrap gap-3">
-            <Link href="/admissions/occupancy">
-              <ClayButton variant="secondary" size="sm">
-                Ward occupancy detail
-              </ClayButton>
-            </Link>
-            <Link href="/finance">
-              <ClayButton variant="secondary" size="sm">
-                Finance overview
-              </ClayButton>
-            </Link>
-            <Link href="/appointments">
-              <ClayButton variant="secondary" size="sm">
-                Today&apos;s appointments
-              </ClayButton>
-            </Link>
+            {secondaryLinks.map((link) => (
+              <Link key={link.href} href={link.href}>
+                <ClayButton variant="secondary" size="sm">
+                  {link.label}
+                </ClayButton>
+              </Link>
+            ))}
           </div>
 
           <ClayCard>
