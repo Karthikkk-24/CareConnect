@@ -6,6 +6,7 @@ import { DollarSign, FileText, Plus } from 'lucide-react';
 import { ClayButton, ClayCard, ClayStatCard } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
 import { HOSPITAL_REPORTS_QUERY, INVOICES_QUERY, ME_QUERY } from '@/lib/graphql/queries';
+import { canAccessRoute } from '@/lib/route-access';
 
 export default function FinancePage() {
   const { data: meData } = useQuery(ME_QUERY);
@@ -41,6 +42,19 @@ export default function FinancePage() {
   const invoiceCountDisplay = (value: number | null) =>
     value == null ? '—' : value;
   const canWriteBilling = (meData?.me?.permissions ?? []).includes('billing:write');
+  const accessCtx = {
+    roles: meData?.me?.roles ?? [],
+    permissions: meData?.me?.permissions ?? [],
+  };
+  const canSeeReports = canAccessRoute('/reports', accessCtx);
+
+  const quickLinks = [
+    { label: 'View All Invoices', href: '/finance/invoices' },
+    ...(canWriteBilling
+      ? [{ label: 'Create Invoice', href: '/finance/invoices/new' }]
+      : []),
+    ...(canSeeReports ? [{ label: 'Reports Hub', href: '/reports' }] : []),
+  ];
 
   return (
     <div>
@@ -81,13 +95,7 @@ export default function FinancePage() {
       <ClayCard>
         <h2 className="mb-4 text-lg font-semibold text-clay-text">Quick Links</h2>
         <div className="grid gap-3 sm:grid-cols-2">
-          {[
-            { label: 'View All Invoices', href: '/finance/invoices' },
-            ...(canWriteBilling
-              ? [{ label: 'Create Invoice', href: '/finance/invoices/new' }]
-              : []),
-            { label: 'Reports Hub', href: '/reports' },
-          ].map((action) => (
+          {quickLinks.map((action) => (
             <Link
               key={action.label}
               href={action.href}
