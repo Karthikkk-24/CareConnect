@@ -7,7 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { existsSync } from 'fs';
 import { basename, join } from 'path';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import {
   Admission,
   ClinicalNote,
@@ -645,7 +645,29 @@ export class ClinicalService {
       order: { createdAt: 'DESC' },
       take: 200,
     });
-    return orders.map((o) => this.toLabOrderType(o));
+
+    const completedOrderIds = orders
+      .filter((o) => o.status === 'completed')
+      .map((o) => o.id);
+    const resultsByOrderId = new Map<string, LabResult>();
+    if (completedOrderIds.length > 0) {
+      const results = await this.labResultsRepo.find({
+        where: { hospitalId, labOrderId: In(completedOrderIds) },
+        order: { completedAt: 'DESC' },
+      });
+      for (const result of results) {
+        if (!resultsByOrderId.has(result.labOrderId)) {
+          resultsByOrderId.set(result.labOrderId, result);
+        }
+      }
+    }
+
+    return orders.map((o) => ({
+      ...this.toLabOrderType(o),
+      result: resultsByOrderId.has(o.id)
+        ? this.toLabResultType(resultsByOrderId.get(o.id)!)
+        : undefined,
+    }));
   }
 
   async listVitalSigns(

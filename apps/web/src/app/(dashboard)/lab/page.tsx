@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery } from '@apollo/client';
-import { FlaskConical } from 'lucide-react';
+import { useAuth } from '@clerk/nextjs';
+import { FileText, FlaskConical, Upload } from 'lucide-react';
 import { ClayBadge, ClayButton, ClayCard, ClayInput } from '@careconnect/ui';
 import { ClayTextarea } from '@/components/clinical/clay-textarea';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
@@ -29,22 +30,43 @@ const statusVariant = (status: string) => {
   }
 };
 
+type LabOrderRow = {
+  id: string;
+  testName: string;
+  status: string;
+  createdAt: string;
+  patient?: { fullName: string };
+  result?: {
+    resultValue?: string;
+    resultFileUrl?: string;
+  };
+};
+
 export default function LabPage() {
+  const { getToken } = useAuth();
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [resultValue, setResultValue] = useState('');
   const [referenceRange, setReferenceRange] = useState('');
   const [unit, setUnit] = useState('');
+  const [resultFileUrl, setResultFileUrl] = useState<string | null>(null);
+  const [resultFileName, setResultFileName] = useState('');
+  const [uploading, setUploading] = useState(false);
   const [showNewOrder, setShowNewOrder] = useState(false);
   const [patientId, setPatientId] = useState('');
   const [patientSearch, setPatientSearch] = useState('');
   const [testName, setTestName] = useState('');
   const [orderNotes, setOrderNotes] = useState('');
   const [error, setError] = useState('');
+  const [fileError, setFileError] = useState('');
 
   const { data: meData } = useQuery(ME_QUERY);
   const hospitalId = meData?.me?.hospitalId;
   const canCreateOrders = (meData?.me?.permissions ?? []).includes('patients:write');
   const canWriteLab = (meData?.me?.permissions ?? []).includes('lab:write');
+
+  const apiBase = (
+    process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/graphql'
+  ).replace(/\/graphql\/?$/, '');
 
   const { data, loading, error: listError, refetch } = useQuery(LAB_ORDERS_QUERY, {
     variables: { hospitalId, status: undefined },
@@ -56,13 +78,20 @@ export default function LabPage() {
     skip: !hospitalId || !canCreateOrders || patientSearch.length < 2,
   });
 
+  const resetCompleteForm = () => {
+    setSelectedOrderId(null);
+    setResultValue('');
+    setReferenceRange('');
+    setUnit('');
+    setResultFileUrl(null);
+    setResultFileName('');
+    setFileError('');
+  };
+
   const [completeResult, { loading: completing }] = useMutation(COMPLETE_LAB_RESULT_MUTATION, {
     onCompleted: () => {
       refetch();
-      setSelectedOrderId(null);
-      setResultValue('');
-      setReferenceRange('');
-      setUnit('');
+      resetCompleteForm();
     },
   });
 
@@ -76,8 +105,66 @@ export default function LabPage() {
     },
   });
 
-  const orders = data?.labOrders ?? [];
-  const pendingOrders = orders.filter((o: { status: string }) => o.status !== 'completed' && o.status !== 'cancelled');
+  const orders: LabOrderRow[] = data?.labOrders ?? [];
+  const pendingOrders = orders.filter(
+    (o) => o.status !== 'completed' && o.status !== 'cancelled',
+  );
+
+  const handleOpenResultFile = async (fileUrl: string) => {
+    setFileError('');
+    const token = await getToken();
+    let pathname: string;
+    try {
+      pathname = fileUrl.startsWith('/uploads/')
+        ? fileUrl.split('?')[0] ?? fileUrl
+        : new URL(fileUrl, apiBase).pathname;
+    } catch {
+      setFileError('Invalid document URL');
+      return;
+    }
+    if (!/^\/uploads\/[^/]+$/.test(pathname) || pathname.includes('..')) {
+      setFileError('Invalid document URL');
+      return;
+    }
+    const res = await fetch(`${apiBase}${pathname}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) {
+      setFileError('Unable to open result file');
+      return;
+    }
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    window.open(objectUrl, '_blank', 'noopener,noreferrer');
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+  };
+
+  const handleFileUpload = async (file: File) => {
+    setUploading(true);
+    setFileError('');
+    try {
+      const token = await getToken();
+      const form = new FormData();
+      form.append('file', file);
+      const uploadRes = await fetch(`${apiBase}/uploads/patient-documents`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: form,
+      });
+      if (!uploadRes.ok) {
+        throw new Error('Upload failed');
+      }
+      const uploaded = (await uploadRes.json()) as { url: string };
+      setResultFileUrl(uploaded.url);
+      setResultFileName(file.name);
+    } catch (err) {
+      setFileError(err instanceof Error ? err.message : 'Upload failed');
+      setResultFileUrl(null);
+      setResultFileName('');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleComplete = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,6 +182,7 @@ export default function LabPage() {
             resultValue: resultValue.trim(),
             referenceRange: referenceRange || undefined,
             unit: unit || undefined,
+            resultFileUrl: resultFileUrl || undefined,
           },
         },
       });
@@ -126,12 +214,26 @@ export default function LabPage() {
     }
   };
 
+  const selectOrder = (orderId: string) => {
+    setSelectedOrderId(orderId);
+    setResultValue('');
+    setReferenceRange('');
+    setUnit('');
+    setResultFileUrl(null);
+    setResultFileName('');
+    setFileError('');
+  };
+
   return (
     <div>
       <DashboardHeader title="Lab Queue" subtitle="Manage lab orders and enter results" />
 
       {error ? (
         <p className="mb-4 rounded-2xl bg-red-50 px-4 py-2 text-sm text-clay-error">{error}</p>
+      ) : null}
+
+      {fileError ? (
+        <p className="mb-4 rounded-2xl bg-red-50 px-4 py-2 text-sm text-clay-error">{fileError}</p>
       ) : null}
 
       <div className="mb-6 flex justify-end">
@@ -220,76 +322,103 @@ export default function LabPage() {
             </div>
           ) : (
             <div className="divide-y divide-white/30">
-              {orders.map(
-                (order: {
-                  id: string;
-                  testName: string;
-                  status: string;
-                  createdAt: string;
-                  patient?: { fullName: string };
-                }) => (
+              {orders.map((order) => (
+                <div
+                  key={order.id}
+                  className={`flex w-full items-center gap-4 px-6 py-4 transition hover:bg-clay-primary-light/20 ${
+                    selectedOrderId === order.id ? 'bg-clay-primary-light/40' : ''
+                  }`}
+                >
                   <button
-                    key={order.id}
                     type="button"
-                    onClick={() => setSelectedOrderId(order.id)}
-                    className={`flex w-full items-center gap-4 px-6 py-4 text-left transition hover:bg-clay-primary-light/20 ${
-                      selectedOrderId === order.id ? 'bg-clay-primary-light/40' : ''
-                    }`}
+                    onClick={() => selectOrder(order.id)}
+                    className="min-w-0 flex-1 text-left"
                   >
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-clay-text">{order.testName}</p>
-                      <p className="text-sm text-clay-text-muted">
-                        {order.patient?.fullName ?? 'Unknown'} ·{' '}
-                        {new Date(order.createdAt).toLocaleString()}
-                      </p>
-                    </div>
+                    <p className="font-medium text-clay-text">{order.testName}</p>
+                    <p className="text-sm text-clay-text-muted">
+                      {order.patient?.fullName ?? 'Unknown'} ·{' '}
+                      {new Date(order.createdAt).toLocaleString()}
+                      {order.result?.resultValue ? ` · ${order.result.resultValue}` : ''}
+                    </p>
+                  </button>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {order.status === 'completed' && order.result?.resultFileUrl ? (
+                      <button
+                        type="button"
+                        onClick={() => void handleOpenResultFile(order.result!.resultFileUrl!)}
+                        className="inline-flex items-center gap-1 rounded-xl bg-clay-primary-light/50 px-2 py-1 text-xs font-medium text-clay-primary hover:bg-clay-primary-light"
+                        title="Download result file"
+                      >
+                        <FileText className="h-3.5 w-3.5" />
+                        File
+                      </button>
+                    ) : null}
                     <ClayBadge variant={statusVariant(order.status)}>
                       {order.status}
                     </ClayBadge>
-                  </button>
-                ),
-              )}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </ClayCard>
 
         {canWriteLab ? (
-        <ClayCard>
-          <h2 className="mb-4 text-lg font-semibold text-clay-text">Enter Result</h2>
-          {selectedOrderId ? (
-            <form onSubmit={handleComplete} className="space-y-4">
+          <ClayCard>
+            <h2 className="mb-4 text-lg font-semibold text-clay-text">Enter Result</h2>
+            {selectedOrderId ? (
+              <form onSubmit={handleComplete} className="space-y-4">
+                <p className="text-sm text-clay-text-muted">
+                  Order ID: <span className="font-mono text-clay-text">{selectedOrderId}</span>
+                </p>
+                <ClayInput
+                  label="Result Value *"
+                  placeholder="e.g. 12.5"
+                  value={resultValue}
+                  onChange={(e) => setResultValue(e.target.value)}
+                  required
+                />
+                <ClayInput
+                  label="Reference Range"
+                  placeholder="e.g. 10.0 - 15.0"
+                  value={referenceRange}
+                  onChange={(e) => setReferenceRange(e.target.value)}
+                />
+                <ClayInput
+                  label="Unit"
+                  placeholder="e.g. g/dL"
+                  value={unit}
+                  onChange={(e) => setUnit(e.target.value)}
+                />
+                <div>
+                  <p className="mb-2 text-sm font-medium text-clay-text">Result File (optional)</p>
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-clay-surface px-4 py-2 text-sm font-medium text-clay-primary shadow-clay-sm hover:shadow-clay">
+                    <Upload className="h-4 w-4" />
+                    {uploading ? 'Uploading...' : resultFileName || 'Upload file'}
+                    <input
+                      type="file"
+                      className="hidden"
+                      disabled={uploading}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) void handleFileUpload(file);
+                      }}
+                    />
+                  </label>
+                  {resultFileName ? (
+                    <p className="mt-2 text-xs text-clay-text-muted">{resultFileName} attached</p>
+                  ) : null}
+                </div>
+                <ClayButton type="submit" isLoading={completing || uploading}>
+                  Complete & Save Result
+                </ClayButton>
+              </form>
+            ) : (
               <p className="text-sm text-clay-text-muted">
-                Order ID: <span className="font-mono text-clay-text">{selectedOrderId}</span>
+                Select an order from the queue to enter results.
               </p>
-              <ClayInput
-                label="Result Value *"
-                placeholder="e.g. 12.5"
-                value={resultValue}
-                onChange={(e) => setResultValue(e.target.value)}
-                required
-              />
-              <ClayInput
-                label="Reference Range"
-                placeholder="e.g. 10.0 - 15.0"
-                value={referenceRange}
-                onChange={(e) => setReferenceRange(e.target.value)}
-              />
-              <ClayInput
-                label="Unit"
-                placeholder="e.g. g/dL"
-                value={unit}
-                onChange={(e) => setUnit(e.target.value)}
-              />
-              <ClayButton type="submit" isLoading={completing}>
-                Complete & Save Result
-              </ClayButton>
-            </form>
-          ) : (
-            <p className="text-sm text-clay-text-muted">
-              Select an order from the queue to enter results.
-            </p>
-          )}
-        </ClayCard>
+            )}
+          </ClayCard>
         ) : null}
       </div>
     </div>
