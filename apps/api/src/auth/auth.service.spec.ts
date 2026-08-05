@@ -130,8 +130,12 @@ describe('AuthService', () => {
   });
 
   describe('toAuthenticatedUser', () => {
-    it('filters out roles from a different hospital', () => {
-      const result = service.toAuthenticatedUser({
+    it('filters out roles from a different hospital', async () => {
+      hospitalsRepo.findOne.mockResolvedValue({
+        id: 'hospital-a',
+        isActive: true,
+      });
+      const result = await service.toAuthenticatedUser({
         id: 'user-1',
         authId: 'auth-1',
         email: 'doc@hospital.com',
@@ -162,10 +166,15 @@ describe('AuthService', () => {
 
       expect(result.roles).toEqual(['nurse']);
       expect(result.permissions).toEqual(['patients:read']);
+      expect(result.hospitalActive).toBe(true);
     });
 
-    it('keeps platform roles regardless of hospital scope', () => {
-      const result = service.toAuthenticatedUser({
+    it('keeps platform roles regardless of hospital scope', async () => {
+      hospitalsRepo.findOne.mockResolvedValue({
+        id: 'hospital-a',
+        isActive: true,
+      });
+      const result = await service.toAuthenticatedUser({
         id: 'user-1',
         authId: 'auth-1',
         email: 'admin@careconnect.com',
@@ -193,6 +202,36 @@ describe('AuthService', () => {
 
       expect(result.roles).toEqual(['super_admin']);
       expect(result.permissions).toEqual(['hospitals:write']);
+    });
+
+    it('strips hospital staff roles when the hospital is deactivated', async () => {
+      hospitalsRepo.findOne.mockResolvedValue({
+        id: 'hospital-a',
+        isActive: false,
+      });
+      const result = await service.toAuthenticatedUser({
+        id: 'user-1',
+        authId: 'auth-1',
+        email: 'nurse@hospital.com',
+        fullName: 'Nurse',
+        hospitalId: 'hospital-a',
+        isActive: true,
+        onboardingCompleted: true,
+        userRoles: [
+          {
+            hospitalId: 'hospital-a',
+            role: {
+              slug: 'nurse',
+              permissions: [{ slug: 'patients:read' }],
+            },
+          },
+        ],
+      } as User);
+
+      expect(result.roles).toEqual([]);
+      expect(result.permissions).toEqual([]);
+      expect(result.hospitalActive).toBe(false);
+      expect(result.hospitalId).toBe('hospital-a');
     });
   });
 

@@ -97,9 +97,17 @@ export class AuthService {
     return this.toAuthenticatedUser(user);
   }
 
-  toAuthenticatedUser(user: User): AuthenticatedUser {
+  async toAuthenticatedUser(user: User): Promise<AuthenticatedUser> {
     const activeHospitalId = user.hospitalId;
     const PLATFORM_ROLE_SLUGS = new Set(['super_admin', 'patient']);
+
+    let hospitalActive = true;
+    if (activeHospitalId) {
+      const hospital = await this.hospitalsRepo.findOne({
+        where: { id: activeHospitalId },
+      });
+      hospitalActive = !hospital || hospital.isActive;
+    }
 
     const scopedRoles =
       user.userRoles?.filter((ur) => {
@@ -111,8 +119,8 @@ export class AuthService {
         return !!activeHospitalId && ur.hospitalId === activeHospitalId;
       }) ?? [];
 
-    const roles = scopedRoles.map((ur) => ur.role.slug);
-    const permissions = [
+    let roles = scopedRoles.map((ur) => ur.role.slug);
+    let permissions = [
       ...new Set(
         scopedRoles.flatMap(
           (ur) => ur.role.permissions?.map((p) => p.slug) ?? [],
@@ -120,12 +128,20 @@ export class AuthService {
       ),
     ];
 
+    // Deactivated hospital: strip hospital-scoped staff roles/permissions so
+    // tenant APIs fail closed. Keep platform patient/super_admin identities.
+    if (!hospitalActive && !roles.includes('super_admin')) {
+      roles = roles.filter((slug) => PLATFORM_ROLE_SLUGS.has(slug));
+      permissions = [];
+    }
+
     return {
       id: user.id,
       authId: user.authId,
       email: user.email,
       fullName: user.fullName,
       hospitalId: user.hospitalId,
+      hospitalActive,
       roles: roles as AuthenticatedUser['roles'],
       permissions,
       onboardingCompleted: user.onboardingCompleted,

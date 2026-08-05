@@ -16,6 +16,8 @@ export interface AuthenticatedUser {
   email: string;
   fullName: string;
   hospitalId?: string;
+  /** False when the user's bound hospital is deactivated. */
+  hospitalActive?: boolean;
   roles: RoleSlug[];
   permissions: string[];
   onboardingCompleted: boolean;

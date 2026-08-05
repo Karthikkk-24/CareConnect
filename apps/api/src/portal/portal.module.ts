@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
   Appointment,
+  Hospital,
   LabOrder,
   LabResult,
   Patient,
@@ -20,6 +21,7 @@ import { PortalService } from './portal.service';
       Prescription,
       LabOrder,
       LabResult,
+      Hospital,
     ]),
     AppointmentsModule,
     ClinicalModule,
