@@ -110,6 +110,10 @@ describe('AuthService', () => {
           },
         ],
       });
+      hospitalsRepo.findOne.mockResolvedValue({
+        id: 'hospital-1',
+        isActive: true,
+      });
 
       const result = await service.syncAndGetUser(
         'auth-1',
@@ -122,6 +126,7 @@ describe('AuthService', () => {
         email: 'active@hospital.com',
         fullName: 'Active User',
         hospitalId: 'hospital-1',
+        hospitalActive: true,
         roles: ['hospital_admin'],
         permissions: ['patients:read'],
         onboardingCompleted: true,
