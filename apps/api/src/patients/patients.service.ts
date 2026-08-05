@@ -21,6 +21,8 @@ import {
   PatientMedicalHistory,
   PatientMedication,
   Admission,
+  LabOrder,
+  LabResult,
   User,
 } from '../database/entities';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -432,6 +434,8 @@ export class PatientsService {
     await this.patientsRepo.manager.transaction(async (manager) => {
       const patientsRepo = manager.getRepository(Patient);
       const documentsRepo = manager.getRepository(PatientDocument);
+      const labOrdersRepo = manager.getRepository(LabOrder);
+      const labResultsRepo = manager.getRepository(LabResult);
 
       patient.userId = null as unknown as string | undefined;
       await patientsRepo.save(patient);
@@ -442,6 +446,19 @@ export class PatientsService {
       for (const document of documents) {
         if (document.fileUrl) fileUrlsToUnlink.push(document.fileUrl);
         await documentsRepo.remove(document);
+      }
+
+      const labOrders = await labOrdersRepo.find({
+        where: { patientId: id, hospitalId },
+        select: ['id'],
+      });
+      for (const order of labOrders) {
+        const results = await labResultsRepo.find({
+          where: { labOrderId: order.id, hospitalId },
+        });
+        for (const result of results) {
+          if (result.resultFileUrl) fileUrlsToUnlink.push(result.resultFileUrl);
+        }
       }
 
       await patientsRepo.softRemove(patient);

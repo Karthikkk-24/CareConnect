@@ -30,6 +30,8 @@ import { PatientsService } from './patients.service';
       PatientImportJob,
       User,
       Admission,
+      LabOrder,
+      LabResult,
     ]),
   ],
   providers: [PatientsResolver, PatientsService],
