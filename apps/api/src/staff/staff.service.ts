@@ -272,6 +272,20 @@ export class StaffService {
     const staff = await this.findByIdForUser(id, actor);
     if (!staff) throw new NotFoundException('Staff member not found');
 
+    const targetIsHospitalAdmin = (staff.user?.userRoles ?? []).some(
+      (ur) => ur.role?.slug === 'hospital_admin',
+    );
+    const actorIsAdmin =
+      actor.roles.includes('hospital_admin') ||
+      actor.roles.includes('super_admin');
+    const touchingPrivileges =
+      input.roleSlug !== undefined || input.isActive !== undefined;
+    if (targetIsHospitalAdmin && touchingPrivileges && !actorIsAdmin) {
+      throw new ForbiddenException(
+        'Only a hospital admin can change or deactivate another hospital admin',
+      );
+    }
+
     if (input.fullName) {
       await this.usersRepo.update(staff.userId, { fullName: input.fullName });
     }
