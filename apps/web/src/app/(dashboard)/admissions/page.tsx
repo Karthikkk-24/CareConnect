@@ -16,7 +16,7 @@ import {
   PATIENTS_QUERY,
   WARDS_QUERY,
 } from '@/lib/graphql/queries';
-import { canDischargePatients } from '@/lib/clinical-access';
+import { canAdmitPatients, canDischargePatients } from '@/lib/clinical-access';
 import { canAccessRoute } from '@/lib/route-access';
 import { QueryError } from '@/components/query-error';
 
@@ -35,6 +35,7 @@ export default function AdmissionsPage() {
   const roles: string[] = meData?.me?.roles ?? [];
   const permissions: string[] = meData?.me?.permissions ?? [];
   const canWritePatients = permissions.includes('patients:write');
+  const canAdmit = canWritePatients && canAdmitPatients(roles);
   const canDischarge = canWritePatients && canDischargePatients(roles);
   const canManageFacility = canAccessRoute('/settings', { roles, permissions });
 
@@ -123,7 +124,7 @@ export default function AdmissionsPage() {
             Bed Occupancy
           </ClayButton>
         </Link>
-        {canWritePatients ? (
+        {canAdmit ? (
         <ClayButton onClick={() => setShowForm(!showForm)}>
           <Plus className="h-4 w-4" />
           {showForm ? 'Hide Form' : 'Admit Patient'}
