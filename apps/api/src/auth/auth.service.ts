@@ -101,12 +101,14 @@ export class AuthService {
     const activeHospitalId = user.hospitalId;
     const PLATFORM_ROLE_SLUGS = new Set(['super_admin', 'patient']);
 
+    // Missing hospital row must fail closed (same as isActive=false).
+    // Previously `!hospital || hospital.isActive` treated orphans as active (#189).
     let hospitalActive = true;
     if (activeHospitalId) {
       const hospital = await this.hospitalsRepo.findOne({
         where: { id: activeHospitalId },
       });
-      hospitalActive = !hospital || hospital.isActive;
+      hospitalActive = !!hospital?.isActive;
     }
 
     const scopedRoles =
