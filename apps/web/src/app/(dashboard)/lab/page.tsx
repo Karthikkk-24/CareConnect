@@ -13,6 +13,7 @@ import {
   LAB_ORDERS_QUERY,
   ME_QUERY,
   PATIENTS_QUERY,
+  UPDATE_LAB_ORDER_STATUS_MUTATION,
 } from '@/lib/graphql/queries';
 import { QueryError } from '@/components/query-error';
 import { canAuthorClinical } from '@/lib/clinical-access';
@@ -30,6 +31,13 @@ const statusVariant = (status: string) => {
       return 'warning' as const;
   }
 };
+
+/** Next workflow step before completeLabResult (matches API status machine). */
+function nextLabStatus(status: string): { status: string; label: string } | null {
+  if (status === 'ordered') return { status: 'collected', label: 'Mark collected' };
+  if (status === 'collected') return { status: 'processing', label: 'Mark processing' };
+  return null;
+}
 
 type LabOrderRow = {
   id: string;
@@ -109,10 +117,29 @@ export default function LabPage() {
     },
   });
 
+  const [updateLabStatus, { loading: updatingStatus }] = useMutation(
+    UPDATE_LAB_ORDER_STATUS_MUTATION,
+    { onCompleted: () => refetch() },
+  );
+
   const orders: LabOrderRow[] = data?.labOrders ?? [];
   const pendingOrders = orders.filter(
     (o) => o.status !== 'completed' && o.status !== 'cancelled',
   );
+
+  const handleAdvanceStatus = async (labOrderId: string, status: string) => {
+    setError('');
+    try {
+      await updateLabStatus({
+        variables: {
+          hospitalId,
+          input: { labOrderId, status },
+        },
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update lab order status');
+    }
+  };
 
   const handleOpenResultFile = async (fileUrl: string) => {
     setFileError('');
@@ -357,6 +384,19 @@ export default function LabPage() {
                         File
                       </button>
                     ) : null}
+                    {canWriteLab && nextLabStatus(order.status) ? (
+                      <ClayButton
+                        size="sm"
+                        variant="secondary"
+                        isLoading={updatingStatus}
+                        onClick={() => {
+                          const next = nextLabStatus(order.status);
+                          if (next) void handleAdvanceStatus(order.id, next.status);
+                        }}
+                      >
+                        {nextLabStatus(order.status)?.label}
+                      </ClayButton>
+                    ) : null}
                     <ClayBadge variant={statusVariant(order.status)}>
                       {order.status}
                     </ClayBadge>
@@ -375,6 +415,25 @@ export default function LabPage() {
                 <p className="text-sm text-clay-text-muted">
                   Order ID: <span className="font-mono text-clay-text">{selectedOrderId}</span>
                 </p>
+                {(() => {
+                  const selected = orders.find((o) => o.id === selectedOrderId);
+                  const next = selected ? nextLabStatus(selected.status) : null;
+                  if (!selected || !next) return null;
+                  return (
+                    <p className="rounded-2xl bg-clay-primary-light/40 px-3 py-2 text-xs text-clay-text-muted">
+                      Status is still &ldquo;{selected.status}&rdquo;. You can{' '}
+                      <button
+                        type="button"
+                        className="font-medium text-clay-primary hover:underline"
+                        disabled={updatingStatus}
+                        onClick={() => void handleAdvanceStatus(selectedOrderId, next.status)}
+                      >
+                        {next.label.toLowerCase()}
+                      </button>{' '}
+                      before completing, or complete now if ready.
+                    </p>
+                  );
+                })()}
                 <ClayInput
                   label="Result Value *"
                   placeholder="e.g. 12.5"

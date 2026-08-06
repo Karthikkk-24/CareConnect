@@ -727,6 +727,24 @@ export const COMPLETE_LAB_RESULT_MUTATION = gql`
   }
 `;
 
+export const UPDATE_LAB_ORDER_STATUS_MUTATION = gql`
+  mutation UpdateLabOrderStatus($input: UpdateLabOrderStatusInput!, $hospitalId: String) {
+    updateLabOrderStatus(input: $input, hospitalId: $hospitalId) {
+      id
+      status
+    }
+  }
+`;
+
+export const CANCEL_PRESCRIPTION_MUTATION = gql`
+  mutation CancelPrescription($input: CancelPrescriptionInput!, $hospitalId: String) {
+    cancelPrescription(input: $input, hospitalId: $hospitalId) {
+      id
+      status
+    }
+  }
+`;
+
 export const DISCHARGES_QUERY = gql`
   query Discharges($patientId: String!, $hospitalId: String) {
     discharges(patientId: $patientId, hospitalId: $hospitalId) {

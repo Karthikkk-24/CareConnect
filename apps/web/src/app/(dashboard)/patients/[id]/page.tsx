@@ -7,10 +7,11 @@ import { useState } from 'react';
 import { FileText, History, Upload } from 'lucide-react';
 import { ClayBadge, ClayButton, ClayCard } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
-import { ADD_PATIENT_DOCUMENT_MUTATION, DELETE_PATIENT_DOCUMENT, DELETE_PATIENT_MUTATION, DISCHARGES_QUERY, LINK_PATIENT_ACCOUNT, ME_QUERY, PATIENT_DIAGNOSES_QUERY, PATIENT_NOTES_QUERY, PATIENT_PRESCRIPTIONS_QUERY, PATIENT_QUERY, PATIENT_VITALS_QUERY, UNLINK_PATIENT_ACCOUNT, UPDATE_PATIENT_STATUS } from '@/lib/graphql/queries';
+import { ADD_PATIENT_DOCUMENT_MUTATION, CANCEL_PRESCRIPTION_MUTATION, DELETE_PATIENT_DOCUMENT, DELETE_PATIENT_MUTATION, DISCHARGES_QUERY, LINK_PATIENT_ACCOUNT, ME_QUERY, PATIENT_DIAGNOSES_QUERY, PATIENT_NOTES_QUERY, PATIENT_PRESCRIPTIONS_QUERY, PATIENT_QUERY, PATIENT_VITALS_QUERY, UNLINK_PATIENT_ACCOUNT, UPDATE_PATIENT_STATUS } from '@/lib/graphql/queries';
 import { PatientClinicalActions } from '@/components/clinical/patient-clinical-actions';
 import { QueryError } from '@/components/query-error';
 import {
+  canActAsClinician,
   canAdminPatients,
   canDischargePatients,
   canWritePatientDemographics,
@@ -46,6 +47,9 @@ export default function PatientDetailPage() {
   const [deletePatient] = useMutation(DELETE_PATIENT_MUTATION);
   const [linkAccount] = useMutation(LINK_PATIENT_ACCOUNT, { onCompleted: () => refetch() });
   const [unlinkAccount] = useMutation(UNLINK_PATIENT_ACCOUNT, { onCompleted: () => refetch() });
+  const [cancelPrescription, { loading: cancellingRx }] = useMutation(
+    CANCEL_PRESCRIPTION_MUTATION,
+  );
 
   const handleStatusChange = async (newStatus: string) => {
     setMutationError('');
@@ -151,6 +155,26 @@ export default function PatientDetailPage() {
   const canWritePatients = canWritePatientDemographics(roles, permissions);
   const canDischarge = canWritePatients && canDischargePatients(roles);
   const canLinkPortal = canWritePatients && canAdminPatients(roles);
+  const canCancelRx =
+    permissions.includes('patients:write') && canActAsClinician(roles);
+
+  const handleCancelPrescription = async (prescriptionId: string) => {
+    if (!confirm('Cancel this pending prescription?')) return;
+    setMutationError('');
+    try {
+      await cancelPrescription({
+        variables: {
+          hospitalId: meData?.me?.hospitalId,
+          input: { prescriptionId },
+        },
+      });
+      await rxQuery.refetch();
+    } catch (err) {
+      setMutationError(
+        err instanceof Error ? err.message : 'Failed to cancel prescription',
+      );
+    }
+  };
 
   const apiBase = (
     process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/graphql'
@@ -549,8 +573,23 @@ export default function PatientDetailPage() {
                       status: string;
                       items?: Array<{ drugName: string }>;
                     }) => (
-                      <li key={p.id} className="text-clay-text">
-                        {p.items?.map((i) => i.drugName).join(', ') || 'Rx'} ({p.status})
+                      <li
+                        key={p.id}
+                        className="flex flex-wrap items-center justify-between gap-2 text-clay-text"
+                      >
+                        <span>
+                          {p.items?.map((i) => i.drugName).join(', ') || 'Rx'} ({p.status})
+                        </span>
+                        {canCancelRx && p.status === 'pending' ? (
+                          <ClayButton
+                            size="sm"
+                            variant="ghost"
+                            isLoading={cancellingRx}
+                            onClick={() => void handleCancelPrescription(p.id)}
+                          >
+                            Cancel
+                          </ClayButton>
+                        ) : null}
                       </li>
                     ),
                   )}
