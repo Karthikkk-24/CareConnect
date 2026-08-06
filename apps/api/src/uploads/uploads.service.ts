@@ -12,6 +12,7 @@ import { DataSource, Repository } from 'typeorm';
 import { PERMISSIONS } from '@careconnect/types';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import {
+  Hospital,
   LabOrder,
   LabResult,
   Patient,
@@ -37,6 +38,8 @@ export class UploadsService implements OnApplicationBootstrap {
     private readonly labResultsRepo: Repository<LabResult>,
     @InjectRepository(LabOrder)
     private readonly labOrdersRepo: Repository<LabOrder>,
+    @InjectRepository(Hospital)
+    private readonly hospitalsRepo: Repository<Hospital>,
     @InjectDataSource()
     private readonly dataSource: DataSource,
   ) {}
@@ -192,6 +195,15 @@ export class UploadsService implements OnApplicationBootstrap {
     }
 
     if (user.roles.includes('super_admin')) return;
+
+    const hospital = await this.hospitalsRepo.findOne({
+      where: { id: patient.hospitalId },
+    });
+    if (!hospital || !hospital.isActive) {
+      throw new ForbiddenException(
+        'This hospital is currently inactive; file access is unavailable',
+      );
+    }
 
     const isHospitalStaff =
       !!user.hospitalId &&

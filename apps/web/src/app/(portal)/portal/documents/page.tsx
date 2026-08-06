@@ -3,24 +3,24 @@
 import { useState } from 'react';
 import { useQuery } from '@apollo/client';
 import { useAuth } from '@clerk/nextjs';
-import { FileText, FlaskConical } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import { ClayButton, ClayCard } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
 import { PortalQueryError } from '@/components/portal/portal-query-error';
 import { PORTAL_PATIENT_RECORDS_QUERY } from '@/lib/graphql/queries';
 
-export default function PortalLabResultsPage() {
+export default function PortalDocumentsPage() {
   const { getToken } = useAuth();
   const [fileError, setFileError] = useState('');
   const { data, loading, error, refetch } = useQuery(PORTAL_PATIENT_RECORDS_QUERY);
   const patient = data?.portalPatientRecords?.patient;
-  const labResults = data?.portalPatientRecords?.labResults ?? [];
+  const documents = data?.portalPatientRecords?.documents ?? [];
 
   const apiBase = (
     process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/graphql'
   ).replace(/\/graphql\/?$/, '');
 
-  const handleOpenResultFile = async (fileUrl: string) => {
+  const handleOpenDocument = async (fileUrl: string) => {
     setFileError('');
     const token = await getToken();
     let pathname: string;
@@ -40,7 +40,7 @@ export default function PortalLabResultsPage() {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
     if (!res.ok) {
-      setFileError('Unable to open result file');
+      setFileError('Unable to open document');
       return;
     }
     const blob = await res.blob();
@@ -51,7 +51,7 @@ export default function PortalLabResultsPage() {
 
   return (
     <div>
-      <DashboardHeader title="Lab Results" subtitle="Completed laboratory test results" />
+      <DashboardHeader title="Documents" subtitle="Files shared from your care team" />
 
       {fileError ? (
         <p className="mb-4 rounded-2xl bg-red-50 px-4 py-2 text-sm text-clay-error">{fileError}</p>
@@ -59,63 +59,46 @@ export default function PortalLabResultsPage() {
 
       <ClayCard padding="none" className="overflow-hidden">
         {loading ? (
-          <p className="px-6 py-8 text-center text-clay-text-muted">Loading lab results...</p>
+          <p className="px-6 py-8 text-center text-clay-text-muted">Loading documents...</p>
         ) : error ? (
           <div className="px-6 py-8">
-            <PortalQueryError
-              onRetry={() => refetch()}
-            />
+            <PortalQueryError onRetry={() => refetch()} />
           </div>
         ) : !patient ? (
           <p className="px-6 py-8 text-center text-clay-text-muted">
             No linked patient record found.
           </p>
-        ) : labResults.length === 0 ? (
+        ) : documents.length === 0 ? (
           <div className="px-6 py-12 text-center">
-            <FlaskConical className="mx-auto mb-3 h-10 w-10 text-clay-text-muted/50" />
-            <p className="text-clay-text-muted">No lab results available yet.</p>
+            <FileText className="mx-auto mb-3 h-10 w-10 text-clay-text-muted/50" />
+            <p className="text-clay-text-muted">No documents available yet.</p>
           </div>
         ) : (
           <div className="divide-y divide-white/30">
-            {labResults.map(
-              (result: {
+            {documents.map(
+              (doc: {
                 id: string;
-                testName: string;
-                resultValue?: string;
-                referenceRange?: string;
-                unit?: string;
-                resultFileUrl?: string;
-                completedAt?: string;
+                fileName: string;
+                fileUrl: string;
+                fileType?: string;
                 createdAt: string;
               }) => (
-                <div key={result.id} className="flex items-start gap-4 px-6 py-4">
+                <div key={doc.id} className="flex items-center gap-4 px-6 py-4">
+                  <FileText className="h-5 w-5 shrink-0 text-clay-primary" />
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium text-clay-text">{result.testName}</p>
-                    <p className="mt-1 text-sm text-clay-text">
-                      {result.resultValue ?? 'Pending'}
-                      {result.unit ? ` ${result.unit}` : ''}
-                    </p>
-                    {result.referenceRange ? (
-                      <p className="text-sm text-clay-text-muted">
-                        Reference: {result.referenceRange}
-                      </p>
-                    ) : null}
-                    <p className="mt-1 text-xs text-clay-text-muted">
-                      {result.completedAt
-                        ? `Completed ${new Date(result.completedAt).toLocaleString()}`
-                        : `Recorded ${new Date(result.createdAt).toLocaleString()}`}
+                    <p className="truncate font-medium text-clay-text">{doc.fileName}</p>
+                    <p className="text-xs text-clay-text-muted">
+                      {doc.fileType ? `${doc.fileType} · ` : ''}
+                      {new Date(doc.createdAt).toLocaleString()}
                     </p>
                   </div>
-                  {result.resultFileUrl ? (
-                    <ClayButton
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => void handleOpenResultFile(result.resultFileUrl!)}
-                    >
-                      <FileText className="h-4 w-4" />
-                      Download
-                    </ClayButton>
-                  ) : null}
+                  <ClayButton
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => void handleOpenDocument(doc.fileUrl)}
+                  >
+                    Download
+                  </ClayButton>
                 </div>
               ),
             )}

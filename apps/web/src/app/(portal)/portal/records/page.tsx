@@ -13,6 +13,7 @@ export default function PortalRecordsPage() {
   const appointments = data?.portalPatientRecords?.appointments ?? [];
   const prescriptions = data?.portalPatientRecords?.prescriptions ?? [];
   const labResults = data?.portalPatientRecords?.labResults ?? [];
+  const documents = data?.portalPatientRecords?.documents ?? [];
 
   return (
     <div>
@@ -69,6 +70,10 @@ export default function PortalRecordsPage() {
               <div className="flex items-center justify-between">
                 <span className="text-clay-text-muted">Lab results</span>
                 <ClayBadge>{labResults.length}</ClayBadge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-clay-text-muted">Documents</span>
+                <ClayBadge>{documents.length}</ClayBadge>
               </div>
             </div>
           </ClayCard>

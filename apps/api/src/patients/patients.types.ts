@@ -81,6 +81,9 @@ export class PatientType {
   @Field()
   status: string;
 
+  @Field(() => ID, { nullable: true })
+  userId?: string;
+
   @Field()
   createdAt: Date;
 

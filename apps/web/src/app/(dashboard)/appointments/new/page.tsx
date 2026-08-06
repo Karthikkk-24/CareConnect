@@ -34,7 +34,7 @@ function NewAppointmentForm() {
     skip: !hospitalId || patientSearch.length < 2,
   });
 
-  const { data: staffData } = useQuery(STAFF_MEMBERS_QUERY, {
+  const { data: staffData, error: staffError } = useQuery(STAFF_MEMBERS_QUERY, {
     variables: { hospitalId },
     skip: !hospitalId,
   });
@@ -44,14 +44,20 @@ function NewAppointmentForm() {
   const canWriteAppointments = (meData?.me?.permissions ?? []).includes('appointments:write');
 
   const doctors =
-    staffData?.staffMembers?.filter(
-      (s: { roleSlug: string; isActive: boolean }) =>
-        s.isActive && (s.roleSlug === 'doctor' || s.roleSlug === 'physician'),
-    ) ?? [];
+    staffError
+      ? []
+      : (staffData?.staffMembers?.filter(
+          (s: { roleSlug: string; isActive: boolean }) =>
+            s.isActive && s.roleSlug === 'doctor',
+        ) ?? []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    if (staffError) {
+      setError('Could not load doctors. Please retry before booking.');
+      return;
+    }
     if (!patientId.trim()) {
       setError('Patient ID is required');
       return;
@@ -132,7 +138,11 @@ function NewAppointmentForm() {
             <label htmlFor="doctor" className="text-sm font-medium text-clay-text">
               Doctor (optional)
             </label>
-            {doctors.length > 0 ? (
+            {staffError ? (
+              <p className="text-sm text-clay-error">
+                Could not load doctors. Fix the connection and retry before booking.
+              </p>
+            ) : doctors.length > 0 ? (
               <select
                 id="doctor"
                 value={doctorId}

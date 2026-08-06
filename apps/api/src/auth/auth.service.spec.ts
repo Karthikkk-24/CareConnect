@@ -238,6 +238,39 @@ describe('AuthService', () => {
       expect(result.hospitalActive).toBe(false);
       expect(result.hospitalId).toBe('hospital-a');
     });
+
+    it('treats a missing hospital row as inactive and strips staff grants', async () => {
+      hospitalsRepo.findOne.mockResolvedValue(null);
+      const result = await service.toAuthenticatedUser({
+        id: 'user-1',
+        authId: 'auth-1',
+        email: 'nurse@hospital.com',
+        fullName: 'Nurse',
+        hospitalId: 'orphan-hospital',
+        isActive: true,
+        onboardingCompleted: true,
+        userRoles: [
+          {
+            hospitalId: 'orphan-hospital',
+            role: {
+              slug: 'nurse',
+              permissions: [{ slug: 'patients:read' }],
+            },
+          },
+          {
+            hospitalId: undefined,
+            role: {
+              slug: 'patient',
+              permissions: [],
+            },
+          },
+        ],
+      } as User);
+
+      expect(result.hospitalActive).toBe(false);
+      expect(result.roles).toEqual(['patient']);
+      expect(result.permissions).toEqual([]);
+    });
   });
 
   describe('completeOnboarding bootstrap', () => {

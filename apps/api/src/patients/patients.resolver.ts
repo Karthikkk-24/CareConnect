@@ -268,4 +268,23 @@ export class PatientsResolver {
       email,
     );
   }
+
+  @Mutation(() => PatientType)
+  @Roles(ROLES.HOSPITAL_ADMIN, ROLES.HOSPITAL_MANAGER, ROLES.SUPER_ADMIN)
+  @Permissions(PERMISSIONS.PATIENTS_WRITE)
+  async unlinkPatientAccount(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('patientId') patientId: string,
+    @Args('hospitalId', { nullable: true }) hospitalId?: string,
+  ): Promise<PatientType> {
+    const resolvedHospitalId = this.patientsService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.patientsService.unlinkPatientAccount(
+      patientId,
+      resolvedHospitalId,
+      user,
+    );
+  }
 }

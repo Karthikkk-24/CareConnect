@@ -8,6 +8,7 @@ import { ClayBadge, ClayButton, ClayCard } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
 import { QueryError } from '@/components/query-error';
 import { ME_QUERY, PATIENTS_QUERY } from '@/lib/graphql/queries';
+import { canWritePatientDemographics } from '@/lib/clinical-access';
 
 export default function PatientsPage() {
   const [search, setSearch] = useState('');
@@ -25,7 +26,7 @@ export default function PatientsPage() {
 
   const patients = data?.patients?.items ?? [];
   const total = error ? 0 : (data?.patients?.total ?? 0);
-  const canWritePatients = (meData?.me?.permissions ?? []).includes('patients:write');
+  const canWritePatients = canWritePatientDemographics(meData?.me?.roles, meData?.me?.permissions);
 
   return (
     <div>

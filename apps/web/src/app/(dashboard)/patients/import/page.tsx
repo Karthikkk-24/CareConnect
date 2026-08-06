@@ -9,6 +9,7 @@ import { ForbiddenAccess } from '@/components/auth/forbidden-access';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
 import { IMPORT_PATIENTS_MUTATION, ME_QUERY } from '@/lib/graphql/queries';
 import { getCsvTemplate, parsePatientCsv } from '@/lib/csv-parser';
+import { canWritePatientDemographics } from '@/lib/clinical-access';
 
 export default function ImportPatientsPage() {
   const router = useRouter();
@@ -24,7 +25,7 @@ export default function ImportPatientsPage() {
   const { data: meData } = useQuery(ME_QUERY);
   const [importPatients, { loading }] = useMutation(IMPORT_PATIENTS_MUTATION);
 
-  const canWritePatients = (meData?.me?.permissions ?? []).includes('patients:write');
+  const canWritePatients = canWritePatientDemographics(meData?.me?.roles, meData?.me?.permissions);
 
   const handleFile = async (file: File) => {
     const text = await file.text();

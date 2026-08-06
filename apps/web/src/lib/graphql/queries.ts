@@ -7,6 +7,7 @@ export const ME_QUERY = gql`
       email
       fullName
       hospitalId
+      hospitalActive
       roles
       permissions
       onboardingCompleted
@@ -72,6 +73,18 @@ export const LINK_PATIENT_ACCOUNT = gql`
       id
       fullName
       status
+      userId
+    }
+  }
+`;
+
+export const UNLINK_PATIENT_ACCOUNT = gql`
+  mutation UnlinkPatientAccount($patientId: String!, $hospitalId: String) {
+    unlinkPatientAccount(patientId: $patientId, hospitalId: $hospitalId) {
+      id
+      fullName
+      status
+      userId
     }
   }
 `;
@@ -269,6 +282,7 @@ export const PATIENT_QUERY = gql`
       identificationNumber
       primaryCarePhysician
       status
+      userId
       createdAt
       emergencyContacts {
         id
@@ -514,6 +528,27 @@ export const DISCHARGE_ADMISSION_MUTATION = gql`
   }
 `;
 
+export const TRANSFER_ADMISSION_MUTATION = gql`
+  mutation TransferAdmission($input: TransferAdmissionInput!, $hospitalId: String) {
+    transferAdmission(input: $input, hospitalId: $hospitalId) {
+      id
+      wardId
+      bedId
+      status
+    }
+  }
+`;
+
+export const TRANSFER_OUT_ADMISSION_MUTATION = gql`
+  mutation TransferOutAdmission($input: TransferOutAdmissionInput!, $hospitalId: String) {
+    transferOutAdmission(input: $input, hospitalId: $hospitalId) {
+      id
+      status
+      dischargedAt
+    }
+  }
+`;
+
 export const BED_OCCUPANCY_QUERY = gql`
   query WardOccupancy($hospitalId: String) {
     wardOccupancy(hospitalId: $hospitalId) {
@@ -692,6 +727,24 @@ export const COMPLETE_LAB_RESULT_MUTATION = gql`
   }
 `;
 
+export const UPDATE_LAB_ORDER_STATUS_MUTATION = gql`
+  mutation UpdateLabOrderStatus($input: UpdateLabOrderStatusInput!, $hospitalId: String) {
+    updateLabOrderStatus(input: $input, hospitalId: $hospitalId) {
+      id
+      status
+    }
+  }
+`;
+
+export const CANCEL_PRESCRIPTION_MUTATION = gql`
+  mutation CancelPrescription($input: CancelPrescriptionInput!, $hospitalId: String) {
+    cancelPrescription(input: $input, hospitalId: $hospitalId) {
+      id
+      status
+    }
+  }
+`;
+
 export const DISCHARGES_QUERY = gql`
   query Discharges($patientId: String!, $hospitalId: String) {
     discharges(patientId: $patientId, hospitalId: $hospitalId) {
@@ -803,7 +856,15 @@ export const PORTAL_PATIENT_RECORDS_QUERY = gql`
         resultValue
         referenceRange
         unit
+        resultFileUrl
         completedAt
+        createdAt
+      }
+      documents {
+        id
+        fileName
+        fileUrl
+        fileType
         createdAt
       }
     }

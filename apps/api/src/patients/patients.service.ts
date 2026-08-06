@@ -112,6 +112,7 @@ export class PatientsService {
       identificationNumber: patient.identificationNumber,
       primaryCarePhysician: patient.primaryCarePhysician,
       status: patient.status,
+      userId: patient.userId,
       createdAt: patient.createdAt,
       updatedAt: patient.updatedAt,
     };
@@ -685,6 +686,35 @@ export class PatientsService {
         userId: targetUserId,
         previousUserId,
         email: lookupEmail,
+      },
+    });
+
+    return this.toPatientType(saved);
+  }
+
+  async unlinkPatientAccount(
+    patientId: string,
+    hospitalId: string,
+    actor: AuthenticatedUser,
+  ): Promise<PatientType> {
+    const patient = await this.findPatientOrThrow(patientId, hospitalId);
+
+    if (!patient.userId) {
+      throw new BadRequestException('Patient chart is not linked to a portal account');
+    }
+
+    const previousUserId = patient.userId;
+    patient.userId = null as unknown as string | undefined;
+    const saved = await this.patientsRepo.save(patient);
+
+    await this.audit.log({
+      actorId: actor.id,
+      hospitalId,
+      action: 'unlink_account',
+      resource: 'patient',
+      resourceId: saved.id,
+      metadata: {
+        previousUserId,
       },
     });
 

@@ -1,12 +1,16 @@
 import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
 import { GraphQLModule } from '@nestjs/graphql';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import depthLimit from 'graphql-depth-limit';
 import { join } from 'path';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { validateEnv } from './config/env.validation';
 import { AuthModule } from './auth/auth.module';
+import { AppThrottlerGuard } from './common/app-throttler.guard';
 import {
   Hospital,
   Patient,
@@ -76,6 +80,13 @@ import { UploadsModule } from './uploads/uploads.module';
       ],
       validate: validateEnv,
     }),
+    // ~120 GraphQL/HTTP ops per minute per IP (#207).
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60_000,
+        limit: 120,
+      },
+    ]),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -147,7 +158,11 @@ import { UploadsModule } from './uploads/uploads.module';
           // Playground + introspection only outside production.
           playground: !isProduction,
           introspection: !isProduction,
-          context: ({ req }: { req: Request }) => ({ req }),
+          validationRules: [depthLimit(10)],
+          context: ({ req, res }: { req: Request; res: Response }) => ({
+            req,
+            res,
+          }),
         };
       },
     }),
@@ -171,6 +186,12 @@ import { UploadsModule } from './uploads/uploads.module';
     DischargeModule,
     PortalModule,
     UploadsModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: AppThrottlerGuard,
+    },
   ],
 })
 export class AppModule {}

@@ -9,6 +9,7 @@ import { DashboardHeader } from '@/components/layout/dashboard-header';
 import { PatientWizard } from '@/components/patients/patient-wizard';
 import { ME_QUERY, PATIENT_QUERY, UPDATE_PATIENT_MUTATION } from '@/lib/graphql/queries';
 import { QueryError } from '@/components/query-error';
+import { canWritePatientDemographics } from '@/lib/clinical-access';
 
 type PatientDetail = {
   fullName: string;
@@ -106,7 +107,7 @@ export default function EditPatientPage() {
 
   const [updatePatient, { loading }] = useMutation(UPDATE_PATIENT_MUTATION);
 
-  const canWritePatients = (meData?.me?.permissions ?? []).includes('patients:write');
+  const canWritePatients = canWritePatientDemographics(meData?.me?.roles, meData?.me?.permissions);
 
   const handleSubmit = async (input: CreatePatientInput) => {
     setError('');

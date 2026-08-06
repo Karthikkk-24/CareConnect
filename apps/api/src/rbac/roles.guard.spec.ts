@@ -38,6 +38,28 @@ describe('RolesGuard', () => {
     expect(guard.canActivate(createContext())).toBe(true);
   });
 
+  it('requires an authenticated user when AllowAuthenticated is set', () => {
+    jest.spyOn(reflector, 'getAllAndOverride').mockImplementation((key) => {
+      if (key === 'allowAuthenticated') return true;
+      return undefined;
+    });
+
+    expect(guard.canActivate(createContext())).toBe(false);
+    expect(
+      guard.canActivate(
+        createContext({
+          id: 'u1',
+          authId: 'a1',
+          email: 'a@b.c',
+          fullName: 'A',
+          roles: [],
+          permissions: [],
+          onboardingCompleted: false,
+        }),
+      ),
+    ).toBe(true);
+  });
+
   it('denies access when user is missing', () => {
     jest
       .spyOn(reflector, 'getAllAndOverride')

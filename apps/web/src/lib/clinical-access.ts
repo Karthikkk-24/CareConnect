@@ -41,6 +41,19 @@ export const PATIENT_ADMIN_ROLES = [
   'super_admin',
 ] as const;
 
+/**
+ * Roles that may create/update/import patient demographics (matches API
+ * createPatient/updatePatient @Roles — excludes pharmacist).
+ */
+export const PATIENT_DEMOGRAPHIC_WRITE_ROLES = [
+  'doctor',
+  'nurse',
+  'receptionist',
+  'hospital_admin',
+  'hospital_manager',
+  'super_admin',
+] as const;
+
 export function hasAnyRole(
   roles: string[] | undefined,
   allowed: readonly string[],
@@ -67,6 +80,18 @@ export function canActAsClinician(roles: string[] | undefined): boolean {
 
 export function canAdminPatients(roles: string[] | undefined): boolean {
   return hasAnyRole(roles, PATIENT_ADMIN_ROLES);
+}
+
+/** Demographic write: patients:write AND a clinical/front-desk role (#190). */
+export function canWritePatientDemographics(
+  roles: string[] | undefined,
+  permissions: string[] | undefined,
+): boolean {
+  if (roles?.includes('super_admin')) return true;
+  return (
+    !!permissions?.includes('patients:write') &&
+    hasAnyRole(roles, PATIENT_DEMOGRAPHIC_WRITE_ROLES)
+  );
 }
 
 /** Roles that may schedule and update follow-ups (matches API @Roles). */

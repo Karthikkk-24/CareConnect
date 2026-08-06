@@ -311,22 +311,28 @@ export class StaffService {
       );
     }
 
+    const previousActive = staff.isActive;
+    const nextActive = input.isActive ?? staff.isActive;
+
+    // Sync IdP before persisting so a Clerk failure does not leave DB/IdP divergent (#200).
+    if (previousActive !== nextActive) {
+      await this.syncClerkActiveState(staff.userId, nextActive);
+    }
+
     Object.assign(staff, {
       phone: input.phone ?? staff.phone,
       department: input.department ?? staff.department,
       specialization: input.specialization ?? staff.specialization,
       employeeId: input.employeeId ?? staff.employeeId,
-      isActive: input.isActive ?? staff.isActive,
+      isActive: nextActive,
     });
 
     const saved = await this.staffRepo.save(staff);
     if (input.isActive === false) {
       await this.usersRepo.update(staff.userId, { isActive: false });
       await this.invalidateOutstandingInvites(saved);
-      await this.syncClerkActiveState(staff.userId, false);
     } else if (input.isActive === true) {
       await this.usersRepo.update(staff.userId, { isActive: true });
-      await this.syncClerkActiveState(staff.userId, true);
     }
 
     await this.audit.log({
@@ -344,11 +350,12 @@ export class StaffService {
     const staff = await this.findByIdForUser(id, actor);
     if (!staff) throw new NotFoundException('Staff member not found');
 
+    await this.syncClerkActiveState(staff.userId, false);
+
     staff.isActive = false;
     await this.staffRepo.save(staff);
     await this.usersRepo.update(staff.userId, { isActive: false });
     await this.invalidateOutstandingInvites(staff);
-    await this.syncClerkActiveState(staff.userId, false);
 
     await this.audit.log({
       actorId: actor.id,

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import {
+  Hospital,
   LabOrder,
   LabResult,
   Patient,
@@ -13,7 +14,13 @@ import { UploadsService } from './uploads.service';
 @Module({
   imports: [
     AuthModule,
-    TypeOrmModule.forFeature([PatientDocument, Patient, LabResult, LabOrder]),
+    TypeOrmModule.forFeature([
+      PatientDocument,
+      Patient,
+      LabResult,
+      LabOrder,
+      Hospital,
+    ]),
   ],
   controllers: [UploadsController],
   providers: [UploadsService],

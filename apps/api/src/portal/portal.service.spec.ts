@@ -6,6 +6,7 @@ import {
   LabOrder,
   LabResult,
   Patient,
+  PatientDocument,
   Prescription,
 } from '../database/entities';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -21,6 +22,7 @@ describe('PortalService', () => {
   const prescriptionsRepo = { find: jest.fn() };
   const labOrdersRepo = { find: jest.fn() };
   const labResultsRepo = { find: jest.fn() };
+  const documentsRepo = { find: jest.fn() };
   const hospitalsRepo = { findOne: jest.fn() };
   const appointmentsService = {
     toAppointmentType: jest.fn((a: unknown) => a),
@@ -60,6 +62,10 @@ describe('PortalService', () => {
         },
         { provide: getRepositoryToken(LabOrder), useValue: labOrdersRepo },
         { provide: getRepositoryToken(LabResult), useValue: labResultsRepo },
+        {
+          provide: getRepositoryToken(PatientDocument),
+          useValue: documentsRepo,
+        },
         { provide: getRepositoryToken(Hospital), useValue: hospitalsRepo },
         { provide: AppointmentsService, useValue: appointmentsService },
         { provide: ClinicalService, useValue: clinicalService },
@@ -77,6 +83,7 @@ describe('PortalService', () => {
     expect(result.appointments).toEqual([]);
     expect(result.prescriptions).toEqual([]);
     expect(result.labResults).toEqual([]);
+    expect(result.documents).toEqual([]);
     expect(patientsRepo.findOne).toHaveBeenCalledWith({
       where: { userId: 'user-1' },
     });
@@ -96,10 +103,12 @@ describe('PortalService', () => {
     appointmentsRepo.find.mockResolvedValue([]);
     prescriptionsRepo.find.mockResolvedValue([]);
     labOrdersRepo.find.mockResolvedValue([]);
+    documentsRepo.find.mockResolvedValue([]);
 
     const result = await service.portalPatientRecords(actor);
 
     expect(result.patient?.id).toBe('patient-1');
+    expect(result.documents).toEqual([]);
     expect(appointmentsRepo.find).toHaveBeenCalled();
   });
 });
