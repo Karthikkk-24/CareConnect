@@ -92,6 +92,7 @@ export class ClerkAdminService implements OnModuleInit {
       this.logger.warn(
         `Failed to deactivate Clerk user ${clerkUserId}: ${(error as Error).message}`,
       );
+      throw error;
     }
   }
 
@@ -103,6 +104,7 @@ export class ClerkAdminService implements OnModuleInit {
       this.logger.warn(
         `Failed to reactivate Clerk user ${clerkUserId}: ${(error as Error).message}`,
       );
+      throw error;
     }
   }
 }
