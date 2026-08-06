@@ -7,6 +7,7 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 import { Permissions } from '../rbac/permissions.decorator';
 import { Roles } from '../rbac/roles.decorator';
 import { RolesGuard } from '../rbac/roles.guard';
+import { AllowAuthenticated } from '../rbac/allow-authenticated.decorator';
 import { STAFF_ROLES } from '../rbac/staff-roles';
 import { AuditService } from '../audit/audit.service';
 import { HospitalsService } from './hospitals.service';
@@ -25,6 +26,7 @@ export class HospitalsResolver {
   ) {}
 
   @Query(() => [HospitalType])
+  @Permissions(PERMISSIONS.HOSPITALS_READ)
   hospitals(@CurrentUser() user: AuthenticatedUser): Promise<HospitalType[]> {
     if (user.roles.includes('super_admin')) {
       return this.hospitalsService.findAll();
@@ -33,6 +35,7 @@ export class HospitalsResolver {
   }
 
   @Query(() => HospitalType, { nullable: true })
+  @Permissions(PERMISSIONS.HOSPITALS_READ)
   hospital(
     @CurrentUser() user: AuthenticatedUser,
     @Args('id') id: string,
@@ -42,6 +45,7 @@ export class HospitalsResolver {
 
   /** Bootstrap: only unassigned non-patient/non-staff users, or super_admin. */
   @Mutation(() => HospitalType)
+  @AllowAuthenticated()
   async createHospital(
     @CurrentUser() user: AuthenticatedUser,
     @Args('input') input: CreateHospitalInput,
