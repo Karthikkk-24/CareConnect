@@ -16,6 +16,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const roles: string[] = me?.roles ?? [];
   const permissions: string[] = me?.permissions ?? [];
+  const isSuperAdmin = roles.includes('super_admin');
+  const hospitalLocked = !!me && me.hospitalActive === false && !isSuperAdmin;
   // Fail closed: never treat missing/failed me as authorized
   const allowed = !!me && canAccessRoute(pathname, { roles, permissions });
 
@@ -29,6 +31,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       router.replace('/portal');
     }
   }, [me, pathname, router]);
+
+  if (hospitalLocked) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-clay-bg p-6">
+        <ForbiddenAccess
+          title="Hospital inactive"
+          message="Your hospital has been deactivated. Staff access is locked until an administrator reactivates it. Contact CareConnect support if you need help."
+          homeHref="/login"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen gap-6 bg-clay-bg p-6">

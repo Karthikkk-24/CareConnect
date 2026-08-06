@@ -7,6 +7,7 @@ export const ME_QUERY = gql`
       email
       fullName
       hospitalId
+      hospitalActive
       roles
       permissions
       onboardingCompleted

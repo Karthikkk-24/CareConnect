@@ -17,6 +17,10 @@ export class UserType {
   @Field({ nullable: true })
   hospitalId?: string;
 
+  /** False when the user's bound hospital is deactivated. */
+  @Field()
+  hospitalActive: boolean;
+
   @Field(() => [String])
   roles: string[];
 
