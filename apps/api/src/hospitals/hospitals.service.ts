@@ -96,6 +96,18 @@ export class HospitalsService {
     const hospital = await this.findByIdForUser(id, user);
     if (!hospital) throw new NotFoundException('Hospital not found');
 
+    // Tenant lockout via isActive is super_admin-only (#188). Hospital admins
+    // may update profile fields but must not deactivate/reactivate the tenant.
+    if (
+      input.isActive !== undefined &&
+      input.isActive !== hospital.isActive &&
+      !user.roles.includes('super_admin')
+    ) {
+      throw new ForbiddenException(
+        'Only a platform super admin can activate or deactivate a hospital',
+      );
+    }
+
     Object.assign(hospital, {
       name: input.name ?? hospital.name,
       email: input.email ?? hospital.email,
