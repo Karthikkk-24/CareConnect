@@ -62,21 +62,24 @@ export default function AdmissionsPage() {
     skip: !hospitalId || patientSearch.length < 2,
   });
 
-  const { data: wardsData } = useQuery(WARDS_QUERY, {
+  const { data: wardsData, error: wardsError } = useQuery(WARDS_QUERY, {
     variables: { hospitalId },
     skip: !hospitalId,
   });
 
   const bedsWardId = activeForm?.kind === 'transfer' ? transferWardId : wardId;
-  const { data: bedsData } = useQuery(BEDS_QUERY, {
+  const { data: bedsData, error: bedsError } = useQuery(BEDS_QUERY, {
     variables: { hospitalId, wardId: bedsWardId || undefined },
     skip: !hospitalId || !bedsWardId,
   });
 
-  const wards: Array<{ id: string; name: string; floor?: string }> = wardsData?.wards ?? [];
+  const wards: Array<{ id: string; name: string; floor?: string }> = wardsError
+    ? []
+    : (wardsData?.wards ?? []);
   const beds: Array<{ id: string; label: string; status: string; wardId: string }> =
-    bedsData?.beds ?? [];
+    bedsError ? [] : (bedsData?.beds ?? []);
   const availableBeds = beds.filter((b) => b.status === 'available');
+  const facilityQueryError = wardsError || bedsError;
 
   const resetActionForm = () => {
     setActiveForm(null);
@@ -275,7 +278,14 @@ export default function AdmissionsPage() {
                     </option>
                   ))}
                 </select>
-                {wards.length === 0 ? (
+                {facilityQueryError ? (
+                  <QueryError
+                    message="We could not load wards or beds. Please try again."
+                    onRetry={() => {
+                      void refetch();
+                    }}
+                  />
+                ) : wards.length === 0 ? (
                   canManageFacility ? (
                     <Link
                       href="/settings/facility"
