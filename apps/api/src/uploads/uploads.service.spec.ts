@@ -4,6 +4,7 @@ import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import {
+  Hospital,
   LabOrder,
   LabResult,
   Patient,
@@ -47,6 +48,9 @@ describe('UploadsService', () => {
   const labOrdersRepo = {
     findOne: jest.fn(),
   };
+  const hospitalsRepo = {
+    findOne: jest.fn(),
+  };
   const queryRunner = {
     connect: jest.fn().mockResolvedValue(undefined),
     release: jest.fn().mockResolvedValue(undefined),
@@ -66,6 +70,10 @@ describe('UploadsService', () => {
     jest.clearAllMocks();
     documentsRepo.createQueryBuilder.mockImplementation(emptyQb);
     labResultsRepo.createQueryBuilder.mockImplementation(emptyQb);
+    hospitalsRepo.findOne.mockResolvedValue({
+      id: 'hospital-a',
+      isActive: true,
+    });
     queryRunner.connect.mockResolvedValue(undefined);
     queryRunner.release.mockResolvedValue(undefined);
     queryRunner.query.mockImplementation((sql: string) => {
@@ -86,6 +94,7 @@ describe('UploadsService', () => {
         { provide: getRepositoryToken(Patient), useValue: patientsRepo },
         { provide: getRepositoryToken(LabResult), useValue: labResultsRepo },
         { provide: getRepositoryToken(LabOrder), useValue: labOrdersRepo },
+        { provide: getRepositoryToken(Hospital), useValue: hospitalsRepo },
         { provide: getDataSourceToken(), useValue: dataSource },
       ],
     }).compile();
@@ -250,6 +259,29 @@ describe('UploadsService', () => {
       await expect(
         service.assertCanDownload('abc.pdf', patientUser),
       ).resolves.toBeUndefined();
+    });
+
+    it('denies download when patient hospital is inactive', async () => {
+      mockDocLookup(document);
+      patientsRepo.findOne.mockResolvedValue(patient);
+      hospitalsRepo.findOne.mockResolvedValue({
+        id: 'hospital-a',
+        isActive: false,
+      });
+
+      await expect(
+        service.assertCanDownload('abc.pdf', patientUser),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('denies download when patient hospital is missing', async () => {
+      mockDocLookup(document);
+      patientsRepo.findOne.mockResolvedValue(patient);
+      hospitalsRepo.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.assertCanDownload('abc.pdf', staffUser),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('denies patient for another patient document', async () => {
