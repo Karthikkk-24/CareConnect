@@ -23,15 +23,32 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 import { UploadsService } from './uploads.service';
 
 const UPLOAD_DIR = join(process.cwd(), 'uploads');
-const ALLOWED_MIME = new Set([
+
+/** MIME → allowed extension (server-chosen; never trust client extension alone). */
+const MIME_TO_EXT: Record<string, string> = {
+  'application/pdf': '.pdf',
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+  'image/gif': '.gif',
+  'text/plain': '.txt',
+  'application/msword': '.doc',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+    '.docx',
+};
+
+const EXT_TO_MIME: Record<string, string> = Object.fromEntries(
+  Object.entries(MIME_TO_EXT).map(([mime, ext]) => [ext, mime]),
+);
+
+/** Preview-safe types may be inline; everything else downloads as attachment. */
+const INLINE_MIME = new Set([
   'application/pdf',
   'image/jpeg',
   'image/png',
   'image/webp',
   'image/gif',
   'text/plain',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ]);
 
 type AuthedRequest = Request & { user?: AuthenticatedUser };
@@ -51,15 +68,32 @@ export class UploadsController {
           cb(null, UPLOAD_DIR);
         },
         filename: (_req, file, cb) => {
-          const safeExt = extname(file.originalname).slice(0, 16);
-          cb(null, `${randomUUID()}${safeExt}`);
+          const ext = MIME_TO_EXT[file.mimetype];
+          if (!ext) {
+            cb(new BadRequestException(`Unsupported file type: ${file.mimetype}`), '');
+            return;
+          }
+          // Ignore client original extension — store only allowlisted ext (#206).
+          cb(null, `${randomUUID()}${ext}`);
         },
       }),
       limits: { fileSize: 10 * 1024 * 1024 },
       fileFilter: (_req, file, cb) => {
-        if (!ALLOWED_MIME.has(file.mimetype)) {
+        if (!MIME_TO_EXT[file.mimetype]) {
           cb(
             new BadRequestException(`Unsupported file type: ${file.mimetype}`),
+            false,
+          );
+          return;
+        }
+        const clientExt = extname(file.originalname).toLowerCase();
+        const expected = MIME_TO_EXT[file.mimetype];
+        // Reject obvious MIME/extension mismatches (e.g. .html claimed as pdf).
+        if (clientExt && clientExt !== expected && !(file.mimetype === 'image/jpeg' && clientExt === '.jpeg')) {
+          cb(
+            new BadRequestException(
+              `File extension ${clientExt} does not match type ${file.mimetype}`,
+            ),
             false,
           );
           return;
@@ -111,7 +145,14 @@ export class UploadsController {
 
     const path = join(UPLOAD_DIR, safe);
     if (!existsSync(path)) throw new NotFoundException('File not found');
-    res.setHeader('Content-Disposition', `inline; filename="${safe}"`);
+
+    const ext = extname(safe).toLowerCase();
+    const contentType = EXT_TO_MIME[ext] ?? 'application/octet-stream';
+    const disposition = INLINE_MIME.has(contentType) ? 'inline' : 'attachment';
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Disposition', `${disposition}; filename="${safe}"`);
     createReadStream(path).pipe(res);
   }
 }
