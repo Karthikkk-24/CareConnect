@@ -3,13 +3,14 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { GraphQLModule } from '@nestjs/graphql';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import depthLimit from 'graphql-depth-limit';
 import { join } from 'path';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { validateEnv } from './config/env.validation';
 import { AuthModule } from './auth/auth.module';
+import { AppThrottlerGuard } from './common/app-throttler.guard';
 import {
   Hospital,
   Patient,
@@ -158,7 +159,10 @@ import { UploadsModule } from './uploads/uploads.module';
           playground: !isProduction,
           introspection: !isProduction,
           validationRules: [depthLimit(10)],
-          context: ({ req }: { req: Request }) => ({ req }),
+          context: ({ req, res }: { req: Request; res: Response }) => ({
+            req,
+            res,
+          }),
         };
       },
     }),
@@ -186,7 +190,7 @@ import { UploadsModule } from './uploads/uploads.module';
   providers: [
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: AppThrottlerGuard,
     },
   ],
 })
