@@ -4,14 +4,17 @@ import { GqlAuthGuard } from '../auth/gql-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { AuthService } from '../auth/auth.service';
+import { AllowAuthenticated } from '../rbac/allow-authenticated.decorator';
+import { RolesGuard } from '../rbac/roles.guard';
 import { UserType } from './users.types';
 
 @Resolver(() => UserType)
+@UseGuards(GqlAuthGuard, RolesGuard)
 export class UsersResolver {
   constructor(private readonly authService: AuthService) {}
 
   @Query(() => UserType, { name: 'me' })
-  @UseGuards(GqlAuthGuard)
+  @AllowAuthenticated()
   me(@CurrentUser() user: AuthenticatedUser): UserType {
     return {
       id: user.id,
@@ -26,7 +29,7 @@ export class UsersResolver {
   }
 
   @Mutation(() => UserType)
-  @UseGuards(GqlAuthGuard)
+  @AllowAuthenticated()
   async completeOnboarding(
     @CurrentUser() user: AuthenticatedUser,
     @Args('fullName') fullName: string,
@@ -57,7 +60,7 @@ export class UsersResolver {
   }
 
   @Mutation(() => UserType)
-  @UseGuards(GqlAuthGuard)
+  @AllowAuthenticated()
   async completePatientOnboarding(
     @CurrentUser() user: AuthenticatedUser,
     @Args('fullName') fullName: string,

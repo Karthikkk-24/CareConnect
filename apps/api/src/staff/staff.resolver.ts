@@ -7,6 +7,7 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 import { Permissions } from '../rbac/permissions.decorator';
 import { Roles } from '../rbac/roles.decorator';
 import { RolesGuard } from '../rbac/roles.guard';
+import { AllowAuthenticated } from '../rbac/allow-authenticated.decorator';
 import { StaffService } from './staff.service';
 import { CreateStaffInput, StaffType, UpdateStaffInput } from './staff.types';
 
@@ -85,7 +86,7 @@ export class StaffResolver {
   }
 
   @Mutation(() => StaffType)
-  @UseGuards(GqlAuthGuard)
+  @AllowAuthenticated()
   async acceptStaffInvite(
     @CurrentUser() user: AuthenticatedUser,
     @Args('token') token: string,
