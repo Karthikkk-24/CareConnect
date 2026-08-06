@@ -33,6 +33,24 @@ export class PortalLabResultType {
 }
 
 @ObjectType()
+export class PortalDocumentType {
+  @Field(() => ID)
+  id: string;
+
+  @Field()
+  fileName: string;
+
+  @Field()
+  fileUrl: string;
+
+  @Field({ nullable: true })
+  fileType?: string;
+
+  @Field()
+  createdAt: Date;
+}
+
+@ObjectType()
 export class PortalPatientProfileType {
   @Field(() => ID)
   id: string;
@@ -72,4 +90,7 @@ export class PortalPatientRecordsType {
 
   @Field(() => [PortalLabResultType])
   labResults: PortalLabResultType[];
+
+  @Field(() => [PortalDocumentType])
+  documents: PortalDocumentType[];
 }

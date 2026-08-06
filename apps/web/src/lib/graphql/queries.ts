@@ -808,6 +808,13 @@ export const PORTAL_PATIENT_RECORDS_QUERY = gql`
         completedAt
         createdAt
       }
+      documents {
+        id
+        fileName
+        fileUrl
+        fileType
+        createdAt
+      }
     }
   }
 `;
