@@ -73,6 +73,18 @@ export const LINK_PATIENT_ACCOUNT = gql`
       id
       fullName
       status
+      userId
+    }
+  }
+`;
+
+export const UNLINK_PATIENT_ACCOUNT = gql`
+  mutation UnlinkPatientAccount($patientId: String!, $hospitalId: String) {
+    unlinkPatientAccount(patientId: $patientId, hospitalId: $hospitalId) {
+      id
+      fullName
+      status
+      userId
     }
   }
 `;
@@ -270,6 +282,7 @@ export const PATIENT_QUERY = gql`
       identificationNumber
       primaryCarePhysician
       status
+      userId
       createdAt
       emergencyContacts {
         id
