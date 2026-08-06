@@ -8,6 +8,7 @@ import { ForbiddenAccess } from '@/components/auth/forbidden-access';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
 import { PatientWizard } from '@/components/patients/patient-wizard';
 import { CREATE_PATIENT_MUTATION, ME_QUERY } from '@/lib/graphql/queries';
+import { canWritePatientDemographics } from '@/lib/clinical-access';
 
 export default function NewPatientPage() {
   const router = useRouter();
@@ -15,7 +16,7 @@ export default function NewPatientPage() {
   const { data: meData } = useQuery(ME_QUERY);
   const [createPatient, { loading }] = useMutation(CREATE_PATIENT_MUTATION);
 
-  const canWritePatients = (meData?.me?.permissions ?? []).includes('patients:write');
+  const canWritePatients = canWritePatientDemographics(meData?.me?.roles, meData?.me?.permissions);
 
   const handleSubmit = async (input: CreatePatientInput) => {
     setError('');

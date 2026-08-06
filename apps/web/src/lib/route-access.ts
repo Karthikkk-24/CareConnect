@@ -15,12 +15,32 @@ type RouteRule = {
   anyRoles?: string[];
 };
 
+/** Roles allowed to create/edit/import patient charts (excludes pharmacist). */
+const PATIENT_DEMOGRAPHIC_WRITE_ROLES = [
+  'doctor',
+  'nurse',
+  'receptionist',
+  'hospital_admin',
+  'hospital_manager',
+  'super_admin',
+];
+
 /** Write/create/edit routes — checked before read rules (longest prefix first) */
-const WRITE_ROUTE_RULES: RouteRule[] = [
+const WRITE_ROUTE_RULES: (RouteRule & { requireAll?: boolean })[] = [
   { prefix: '/finance/invoices/new', anyPermissions: ['billing:write'] },
   { prefix: '/appointments/new', anyPermissions: ['appointments:write'] },
-  { prefix: '/patients/import', anyPermissions: ['patients:write'] },
-  { prefix: '/patients/new', anyPermissions: ['patients:write'] },
+  {
+    prefix: '/patients/import',
+    anyPermissions: ['patients:write'],
+    anyRoles: PATIENT_DEMOGRAPHIC_WRITE_ROLES,
+    requireAll: true,
+  },
+  {
+    prefix: '/patients/new',
+    anyPermissions: ['patients:write'],
+    anyRoles: PATIENT_DEMOGRAPHIC_WRITE_ROLES,
+    requireAll: true,
+  },
   { prefix: '/staff/new', anyPermissions: ['staff:write'] },
 ];
 
@@ -31,7 +51,12 @@ const WRITE_ROUTE_PATTERNS: {
   /** When both are set, require permission AND role (e.g. discharge). */
   requireAll?: boolean;
 }[] = [
-  { pattern: /^\/patients\/[^/]+\/edit$/, anyPermissions: ['patients:write'] },
+  {
+    pattern: /^\/patients\/[^/]+\/edit$/,
+    anyPermissions: ['patients:write'],
+    anyRoles: PATIENT_DEMOGRAPHIC_WRITE_ROLES,
+    requireAll: true,
+  },
   {
     pattern: /^\/patients\/[^/]+\/discharge$/,
     anyPermissions: ['patients:write'],
@@ -119,7 +144,8 @@ function matchesWriteRoute(pathname: string, ctx: AccessContext): boolean | null
   const writeRule = SORTED_WRITE_RULES.find(
     (r) => pathname === r.prefix || pathname.startsWith(`${r.prefix}/`),
   );
-  if (!writeRule?.anyPermissions) return null;
+  if (!writeRule) return null;
+  if (!writeRule.anyPermissions && !writeRule.anyRoles) return null;
   return hasWriteAccess(writeRule, ctx);
 }
 

@@ -130,7 +130,8 @@ export default function PatientDetailPage() {
 
   const patient = data?.patient;
   const roles: string[] = meData?.me?.roles ?? [];
-  const canWritePatients = (meData?.me?.permissions ?? []).includes('patients:write');
+  const permissions: string[] = meData?.me?.permissions ?? [];
+  const canWritePatients = canWritePatientDemographics(roles, permissions);
   const canDischarge = canWritePatients && canDischargePatients(roles);
   const canLinkPortal = canWritePatients && canAdminPatients(roles);
 
