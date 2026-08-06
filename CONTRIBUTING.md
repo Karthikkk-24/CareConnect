@@ -68,6 +68,24 @@ pnpm --filter @careconnect/ui storybook
 
 Do not commit secrets (`.env`, keys, credentials).
 
+## Security scanning (Snyk)
+
+Dependency scanning:
+
+```bash
+snyk test --all-projects
+```
+
+Snyk Code (SAST / OWASP-oriented code analysis) must be enabled for the Snyk organization
+before `snyk code test` works. If you see `SNYK-CODE-0005`, an org admin should enable
+**Snyk Code** in the Snyk UI (Settings → Snyk Code), then re-run:
+
+```bash
+snyk code test --all-projects
+```
+
+File any new findings as GitHub issues with severity P0–P4.
+
 ## Project layout
 
 - `apps/web` — Next.js frontend (Clerk)
