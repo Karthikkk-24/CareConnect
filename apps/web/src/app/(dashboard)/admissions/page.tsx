@@ -14,11 +14,18 @@ import {
   BEDS_QUERY,
   ME_QUERY,
   PATIENTS_QUERY,
+  TRANSFER_ADMISSION_MUTATION,
+  TRANSFER_OUT_ADMISSION_MUTATION,
   WARDS_QUERY,
 } from '@/lib/graphql/queries';
 import { canAdmitPatients, canDischargePatients } from '@/lib/clinical-access';
 import { canAccessRoute } from '@/lib/route-access';
 import { QueryError } from '@/components/query-error';
+
+type ActiveForm =
+  | null
+  | { kind: 'transfer'; admissionId: string }
+  | { kind: 'transferOut'; admissionId: string };
 
 export default function AdmissionsPage() {
   const router = useRouter();
@@ -29,6 +36,10 @@ export default function AdmissionsPage() {
   const [bedId, setBedId] = useState('');
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
+  const [activeForm, setActiveForm] = useState<ActiveForm>(null);
+  const [transferWardId, setTransferWardId] = useState('');
+  const [transferBedId, setTransferBedId] = useState('');
+  const [transferOutNotes, setTransferOutNotes] = useState('');
 
   const { data: meData } = useQuery(ME_QUERY);
   const hospitalId = meData?.me?.hospitalId;
@@ -37,6 +48,8 @@ export default function AdmissionsPage() {
   const canWritePatients = permissions.includes('patients:write');
   const canAdmit = canWritePatients && canAdmitPatients(roles);
   const canDischarge = canWritePatients && canDischargePatients(roles);
+  const canTransfer = canAdmit;
+  const canTransferOut = canDischarge;
   const canManageFacility = canAccessRoute('/settings', { roles, permissions });
 
   const { data, loading, error: listError, refetch } = useQuery(ACTIVE_ADMISSIONS_QUERY, {
@@ -54,15 +67,23 @@ export default function AdmissionsPage() {
     skip: !hospitalId,
   });
 
+  const bedsWardId = activeForm?.kind === 'transfer' ? transferWardId : wardId;
   const { data: bedsData } = useQuery(BEDS_QUERY, {
-    variables: { hospitalId, wardId: wardId || undefined },
-    skip: !hospitalId || !wardId,
+    variables: { hospitalId, wardId: bedsWardId || undefined },
+    skip: !hospitalId || !bedsWardId,
   });
 
   const wards: Array<{ id: string; name: string; floor?: string }> = wardsData?.wards ?? [];
   const beds: Array<{ id: string; label: string; status: string; wardId: string }> =
     bedsData?.beds ?? [];
   const availableBeds = beds.filter((b) => b.status === 'available');
+
+  const resetActionForm = () => {
+    setActiveForm(null);
+    setTransferWardId('');
+    setTransferBedId('');
+    setTransferOutNotes('');
+  };
 
   const [admitPatient, { loading: admitting }] = useMutation(ADMIT_PATIENT_MUTATION, {
     onCompleted: () => {
@@ -74,6 +95,26 @@ export default function AdmissionsPage() {
       setReason('');
     },
   });
+
+  const [transferAdmission, { loading: transferring }] = useMutation(
+    TRANSFER_ADMISSION_MUTATION,
+    {
+      onCompleted: () => {
+        refetch();
+        resetActionForm();
+      },
+    },
+  );
+
+  const [transferOutAdmission, { loading: transferringOut }] = useMutation(
+    TRANSFER_OUT_ADMISSION_MUTATION,
+    {
+      onCompleted: () => {
+        refetch();
+        resetActionForm();
+      },
+    },
+  );
 
   const admissions = data?.activeAdmissions ?? [];
 
@@ -109,6 +150,49 @@ export default function AdmissionsPage() {
     }
   };
 
+  const handleTransfer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeForm || activeForm.kind !== 'transfer') return;
+    setError('');
+    if (!transferWardId || !transferBedId) {
+      setError('Ward and bed are required for transfer');
+      return;
+    }
+    try {
+      await transferAdmission({
+        variables: {
+          hospitalId,
+          input: {
+            admissionId: activeForm.admissionId,
+            wardId: transferWardId,
+            bedId: transferBedId,
+          },
+        },
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to transfer patient');
+    }
+  };
+
+  const handleTransferOut = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeForm || activeForm.kind !== 'transferOut') return;
+    setError('');
+    try {
+      await transferOutAdmission({
+        variables: {
+          hospitalId,
+          input: {
+            admissionId: activeForm.admissionId,
+            notes: transferOutNotes || undefined,
+          },
+        },
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to transfer out patient');
+    }
+  };
+
   const handleDischarge = (patientId: string) => {
     router.push(`/patients/${patientId}/discharge`);
   };
@@ -132,10 +216,11 @@ export default function AdmissionsPage() {
         ) : null}
       </div>
 
+      {error ? <p className="mb-4 text-sm text-clay-error">{error}</p> : null}
+
       {showForm ? (
         <ClayCard className="mb-6 max-w-2xl">
           <h2 className="mb-4 text-lg font-semibold text-clay-text">Admit Patient</h2>
-          {error ? <p className="mb-4 text-sm text-clay-error">{error}</p> : null}
           <form onSubmit={handleAdmit} className="space-y-4">
             <ClayInput
               label="Search Patient"
@@ -244,6 +329,92 @@ export default function AdmissionsPage() {
         </ClayCard>
       ) : null}
 
+      {activeForm?.kind === 'transfer' ? (
+        <ClayCard className="mb-6 max-w-2xl">
+          <h2 className="mb-4 text-lg font-semibold text-clay-text">Transfer bed</h2>
+          <form onSubmit={handleTransfer} className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-2">
+                <label htmlFor="transfer-ward" className="text-sm font-medium text-clay-text">
+                  New ward *
+                </label>
+                <select
+                  id="transfer-ward"
+                  value={transferWardId}
+                  onChange={(e) => {
+                    setTransferWardId(e.target.value);
+                    setTransferBedId('');
+                  }}
+                  required
+                  className="w-full rounded-2xl border border-white/60 bg-clay-surface px-4 py-3 text-sm text-clay-text shadow-clay-inset outline-none focus:ring-2 focus:ring-clay-primary/30"
+                >
+                  <option value="">Select ward</option>
+                  {wards.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name}
+                      {w.floor ? ` · Floor ${w.floor}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-2">
+                <label htmlFor="transfer-bed" className="text-sm font-medium text-clay-text">
+                  New bed *
+                </label>
+                <select
+                  id="transfer-bed"
+                  value={transferBedId}
+                  onChange={(e) => setTransferBedId(e.target.value)}
+                  disabled={!transferWardId}
+                  required
+                  className="w-full rounded-2xl border border-white/60 bg-clay-surface px-4 py-3 text-sm text-clay-text shadow-clay-inset outline-none focus:ring-2 focus:ring-clay-primary/30 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <option value="">
+                    {transferWardId ? 'Select bed' : 'Choose ward first'}
+                  </option>
+                  {availableBeds.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <ClayButton type="submit" isLoading={transferring}>
+                Confirm transfer
+              </ClayButton>
+              <ClayButton type="button" variant="ghost" onClick={resetActionForm}>
+                Cancel
+              </ClayButton>
+            </div>
+          </form>
+        </ClayCard>
+      ) : null}
+
+      {activeForm?.kind === 'transferOut' ? (
+        <ClayCard className="mb-6 max-w-2xl">
+          <h2 className="mb-4 text-lg font-semibold text-clay-text">Transfer out</h2>
+          <form onSubmit={handleTransferOut} className="space-y-4">
+            <ClayTextarea
+              label="Notes"
+              rows={3}
+              value={transferOutNotes}
+              onChange={(e) => setTransferOutNotes(e.target.value)}
+              placeholder="Destination facility, reason…"
+            />
+            <div className="flex flex-wrap gap-2">
+              <ClayButton type="submit" isLoading={transferringOut}>
+                Confirm transfer out
+              </ClayButton>
+              <ClayButton type="button" variant="ghost" onClick={resetActionForm}>
+                Cancel
+              </ClayButton>
+            </div>
+          </form>
+        </ClayCard>
+      ) : null}
+
       <ClayCard padding="none" className="overflow-hidden">
         <table className="w-full">
           <thead>
@@ -305,19 +476,48 @@ export default function AdmissionsPage() {
                     <td className="px-6 py-4">
                       <ClayBadge variant="success">{adm.status}</ClayBadge>
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      {canDischarge ? (
-                      <ClayButton
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => {
-                          const patientId = adm.patientId ?? adm.patient?.id;
-                          if (patientId) handleDischarge(patientId);
-                        }}
-                      >
-                        Discharge
-                      </ClayButton>
-                      ) : null}
+                    <td className="px-6 py-4">
+                      <div className="flex flex-wrap justify-end gap-2">
+                        {canTransfer ? (
+                          <ClayButton
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => {
+                              setError('');
+                              setTransferWardId('');
+                              setTransferBedId('');
+                              setActiveForm({ kind: 'transfer', admissionId: adm.id });
+                            }}
+                          >
+                            Transfer
+                          </ClayButton>
+                        ) : null}
+                        {canTransferOut ? (
+                          <ClayButton
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => {
+                              setError('');
+                              setTransferOutNotes('');
+                              setActiveForm({ kind: 'transferOut', admissionId: adm.id });
+                            }}
+                          >
+                            Transfer out
+                          </ClayButton>
+                        ) : null}
+                        {canDischarge ? (
+                          <ClayButton
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => {
+                              const pid = adm.patientId ?? adm.patient?.id;
+                              if (pid) handleDischarge(pid);
+                            }}
+                          >
+                            Discharge
+                          </ClayButton>
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
                 ),

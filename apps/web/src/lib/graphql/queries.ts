@@ -528,6 +528,27 @@ export const DISCHARGE_ADMISSION_MUTATION = gql`
   }
 `;
 
+export const TRANSFER_ADMISSION_MUTATION = gql`
+  mutation TransferAdmission($input: TransferAdmissionInput!, $hospitalId: String) {
+    transferAdmission(input: $input, hospitalId: $hospitalId) {
+      id
+      wardId
+      bedId
+      status
+    }
+  }
+`;
+
+export const TRANSFER_OUT_ADMISSION_MUTATION = gql`
+  mutation TransferOutAdmission($input: TransferOutAdmissionInput!, $hospitalId: String) {
+    transferOutAdmission(input: $input, hospitalId: $hospitalId) {
+      id
+      status
+      dischargedAt
+    }
+  }
+`;
+
 export const BED_OCCUPANCY_QUERY = gql`
   query WardOccupancy($hospitalId: String) {
     wardOccupancy(hospitalId: $hospitalId) {
