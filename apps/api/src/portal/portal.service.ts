@@ -128,6 +128,7 @@ export class PortalService {
           resultValue: result.resultValue,
           referenceRange: result.referenceRange,
           unit: result.unit,
+          resultFileUrl: result.resultFileUrl,
           completedAt: result.completedAt,
           createdAt: result.createdAt,
         });

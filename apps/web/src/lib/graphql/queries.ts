@@ -804,6 +804,7 @@ export const PORTAL_PATIENT_RECORDS_QUERY = gql`
         resultValue
         referenceRange
         unit
+        resultFileUrl
         completedAt
         createdAt
       }

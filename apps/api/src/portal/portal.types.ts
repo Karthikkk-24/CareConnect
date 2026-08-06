@@ -23,6 +23,9 @@ export class PortalLabResultType {
   unit?: string;
 
   @Field({ nullable: true })
+  resultFileUrl?: string;
+
+  @Field({ nullable: true })
   completedAt?: Date;
 
   @Field()
