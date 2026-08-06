@@ -15,6 +15,7 @@ import {
   PATIENTS_QUERY,
 } from '@/lib/graphql/queries';
 import { QueryError } from '@/components/query-error';
+import { canAuthorClinical } from '@/lib/clinical-access';
 
 const statusVariant = (status: string) => {
   switch (status) {
@@ -61,8 +62,11 @@ export default function LabPage() {
 
   const { data: meData } = useQuery(ME_QUERY);
   const hospitalId = meData?.me?.hospitalId;
-  const canCreateOrders = (meData?.me?.permissions ?? []).includes('patients:write');
-  const canWriteLab = (meData?.me?.permissions ?? []).includes('lab:write');
+  const roles: string[] = meData?.me?.roles ?? [];
+  const permissions: string[] = meData?.me?.permissions ?? [];
+  const canCreateOrders =
+    permissions.includes('patients:write') && canAuthorClinical(roles);
+  const canWriteLab = permissions.includes('lab:write');
 
   const apiBase = (
     process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/graphql'
