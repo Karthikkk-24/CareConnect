@@ -359,7 +359,7 @@ export class DischargeService {
       throw new BadRequestException(`Invalid follow-up status "${status}"`);
     }
 
-    const items = await this.followUpsRepo
+    const items = this.followUpsRepo
       .createQueryBuilder('followUp')
       .innerJoinAndSelect('followUp.patient', 'patient')
       .leftJoinAndSelect('followUp.doctor', 'doctor')

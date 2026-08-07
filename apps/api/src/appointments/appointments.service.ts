@@ -195,7 +195,7 @@ export class AppointmentsService {
       }
     }
 
-    const appointments = await this.appointmentsRepo
+    const appointments = this.appointmentsRepo
       .createQueryBuilder('appointment')
       .innerJoinAndSelect('appointment.patient', 'patient')
       .leftJoinAndSelect('appointment.doctor', 'doctor')
