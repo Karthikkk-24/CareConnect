@@ -56,10 +56,13 @@ export default function FollowUpsPage() {
     skip: !hospitalId,
   });
 
-  const { data: patientsData } = useQuery(PATIENTS_QUERY, {
-    variables: { search: patientSearch, limit: 8, hospitalId },
-    skip: !hospitalId || patientSearch.length < 2,
-  });
+  const { data: patientsData, error: patientsError, refetch: refetchPatients } = useQuery(
+    PATIENTS_QUERY,
+    {
+      variables: { search: patientSearch, limit: 8, hospitalId },
+      skip: !hospitalId || patientSearch.length < 2,
+    },
+  );
 
   const [updateStatus] = useMutation(UPDATE_FOLLOW_UP_STATUS_MUTATION, {
     onCompleted: () => refetch(),
@@ -134,7 +137,13 @@ export default function FollowUpsPage() {
               onChange={(e) => setPatientSearch(e.target.value)}
               placeholder="Type at least 2 characters"
             />
-            {(patientsData?.patients?.items ?? []).length > 0 ? (
+            {patientsError ? (
+              <QueryError
+                message="We could not search patients. Please try again."
+                onRetry={() => void refetchPatients()}
+                className="text-left"
+              />
+            ) : (patientsData?.patients?.items ?? []).length > 0 ? (
               <ul className="max-h-40 overflow-auto rounded-2xl bg-clay-primary-light/20 text-sm">
                 {(patientsData?.patients?.items ?? []).map(
                   (p: { id: string; fullName: string }) => (

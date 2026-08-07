@@ -6,6 +6,7 @@ import { useMutation, useQuery } from '@apollo/client';
 import { ClayButton, ClayCard, ClayInput } from '@careconnect/ui';
 import { ForbiddenAccess } from '@/components/auth/forbidden-access';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
+import { QueryError } from '@/components/query-error';
 import {
   CREATE_INVOICE_MUTATION,
   ME_QUERY,
@@ -32,10 +33,13 @@ export default function NewInvoicePage() {
   const hospitalId = meData?.me?.hospitalId;
   const canWriteBilling = (meData?.me?.permissions ?? []).includes('billing:write');
 
-  const { data: patientsData } = useQuery(PATIENTS_QUERY, {
-    variables: { search: patientSearch, limit: 8, hospitalId },
-    skip: !hospitalId || patientSearch.length < 2,
-  });
+  const { data: patientsData, error: patientsError, refetch: refetchPatients } = useQuery(
+    PATIENTS_QUERY,
+    {
+      variables: { search: patientSearch, limit: 8, hospitalId },
+      skip: !hospitalId || patientSearch.length < 2,
+    },
+  );
 
   const [createInvoice, { loading }] = useMutation(CREATE_INVOICE_MUTATION, {
     onCompleted: () => router.push('/finance/invoices'),
@@ -120,7 +124,13 @@ export default function NewInvoicePage() {
             value={patientSearch}
             onChange={(e) => setPatientSearch(e.target.value)}
           />
-          {patientsData?.patients?.items?.length ? (
+          {patientsError ? (
+            <QueryError
+              message="We could not search patients. Please try again."
+              onRetry={() => void refetchPatients()}
+              className="text-left"
+            />
+          ) : patientsData?.patients?.items?.length ? (
             <div className="rounded-2xl bg-clay-primary-light/30 p-2">
               {patientsData.patients.items.map((p: { id: string; fullName: string }) => (
                 <button

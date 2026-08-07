@@ -543,33 +543,43 @@ export function PatientClinicalActions({ patientId, hospitalId }: PatientClinica
 }
 
 function DoctorSelect({ hospitalId }: { hospitalId?: string }) {
-  const { data } = useQuery(STAFF_MEMBERS_QUERY, {
+  const { data, error, refetch } = useQuery(STAFF_MEMBERS_QUERY, {
     variables: { hospitalId },
     skip: !hospitalId,
   });
-  const doctors = (data?.staffMembers ?? []).filter(
-    (s: { roleSlug: string; isActive: boolean }) =>
-      s.isActive && (s.roleSlug === 'doctor' || s.roleSlug === 'hospital_admin'),
-  );
+  const doctors = error
+    ? []
+    : (data?.staffMembers ?? []).filter(
+        (s: { roleSlug: string; isActive: boolean }) =>
+          s.isActive && (s.roleSlug === 'doctor' || s.roleSlug === 'hospital_admin'),
+      );
 
   return (
     <div className="flex flex-col gap-2">
       <label htmlFor="clinical-doctor" className="text-sm font-medium text-clay-text">
         Doctor (optional)
       </label>
-      <select
-        id="clinical-doctor"
-        name="doctorId"
-        className="rounded-2xl border border-white/60 bg-clay-surface px-4 py-3 text-sm shadow-clay-inset"
-        defaultValue=""
-      >
-        <option value="">Unassigned</option>
-        {doctors.map((d: { userId: string; fullName: string }) => (
-          <option key={d.userId} value={d.userId}>
-            {d.fullName}
-          </option>
-        ))}
-      </select>
+      {error ? (
+        <QueryError
+          message="We could not load doctors. Please try again."
+          onRetry={() => void refetch()}
+          className="text-left"
+        />
+      ) : (
+        <select
+          id="clinical-doctor"
+          name="doctorId"
+          className="rounded-2xl border border-white/60 bg-clay-surface px-4 py-3 text-sm shadow-clay-inset"
+          defaultValue=""
+        >
+          <option value="">Unassigned</option>
+          {doctors.map((d: { userId: string; fullName: string }) => (
+            <option key={d.userId} value={d.userId}>
+              {d.fullName}
+            </option>
+          ))}
+        </select>
+      )}
     </div>
   );
 }
