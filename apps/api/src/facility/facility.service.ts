@@ -218,6 +218,7 @@ export class FacilityService {
     const departments = await this.departmentsRepo.find({
       where: { hospitalId },
       order: { name: 'ASC' },
+      take: 200,
     });
     return departments.map((d) => this.toDepartmentType(d));
   }
@@ -229,6 +230,7 @@ export class FacilityService {
     const wards = await this.wardsRepo.find({
       where: departmentId ? { hospitalId, departmentId } : { hospitalId },
       order: { name: 'ASC' },
+      take: 200,
     });
     return wards.map((w) => this.toWardType(w));
   }
@@ -237,6 +239,7 @@ export class FacilityService {
     const beds = await this.bedsRepo.find({
       where: wardId ? { hospitalId, wardId } : { hospitalId },
       order: { label: 'ASC' },
+      take: 200,
     });
     return beds.map((b) => this.toBedType(b));
   }
