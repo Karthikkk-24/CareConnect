@@ -36,8 +36,9 @@ export class RolesGuard implements CanActivate {
       return !!user;
     }
 
+    // Fail closed: handlers must declare @Roles, @Permissions, or @AllowAuthenticated.
     if (!requiredRoles?.length && !requiredPermissions?.length) {
-      return true;
+      return false;
     }
 
     if (!user) return false;

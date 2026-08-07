@@ -32,10 +32,10 @@ describe('RolesGuard', () => {
     jest.restoreAllMocks();
   });
 
-  it('allows access when no roles or permissions are required', () => {
+  it('denies access when no roles or permissions are required', () => {
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(undefined);
 
-    expect(guard.canActivate(createContext())).toBe(true);
+    expect(guard.canActivate(createContext())).toBe(false);
   });
 
   it('requires an authenticated user when AllowAuthenticated is set', () => {
