@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { ClayButton, ClayCard, ClayInput } from '@careconnect/ui';
 import { ClayTextarea } from '@/components/clinical/clay-textarea';
+import { QueryError } from '@/components/query-error';
 import {
   ADMIT_PATIENT_MUTATION,
   BEDS_QUERY,
@@ -108,10 +109,14 @@ export function PatientClinicalActions({ patientId, hospitalId }: PatientClinica
     skip: !hospitalId || !admitWardId || expanded !== 'admit',
   });
 
-  const wards: Array<{ id: string; name: string; floor?: string }> =
-    wardsQuery.data?.wards ?? [];
-  const beds: Array<{ id: string; label: string; status: string }> = bedsQuery.data?.beds ?? [];
+  const wards: Array<{ id: string; name: string; floor?: string }> = wardsQuery.error
+    ? []
+    : (wardsQuery.data?.wards ?? []);
+  const beds: Array<{ id: string; label: string; status: string }> = bedsQuery.error
+    ? []
+    : (bedsQuery.data?.beds ?? []);
   const availableBeds = beds.filter((b) => b.status === 'available');
+  const facilityQueryError = wardsQuery.error || bedsQuery.error;
 
   const toggle = (key: ActionKey) => {
     setExpanded((prev) => (prev === key ? null : key));
@@ -389,7 +394,16 @@ export function PatientClinicalActions({ patientId, hospitalId }: PatientClinica
                           </option>
                         ))}
                       </select>
-                      {wards.length === 0 && !wardsQuery.loading ? (
+                      {facilityQueryError ? (
+                        <QueryError
+                          message="We could not load wards or beds. Please try again."
+                          onRetry={() => {
+                            void wardsQuery.refetch();
+                            if (admitWardId) void bedsQuery.refetch();
+                          }}
+                          className="text-left"
+                        />
+                      ) : wards.length === 0 && !wardsQuery.loading ? (
                         canManageFacility ? (
                           <Link
                             href="/settings/facility"
@@ -428,7 +442,10 @@ export function PatientClinicalActions({ patientId, hospitalId }: PatientClinica
                           </option>
                         ))}
                       </select>
-                      {admitWardId && availableBeds.length === 0 && !bedsQuery.loading ? (
+                      {admitWardId &&
+                      !bedsQuery.error &&
+                      availableBeds.length === 0 &&
+                      !bedsQuery.loading ? (
                         <p className="text-xs text-clay-text-muted">
                           No available beds in this ward.
                         </p>
