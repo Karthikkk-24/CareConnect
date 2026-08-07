@@ -50,6 +50,23 @@ describe('PatientsService', () => {
     remove: jest.fn(),
     find: jest.fn(),
     findOne: jest.fn(),
+    createQueryBuilder: jest.fn(),
+    manager: {
+      getRepository: jest.fn(),
+    },
+  };
+
+  const labResultsRepo = {
+    createQueryBuilder: jest.fn(),
+  };
+
+  const mockUploadUrlQb = (rows: unknown[] = []) => {
+    const qb = {
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue(rows),
+    };
+    return qb;
   };
 
   const usersRepo = {
@@ -76,6 +93,9 @@ describe('PatientsService', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     relatedRepo.find.mockResolvedValue([]);
+    relatedRepo.createQueryBuilder.mockImplementation(() => mockUploadUrlQb([]));
+    relatedRepo.manager.getRepository.mockReturnValue(labResultsRepo);
+    labResultsRepo.createQueryBuilder.mockImplementation(() => mockUploadUrlQb([]));
     existsSyncMock.mockReturnValue(true);
 
     const module: TestingModule = await Test.createTestingModule({
@@ -284,7 +304,6 @@ describe('PatientsService', () => {
         id: 'patient-1',
         hospitalId: 'hospital-1',
       });
-      relatedRepo.find.mockResolvedValue([]);
       relatedRepo.create.mockImplementation((row: unknown) => row);
       relatedRepo.save.mockImplementation((row: unknown) =>
         Promise.resolve(row),
@@ -302,6 +321,29 @@ describe('PatientsService', () => {
       );
 
       expect(result.fileUrl).toBe('/uploads/a1b2c3d4-e5f6.pdf');
+    });
+
+    it('rejects when the upload is already linked to a lab result', async () => {
+      patientsRepo.findOne.mockResolvedValue({
+        id: 'patient-1',
+        hospitalId: 'hospital-1',
+      });
+      labResultsRepo.createQueryBuilder.mockImplementation(() =>
+        mockUploadUrlQb([{ id: 'lab-result-1' }]),
+      );
+      existsSyncMock.mockReturnValue(true);
+
+      await expect(
+        service.addDocument(
+          'patient-1',
+          'hospital-1',
+          {
+            name: 'scan.pdf',
+            fileUrl: '/uploads/a1b2c3d4-e5f6.pdf',
+          },
+          'user-1',
+        ),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });
