@@ -1,6 +1,7 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { QueryFailedError } from 'typeorm';
 import {
   Admission,
   ClinicalNote,
@@ -165,6 +166,24 @@ describe('ClinicalService', () => {
         ),
       ).rejects.toThrow(BadRequestException);
       expect(labManager.save).not.toHaveBeenCalled();
+    });
+
+    it('maps unique result_file_url violation to ConflictException', async () => {
+      const uniqueError = new QueryFailedError('INSERT', [], new Error('dup'));
+      (uniqueError as QueryFailedError & { code?: string }).code = '23505';
+      labOrdersRepo.manager.transaction.mockRejectedValue(uniqueError);
+
+      await expect(
+        service.completeLabResult(
+          'hospital-a',
+          {
+            labOrderId: 'lab-1',
+            resultValue: '5.0',
+            resultFileUrl: '/uploads/abc.pdf',
+          },
+          actor,
+        ),
+      ).rejects.toThrow(ConflictException);
     });
 
     it('advances ordered → collected', async () => {
