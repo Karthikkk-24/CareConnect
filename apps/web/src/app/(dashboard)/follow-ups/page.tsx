@@ -10,6 +10,7 @@ import {
   FOLLOW_UPS_QUERY,
   ME_QUERY,
   PATIENTS_QUERY,
+  STAFF_MEMBERS_QUERY,
   UPDATE_FOLLOW_UP_STATUS_MUTATION,
 } from '@/lib/graphql/queries';
 import { QueryError } from '@/components/query-error';
@@ -47,6 +48,7 @@ export default function FollowUpsPage() {
   const [showForm, setShowForm] = useState(false);
   const [patientSearch, setPatientSearch] = useState('');
   const [patientId, setPatientId] = useState('');
+  const [doctorId, setDoctorId] = useState('');
   const [scheduledAt, setScheduledAt] = useState('');
   const [type, setType] = useState('outpatient');
   const [error, setError] = useState('');
@@ -64,6 +66,22 @@ export default function FollowUpsPage() {
     },
   );
 
+  const {
+    data: staffData,
+    error: staffError,
+    refetch: refetchStaff,
+  } = useQuery(STAFF_MEMBERS_QUERY, {
+    variables: { hospitalId },
+    skip: !hospitalId || !showForm,
+  });
+
+  const doctors = staffError
+    ? []
+    : (staffData?.staffMembers ?? []).filter(
+        (s: { roleSlug: string; isActive: boolean }) =>
+          s.isActive && (s.roleSlug === 'doctor' || s.roleSlug === 'hospital_admin'),
+      );
+
   const [updateStatus] = useMutation(UPDATE_FOLLOW_UP_STATUS_MUTATION, {
     onCompleted: () => refetch(),
   });
@@ -72,6 +90,7 @@ export default function FollowUpsPage() {
       refetch();
       setShowForm(false);
       setPatientId('');
+      setDoctorId('');
       setScheduledAt('');
       setPatientSearch('');
     },
@@ -92,8 +111,16 @@ export default function FollowUpsPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    if (staffError) {
+      setError('Could not load doctors. Please retry before scheduling.');
+      return;
+    }
     if (!patientId || !scheduledAt) {
       setError('Patient and schedule are required');
+      return;
+    }
+    if (!doctorId) {
+      setError('Doctor is required');
       return;
     }
     await createFollowUp({
@@ -101,6 +128,7 @@ export default function FollowUpsPage() {
         hospitalId,
         input: {
           patientId,
+          doctorId,
           scheduledAt: new Date(scheduledAt).toISOString(),
           type,
         },
@@ -172,6 +200,33 @@ export default function FollowUpsPage() {
               onChange={(e) => setScheduledAt(e.target.value)}
               required
             />
+            <div className="flex flex-col gap-2">
+              <label htmlFor="follow-up-doctor" className="text-sm font-medium text-clay-text">
+                Doctor *
+              </label>
+              {staffError ? (
+                <QueryError
+                  message="We could not load doctors. Please try again."
+                  onRetry={() => void refetchStaff()}
+                  className="text-left"
+                />
+              ) : (
+                <select
+                  id="follow-up-doctor"
+                  value={doctorId}
+                  onChange={(e) => setDoctorId(e.target.value)}
+                  required
+                  className="w-full rounded-2xl border border-white/60 bg-clay-surface px-4 py-3 text-sm text-clay-text shadow-clay-inset outline-none focus:ring-2 focus:ring-clay-primary/30"
+                >
+                  <option value="">Select doctor</option>
+                  {doctors.map((d: { userId: string; fullName: string }) => (
+                    <option key={d.userId} value={d.userId}>
+                      {d.fullName}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
             <label className="block text-sm font-medium text-clay-text">
               Type
               <select
