@@ -3,13 +3,14 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
-import { Plus, Pencil, Trash2, RotateCcw } from 'lucide-react';
+import { Mail, Plus, Pencil, Trash2, RotateCcw } from 'lucide-react';
 import { ClayBadge, ClayButton, ClayCard } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
 import { QueryError } from '@/components/query-error';
 import {
   DELETE_STAFF_MUTATION,
   ME_QUERY,
+  RESEND_STAFF_INVITE_MUTATION,
   STAFF_MEMBERS_QUERY,
   UPDATE_STAFF_MUTATION,
 } from '@/lib/graphql/queries';
@@ -29,18 +30,27 @@ export default function StaffPage() {
     onCompleted: () => refetch(),
   });
 
+  const [resendInvite] = useMutation(RESEND_STAFF_INVITE_MUTATION);
+
   const staff = data?.staffMembers ?? [];
   const permissions = meData?.me?.permissions ?? [];
   const roles = meData?.me?.roles ?? [];
   const canWriteStaff = permissions.includes('staff:write');
+  const canResendInvite =
+    canWriteStaff &&
+    (roles.includes('hospital_admin') ||
+      roles.includes('hospital_manager') ||
+      roles.includes('super_admin'));
   const canDeactivateStaff =
     canWriteStaff &&
     (roles.includes('hospital_admin') || roles.includes('super_admin'));
   const [actionError, setActionError] = useState('');
+  const [inviteNotice, setInviteNotice] = useState('');
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Deactivate ${name}?`)) return;
     setActionError('');
+    setInviteNotice('');
     try {
       await deleteStaff({ variables: { id } });
     } catch (err) {
@@ -50,10 +60,34 @@ export default function StaffPage() {
 
   const handleReactivate = async (id: string) => {
     setActionError('');
+    setInviteNotice('');
     try {
       await updateStaff({ variables: { id, input: { isActive: true } } });
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Failed to reactivate staff member');
+    }
+  };
+
+  const handleResendInvite = async (id: string, name: string) => {
+    setActionError('');
+    setInviteNotice('');
+    try {
+      const result = await resendInvite({ variables: { id } });
+      const url = result.data?.resendStaffInvite?.inviteUrl as string | undefined;
+      if (url) {
+        try {
+          await navigator.clipboard.writeText(url);
+          setInviteNotice(`Invite resent for ${name}. Link copied to clipboard.`);
+        } catch {
+          setInviteNotice(`Invite resent for ${name}: ${url}`);
+        }
+      } else {
+        setInviteNotice(`Invite resent for ${name}.`);
+      }
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : 'Failed to resend staff invite',
+      );
     }
   };
 
@@ -74,6 +108,9 @@ export default function StaffPage() {
 
       {actionError ? (
         <p className="mb-4 text-sm text-clay-error">{actionError}</p>
+      ) : null}
+      {inviteNotice ? (
+        <p className="mb-4 text-sm text-clay-text">{inviteNotice}</p>
       ) : null}
 
       <ClayCard padding="none" className="overflow-hidden">
@@ -157,6 +194,17 @@ export default function StaffPage() {
                             <Pencil className="h-4 w-4" />
                           </button>
                         </Link>
+                        {member.isActive && canResendInvite ? (
+                          <button
+                            onClick={() =>
+                              void handleResendInvite(member.id, member.fullName)
+                            }
+                            title="Resend invite"
+                            className="flex h-8 w-8 items-center justify-center rounded-xl bg-clay-primary-light text-clay-primary hover:shadow-clay-sm"
+                          >
+                            <Mail className="h-4 w-4" />
+                          </button>
+                        ) : null}
                         {member.isActive ? (
                           canDeactivateStaff ? (
                             <button

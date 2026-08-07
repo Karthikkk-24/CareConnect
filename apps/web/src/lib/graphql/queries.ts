@@ -47,6 +47,16 @@ export const CREATE_STAFF_MUTATION = gql`
   }
 `;
 
+export const RESEND_STAFF_INVITE_MUTATION = gql`
+  mutation ResendStaffInvite($id: String!) {
+    resendStaffInvite(id: $id) {
+      id
+      inviteToken
+      inviteUrl
+    }
+  }
+`;
+
 export const COMPLETE_PATIENT_ONBOARDING = gql`
   mutation CompletePatientOnboarding($fullName: String!) {
     completePatientOnboarding(fullName: $fullName) {
