@@ -10,7 +10,7 @@ import { QueryError } from '@/components/query-error';
 import {
   CREATE_INVOICE_MUTATION,
   ME_QUERY,
-  PATIENTS_QUERY,
+  BILLING_PATIENT_SEARCH_QUERY,
 } from '@/lib/graphql/queries';
 
 type LineItem = {
@@ -34,7 +34,7 @@ export default function NewInvoicePage() {
   const canWriteBilling = (meData?.me?.permissions ?? []).includes('billing:write');
 
   const { data: patientsData, error: patientsError, refetch: refetchPatients } = useQuery(
-    PATIENTS_QUERY,
+    BILLING_PATIENT_SEARCH_QUERY,
     {
       variables: { search: patientSearch, limit: 8, hospitalId },
       skip: !hospitalId || patientSearch.length < 2,
@@ -130,21 +130,26 @@ export default function NewInvoicePage() {
               onRetry={() => void refetchPatients()}
               className="text-left"
             />
-          ) : patientsData?.patients?.items?.length ? (
+          ) : patientsData?.billingPatientSearch?.length ? (
             <div className="rounded-2xl bg-clay-primary-light/30 p-2">
-              {patientsData.patients.items.map((p: { id: string; fullName: string }) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => {
-                    setPatientId(p.id);
-                    setPatientSearch(p.fullName);
-                  }}
-                  className="block w-full rounded-xl px-3 py-2 text-left text-sm text-clay-text hover:bg-clay-primary-light/50"
-                >
-                  {p.fullName}
-                </button>
-              ))}
+              {patientsData.billingPatientSearch.map(
+                (p: { id: string; fullName: string; mrn?: string }) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => {
+                      setPatientId(p.id);
+                      setPatientSearch(p.fullName);
+                    }}
+                    className="block w-full rounded-xl px-3 py-2 text-left text-sm text-clay-text hover:bg-clay-primary-light/50"
+                  >
+                    {p.fullName}
+                    {p.mrn ? (
+                      <span className="ml-2 text-clay-text-muted">({p.mrn})</span>
+                    ) : null}
+                  </button>
+                ),
+              )}
             </div>
           ) : null}
           <ClayInput

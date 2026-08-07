@@ -21,6 +21,7 @@ import {
   InvoiceType,
   PaymentType,
   RecordPaymentInput,
+  BillingPatientLookupType,
 } from './billing.types';
 
 @Injectable()
@@ -220,6 +221,42 @@ export class BillingService {
       order: { createdAt: 'DESC' },
     });
     return invoices.map((invoice) => this.toInvoiceType(invoice));
+  }
+
+  /**
+   * Constrained patient search for invoice creation. Returns id, MRN, and
+   * fullName only — gated on billing:read rather than patients:read.
+   */
+  async searchPatientsForBilling(
+    hospitalId: string,
+    search: string,
+    limit = 8,
+  ): Promise<BillingPatientLookupType[]> {
+    const trimmed = search?.trim() ?? '';
+    if (trimmed.length < 2) return [];
+
+    const safeLimit = Math.min(20, Math.max(1, Math.floor(limit) || 8));
+    const literal = trimmed.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+    const pattern = `%${literal}%`;
+
+    const patients = await this.patientsRepo
+      .createQueryBuilder('patient')
+      .select(['patient.id', 'patient.fullName', 'patient.identificationNumber'])
+      .where('patient.hospital_id = :hospitalId', { hospitalId })
+      .andWhere('patient.deleted_at IS NULL')
+      .andWhere(
+        `(patient.full_name ILIKE :pattern ESCAPE '\\' OR patient.identification_number ILIKE :pattern ESCAPE '\\')`,
+        { pattern },
+      )
+      .orderBy('patient.full_name', 'ASC')
+      .take(safeLimit)
+      .getMany();
+
+    return patients.map((p) => ({
+      id: p.id,
+      mrn: p.identificationNumber,
+      fullName: p.fullName,
+    }));
   }
 
   async getInvoice(hospitalId: string, id: string): Promise<InvoiceType> {

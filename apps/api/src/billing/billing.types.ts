@@ -154,3 +154,16 @@ export class RecordPaymentInput {
   @MinLength(1)
   method: string;
 }
+
+/** Billing-safe patient picker — id, MRN (identification number), and name only. */
+@ObjectType()
+export class BillingPatientLookupType {
+  @Field(() => ID)
+  id: string;
+
+  @Field({ nullable: true })
+  mrn?: string;
+
+  @Field()
+  fullName: string;
+}

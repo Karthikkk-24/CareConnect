@@ -808,6 +808,7 @@ export const CREATE_FOLLOW_UP_MUTATION = gql`
     createFollowUp(input: $input, hospitalId: $hospitalId) {
       id
       patientId
+      doctorId
       scheduledAt
       type
       status
@@ -909,6 +910,16 @@ export const INVOICES_QUERY = gql`
         method
         paidAt
       }
+    }
+  }
+`;
+
+export const BILLING_PATIENT_SEARCH_QUERY = gql`
+  query BillingPatientSearch($search: String!, $limit: Int, $hospitalId: String) {
+    billingPatientSearch(search: $search, limit: $limit, hospitalId: $hospitalId) {
+      id
+      mrn
+      fullName
     }
   }
 `;

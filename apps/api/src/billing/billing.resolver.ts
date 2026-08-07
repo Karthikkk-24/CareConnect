@@ -1,5 +1,5 @@
 import { UseGuards } from '@nestjs/common';
-import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { Args, Int, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { PERMISSIONS } from '@careconnect/types';
 import { GqlAuthGuard } from '../auth/gql-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -13,6 +13,7 @@ import {
   CreateInvoiceInput,
   InvoiceType,
   RecordPaymentInput,
+  BillingPatientLookupType,
 } from './billing.types';
 
 @Resolver()
@@ -32,6 +33,26 @@ export class BillingResolver {
       hospitalId,
     );
     return this.billingService.listInvoices(resolvedHospitalId);
+  }
+
+  @Query(() => [BillingPatientLookupType])
+  @Roles(...STAFF_ROLES)
+  @Permissions(PERMISSIONS.BILLING_READ)
+  async billingPatientSearch(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('search') search: string,
+    @Args('limit', { type: () => Int, nullable: true }) limit?: number,
+    @Args('hospitalId', { nullable: true }) hospitalId?: string,
+  ): Promise<BillingPatientLookupType[]> {
+    const resolvedHospitalId = this.billingService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.billingService.searchPatientsForBilling(
+      resolvedHospitalId,
+      search,
+      limit,
+    );
   }
 
   @Query(() => InvoiceType)
