@@ -368,6 +368,52 @@ export class StaffService {
     return true;
   }
 
+  /**
+   * Rotate token and reset expiry for a pending (unaccepted) staff invite.
+   * Managers can recover lost/expired invites without deleting the profile.
+   */
+  async resendStaffInvite(
+    staffId: string,
+    actor: AuthenticatedUser,
+  ): Promise<StaffProfile & { inviteToken: string }> {
+    const staff = await this.findByIdForUser(staffId, actor);
+    if (!staff) throw new NotFoundException('Staff member not found');
+    if (!staff.isActive) {
+      throw new BadRequestException(
+        'Cannot resend invite for a deactivated staff member',
+      );
+    }
+
+    const invite = await this.invitesRepo.findOne({
+      where: { staffProfileId: staff.id },
+      order: { createdAt: 'DESC' },
+    });
+    if (!invite) {
+      throw new NotFoundException('No invite found for this staff member');
+    }
+    if (invite.acceptedAt) {
+      throw new BadRequestException(
+        'Invite has already been accepted; cannot resend',
+      );
+    }
+
+    const token = randomBytes(32).toString('hex');
+    invite.token = token;
+    invite.expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    await this.invitesRepo.save(invite);
+
+    await this.audit.log({
+      actorId: actor.id,
+      hospitalId: staff.hospitalId,
+      action: 'resend_invite',
+      resource: 'staff',
+      resourceId: staff.id,
+      metadata: { email: invite.email },
+    });
+
+    return Object.assign(staff, { inviteToken: token });
+  }
+
   /** Expire unaccepted invites so deactivated staff cannot self-reactivate. */
   private async invalidateOutstandingInvites(staff: StaffProfile) {
     const now = new Date();
