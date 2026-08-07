@@ -214,12 +214,16 @@ export class BillingService {
   }
 
   async listInvoices(hospitalId: string): Promise<InvoiceType[]> {
-    const invoices = await this.invoicesRepo.find({
-      where: { hospitalId },
-      relations: ['items', 'payments', 'patient'],
-      take: 200,
-      order: { createdAt: 'DESC' },
-    });
+    const invoices = await this.invoicesRepo
+      .createQueryBuilder('invoice')
+      .innerJoinAndSelect('invoice.patient', 'patient')
+      .leftJoinAndSelect('invoice.items', 'items')
+      .leftJoinAndSelect('invoice.payments', 'payments')
+      .where('invoice.hospital_id = :hospitalId', { hospitalId })
+      .andWhere('patient.deleted_at IS NULL')
+      .orderBy('invoice.created_at', 'DESC')
+      .take(200)
+      .getMany();
     return invoices.map((invoice) => this.toInvoiceType(invoice));
   }
 
@@ -260,10 +264,15 @@ export class BillingService {
   }
 
   async getInvoice(hospitalId: string, id: string): Promise<InvoiceType> {
-    const invoice = await this.invoicesRepo.findOne({
-      where: { id, hospitalId },
-      relations: ['items', 'payments', 'patient'],
-    });
+    const invoice = await this.invoicesRepo
+      .createQueryBuilder('invoice')
+      .innerJoinAndSelect('invoice.patient', 'patient')
+      .leftJoinAndSelect('invoice.items', 'items')
+      .leftJoinAndSelect('invoice.payments', 'payments')
+      .where('invoice.id = :id', { id })
+      .andWhere('invoice.hospital_id = :hospitalId', { hospitalId })
+      .andWhere('patient.deleted_at IS NULL')
+      .getOne();
     if (!invoice) throw new NotFoundException('Invoice not found');
     return this.toInvoiceType(invoice);
   }
@@ -283,6 +292,7 @@ export class BillingService {
           .andWhere('invoice.hospital_id = :hospitalId', { hospitalId })
           .getOne();
         if (!invoice) throw new NotFoundException('Invoice not found');
+        await this.assertPatient(hospitalId, invoice.patientId);
         if (invoice.status === 'void') {
           throw new BadRequestException(
             'Cannot record payment on a void invoice',
@@ -356,6 +366,7 @@ export class BillingService {
         .andWhere('invoice.hospital_id = :hospitalId', { hospitalId })
         .getOne();
       if (!invoice) throw new NotFoundException('Invoice not found');
+      await this.assertPatient(hospitalId, invoice.patientId);
       if (invoice.status === 'void') {
         throw new BadRequestException('Invoice is already void');
       }

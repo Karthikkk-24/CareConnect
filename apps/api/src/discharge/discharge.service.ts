@@ -318,6 +318,11 @@ export class DischargeService {
           .getOne();
         if (!followUp) throw new NotFoundException('Follow-up not found');
 
+        const patient = await manager.findOne(Patient, {
+          where: { id: followUp.patientId, hospitalId },
+        });
+        if (!patient) throw new NotFoundException('Follow-up not found');
+
         assertFollowUpTransition(followUp.status, input.status);
         followUp.status = input.status;
         if (input.notes !== undefined) {
@@ -350,22 +355,25 @@ export class DischargeService {
     hospitalId: string,
     status?: string,
   ): Promise<FollowUpType[]> {
-    const where: { hospitalId: string; status?: string } = { hospitalId };
-    if (status) {
-      if (!(status in FOLLOW_UP_TRANSITIONS)) {
-        throw new BadRequestException(`Invalid follow-up status "${status}"`);
-      }
-      where.status = status;
+    if (status && !(status in FOLLOW_UP_TRANSITIONS)) {
+      throw new BadRequestException(`Invalid follow-up status "${status}"`);
     }
 
-    const items = await this.followUpsRepo.find({
-      where,
-      relations: ['patient', 'doctor'],
-      order: { scheduledAt: 'ASC' },
-      take: 200,
-    });
+    const items = await this.followUpsRepo
+      .createQueryBuilder('followUp')
+      .innerJoinAndSelect('followUp.patient', 'patient')
+      .leftJoinAndSelect('followUp.doctor', 'doctor')
+      .where('followUp.hospital_id = :hospitalId', { hospitalId })
+      .andWhere('patient.deleted_at IS NULL');
+    if (status) {
+      items.andWhere('followUp.status = :status', { status });
+    }
+    const rows = await items
+      .orderBy('followUp.scheduled_at', 'ASC')
+      .take(200)
+      .getMany();
 
-    return items.map((item) => this.toFollowUpType(item));
+    return rows.map((item) => this.toFollowUpType(item));
   }
 
   async dischargesForPatient(

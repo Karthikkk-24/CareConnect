@@ -494,6 +494,8 @@ export class ClinicalService {
             .getOne();
           if (!order) throw new NotFoundException('Lab order not found');
 
+          await this.assertPatient(hospitalId, order.patientId);
+
           if (order.status === 'completed' || order.status === 'cancelled') {
             throw new BadRequestException(
               `Cannot complete lab order with status "${order.status}"`,
@@ -575,6 +577,8 @@ export class ClinicalService {
           .getOne();
         if (!order) throw new NotFoundException('Lab order not found');
 
+        await this.assertPatient(hospitalId, order.patientId);
+
         assertLabTransition(order.status, input.status);
         order.status = input.status;
         await manager.save(order);
@@ -617,6 +621,8 @@ export class ClinicalService {
         if (!prescription)
           throw new NotFoundException('Prescription not found');
 
+        await this.assertPatient(hospitalId, prescription.patientId);
+
         assertPrescriptionTransition(prescription.status, 'cancelled');
         prescription.status = 'cancelled';
         await manager.save(prescription);
@@ -646,19 +652,23 @@ export class ClinicalService {
     hospitalId: string,
     status?: string,
   ): Promise<LabOrderType[]> {
-    const where: { hospitalId: string; status?: string } = { hospitalId };
-    if (status) {
-      if (!(status in LAB_ALLOWED_TRANSITIONS)) {
-        throw new BadRequestException(`Invalid lab order status "${status}"`);
-      }
-      where.status = status;
+    if (status && !(status in LAB_ALLOWED_TRANSITIONS)) {
+      throw new BadRequestException(`Invalid lab order status "${status}"`);
     }
-    const orders = await this.labOrdersRepo.find({
-      where,
-      relations: ['patient', 'orderedBy'],
-      order: { createdAt: 'DESC' },
-      take: 200,
-    });
+
+    const qb = this.labOrdersRepo
+      .createQueryBuilder('order')
+      .innerJoinAndSelect('order.patient', 'patient')
+      .leftJoinAndSelect('order.orderedBy', 'orderedBy')
+      .where('order.hospital_id = :hospitalId', { hospitalId })
+      .andWhere('patient.deleted_at IS NULL');
+    if (status) {
+      qb.andWhere('order.status = :status', { status });
+    }
+    const orders = await qb
+      .orderBy('order.created_at', 'DESC')
+      .take(200)
+      .getMany();
 
     const completedOrderIds = orders
       .filter((o) => o.status === 'completed')

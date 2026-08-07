@@ -12,6 +12,10 @@ describe('PharmacyService', () => {
   const manager = {
     createQueryBuilder: jest.fn(),
     save: jest.fn(),
+    findOne: jest.fn().mockResolvedValue({
+      id: 'patient-1',
+      hospitalId: 'hospital-a',
+    }),
   };
 
   const pharmacyStockRepo = {
@@ -73,6 +77,7 @@ describe('PharmacyService', () => {
         getOne: jest.fn().mockResolvedValue({
           id: 'rx-1',
           hospitalId: 'hospital-a',
+          patientId: 'patient-1',
           status: 'pending',
           items: [{ drugName: 'Amoxicillin' }],
         }),
@@ -105,6 +110,7 @@ describe('PharmacyService', () => {
         getOne: jest.fn().mockResolvedValue({
           id: 'rx-1',
           hospitalId: 'hospital-a',
+          patientId: 'patient-1',
           status: 'pending',
           items: [{ drugName: 'Amoxicillin' }, { drugName: 'Amoxicillin' }],
         }),
@@ -146,6 +152,7 @@ describe('PharmacyService', () => {
         getOne: jest.fn().mockResolvedValue({
           id: 'rx-1',
           hospitalId: 'hospital-a',
+          patientId: 'patient-1',
           status: 'pending',
           items: [{ drugName: 'Amoxicillin' }],
           patient: null,

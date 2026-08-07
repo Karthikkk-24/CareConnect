@@ -85,12 +85,17 @@ describe('BillingService', () => {
         getOne: jest.fn().mockResolvedValue({
           id: 'inv-1',
           hospitalId: 'hospital-a',
+          patientId: 'patient-1',
           status: 'issued',
           totalAmount: '100.00',
         }),
       };
       manager.createQueryBuilder.mockReturnValue(qb);
       manager.find.mockResolvedValue([{ amount: '100.00' }]);
+      patientsRepo.findOne.mockResolvedValue({
+        id: 'patient-1',
+        hospitalId: 'hospital-a',
+      });
 
       await expect(
         service.recordPayment(
@@ -110,11 +115,16 @@ describe('BillingService', () => {
         getOne: jest.fn().mockResolvedValue({
           id: 'inv-1',
           hospitalId: 'hospital-a',
+          patientId: 'patient-1',
           status: 'paid',
           totalAmount: '100.00',
         }),
       };
       manager.createQueryBuilder.mockReturnValue(qb);
+      patientsRepo.findOne.mockResolvedValue({
+        id: 'patient-1',
+        hospitalId: 'hospital-a',
+      });
 
       await expect(
         service.recordPayment(

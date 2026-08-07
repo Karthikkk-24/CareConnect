@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { PharmacyStock, Prescription } from '../database/entities';
+import { PharmacyStock, Prescription, Patient } from '../database/entities';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
 import {
@@ -180,12 +180,16 @@ export class PharmacyService {
   async listPendingPrescriptions(
     hospitalId: string,
   ): Promise<PendingPrescriptionType[]> {
-    const prescriptions = await this.prescriptionsRepo.find({
-      where: { hospitalId, status: 'pending' },
-      relations: ['items', 'patient'],
-      order: { createdAt: 'ASC' },
-      take: 200,
-    });
+    const prescriptions = await this.prescriptionsRepo
+      .createQueryBuilder('prescription')
+      .innerJoinAndSelect('prescription.patient', 'patient')
+      .leftJoinAndSelect('prescription.items', 'items')
+      .where('prescription.hospital_id = :hospitalId', { hospitalId })
+      .andWhere('prescription.status = :status', { status: 'pending' })
+      .andWhere('patient.deleted_at IS NULL')
+      .orderBy('prescription.created_at', 'ASC')
+      .take(200)
+      .getMany();
     return prescriptions.map((prescription) =>
       this.toPendingPrescriptionType(prescription),
     );
@@ -208,6 +212,10 @@ export class PharmacyService {
           .getOne();
         if (!prescription)
           throw new NotFoundException('Prescription not found');
+        const patient = await manager.findOne(Patient, {
+          where: { id: prescription.patientId, hospitalId },
+        });
+        if (!patient) throw new NotFoundException('Prescription not found');
         if (prescription.status !== 'pending') {
           throw new BadRequestException(
             'Only pending prescriptions can be dispensed',

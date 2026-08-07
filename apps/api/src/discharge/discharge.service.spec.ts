@@ -33,6 +33,10 @@ describe('DischargeService', () => {
   const followManager = {
     createQueryBuilder: jest.fn(),
     save: jest.fn(),
+    findOne: jest.fn().mockResolvedValue({
+      id: 'patient-1',
+      hospitalId: 'hospital-a',
+    }),
   };
   const followUpsRepo = {
     save: jest.fn(),
@@ -114,6 +118,7 @@ describe('DischargeService', () => {
       const row = {
         id: 'fu-1',
         hospitalId: 'hospital-a',
+        patientId: 'patient-1',
         status: 'scheduled',
       };
       const qb = {
@@ -148,6 +153,7 @@ describe('DischargeService', () => {
         getOne: jest.fn().mockResolvedValue({
           id: 'fu-1',
           hospitalId: 'hospital-a',
+          patientId: 'patient-1',
           status: 'completed',
         }),
       };

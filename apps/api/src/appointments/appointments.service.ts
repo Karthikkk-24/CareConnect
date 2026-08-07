@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Appointment, Department, Patient } from '../database/entities';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
@@ -113,10 +113,14 @@ export class AppointmentsService {
     id: string,
     hospitalId: string,
   ): Promise<Appointment> {
-    const appointment = await this.appointmentsRepo.findOne({
-      where: { id, hospitalId },
-      relations: ['patient', 'doctor'],
-    });
+    const appointment = await this.appointmentsRepo
+      .createQueryBuilder('appointment')
+      .innerJoinAndSelect('appointment.patient', 'patient')
+      .leftJoinAndSelect('appointment.doctor', 'doctor')
+      .where('appointment.id = :id', { id })
+      .andWhere('appointment.hospital_id = :hospitalId', { hospitalId })
+      .andWhere('patient.deleted_at IS NULL')
+      .getOne();
     if (!appointment) throw new NotFoundException('Appointment not found');
     return appointment;
   }
@@ -179,12 +183,7 @@ export class AppointmentsService {
     status?: string,
     actor?: AuthenticatedUser,
   ): Promise<AppointmentType[]> {
-    const where: Record<string, unknown> = { hospitalId };
-
     const effectiveDoctorId = this.resolveDoctorScope(actor, doctorId);
-    if (effectiveDoctorId) {
-      where.doctorId = effectiveDoctorId;
-    }
 
     if (status) {
       if (
@@ -194,25 +193,40 @@ export class AppointmentsService {
       ) {
         throw new BadRequestException(`Invalid appointment status: ${status}`);
       }
-      where.status = status;
     }
 
+    const appointments = await this.appointmentsRepo
+      .createQueryBuilder('appointment')
+      .innerJoinAndSelect('appointment.patient', 'patient')
+      .leftJoinAndSelect('appointment.doctor', 'doctor')
+      .where('appointment.hospital_id = :hospitalId', { hospitalId })
+      .andWhere('patient.deleted_at IS NULL');
+
+    if (effectiveDoctorId) {
+      appointments.andWhere('appointment.doctor_id = :doctorId', {
+        doctorId: effectiveDoctorId,
+      });
+    }
+    if (status) {
+      appointments.andWhere('appointment.status = :status', { status });
+    }
     if (date) {
       const start = new Date(date);
       start.setHours(0, 0, 0, 0);
       const end = new Date(date);
       end.setHours(23, 59, 59, 999);
-      where.scheduledAt = Between(start, end);
+      appointments.andWhere(
+        'appointment.scheduled_at BETWEEN :start AND :end',
+        { start, end },
+      );
     }
 
-    const appointments = await this.appointmentsRepo.find({
-      where,
-      relations: ['patient', 'doctor'],
-      order: { scheduledAt: 'ASC' },
-      take: 200,
-    });
+    const rows = await appointments
+      .orderBy('appointment.scheduled_at', 'ASC')
+      .take(200)
+      .getMany();
 
-    return appointments.map((a) => this.toAppointmentType(a));
+    return rows.map((a) => this.toAppointmentType(a));
   }
 
   /**
@@ -263,14 +277,17 @@ export class AppointmentsService {
           .getOne();
         if (!appointment) throw new NotFoundException('Appointment not found');
 
+        const patientAlive = await manager.findOne(Patient, {
+          where: { id: appointment.patientId, hospitalId },
+        });
+        if (!patientAlive) throw new NotFoundException('Appointment not found');
+
         assertTransition(appointment.status, status);
         appointment.status = status;
         await manager.save(appointment);
 
         if (status === 'checked_in') {
-          const patient = await manager.findOne(Patient, {
-            where: { id: appointment.patientId, hospitalId },
-          });
+          const patient = patientAlive;
           if (patient && patient.status === 'registered') {
             patient.status = 'checked_in';
             await manager.save(patient);
@@ -309,6 +326,11 @@ export class AppointmentsService {
           .andWhere('appointment.hospital_id = :hospitalId', { hospitalId })
           .getOne();
         if (!appointment) throw new NotFoundException('Appointment not found');
+
+        const patientAlive = await manager.findOne(Patient, {
+          where: { id: appointment.patientId, hospitalId },
+        });
+        if (!patientAlive) throw new NotFoundException('Appointment not found');
 
         assertTransition(appointment.status, 'cancelled');
 
