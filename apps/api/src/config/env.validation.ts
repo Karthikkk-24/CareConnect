@@ -115,14 +115,24 @@ export function validateEnv(config: Record<string, unknown>) {
     }
   }
 
-  if (config.NODE_ENV === 'production') {
+  const nodeEnv =
+    typeof config.NODE_ENV === 'string' ? config.NODE_ENV.trim() : '';
+  const isLocalDevOrTest =
+    nodeEnv === 'development' || nodeEnv === 'test' || nodeEnv === '';
+  const allowUnsetAzp =
+    typeof config.CARECONNECT_ALLOW_UNSET_AZP === 'string' &&
+    ['1', 'true', 'yes'].includes(
+      config.CARECONNECT_ALLOW_UNSET_AZP.trim().toLowerCase(),
+    );
+
+  if (!isLocalDevOrTest && !allowUnsetAzp) {
     if (
       !config.CLERK_AUTHORIZED_PARTIES ||
       typeof config.CLERK_AUTHORIZED_PARTIES !== 'string' ||
       !config.CLERK_AUTHORIZED_PARTIES.trim()
     ) {
       throw new Error(
-        'CLERK_AUTHORIZED_PARTIES is required in production (comma-separated authorized party URLs for JWT azp checks).',
+        'CLERK_AUTHORIZED_PARTIES is required outside development/test (comma-separated authorized party URLs for JWT azp checks). For local overrides only, set CARECONNECT_ALLOW_UNSET_AZP=true.',
       );
     }
   }
