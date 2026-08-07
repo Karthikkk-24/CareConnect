@@ -360,4 +360,71 @@ describe('StaffService', () => {
       });
     });
   });
+
+  describe('resendStaffInvite', () => {
+    const pendingStaff = {
+      id: 'staff-1',
+      userId: 'user-1',
+      hospitalId: 'hospital-a',
+      isActive: true,
+      user: {
+        email: 'doc@example.com',
+        fullName: 'Doc',
+        userRoles: [{ role: { slug: 'doctor' } }],
+      },
+    };
+
+    it('rotates token and resets expiry for pending invites', async () => {
+      staffRepo.findOne.mockResolvedValue({ ...pendingStaff });
+      const invite = {
+        id: 'invite-1',
+        staffProfileId: 'staff-1',
+        email: 'doc@example.com',
+        acceptedAt: null,
+        token: 'old-token',
+        expiresAt: new Date(Date.now() - 1000),
+      };
+      invitesRepo.findOne.mockResolvedValue(invite);
+      invitesRepo.save.mockImplementation((row: unknown) =>
+        Promise.resolve(row),
+      );
+
+      const result = await service.resendStaffInvite('staff-1', hospitalAdmin);
+
+      expect(result.inviteToken).toBeDefined();
+      expect(result.inviteToken).not.toBe('old-token');
+      expect(invite.token).toBe(result.inviteToken);
+      expect(invite.expiresAt.getTime()).toBeGreaterThan(Date.now());
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'resend_invite',
+          resource: 'staff',
+          resourceId: 'staff-1',
+        }),
+      );
+    });
+
+    it('rejects when invite was already accepted', async () => {
+      staffRepo.findOne.mockResolvedValue({ ...pendingStaff });
+      invitesRepo.findOne.mockResolvedValue({
+        id: 'invite-1',
+        staffProfileId: 'staff-1',
+        acceptedAt: new Date(),
+        token: 'old-token',
+      });
+
+      await expect(
+        service.resendStaffInvite('staff-1', hospitalAdmin),
+      ).rejects.toThrow(BadRequestException);
+      expect(invitesRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('rejects when staff member is not found', async () => {
+      staffRepo.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.resendStaffInvite('missing', hospitalAdmin),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
 });

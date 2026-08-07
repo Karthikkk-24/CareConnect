@@ -430,12 +430,16 @@ export class AdmissionsService {
   }
 
   async wardOccupancy(hospitalId: string): Promise<WardOccupancyType[]> {
-    const wards = await this.wardsRepo.find({ where: { hospitalId } });
+    const wards = await this.wardsRepo.find({
+      where: { hospitalId },
+      take: 200,
+    });
     const result: WardOccupancyType[] = [];
 
     for (const ward of wards) {
       const beds = await this.bedsRepo.find({
         where: { wardId: ward.id, hospitalId },
+        take: 200,
       });
       const occupiedBeds = beds.filter((b) => b.status === 'occupied').length;
       result.push({

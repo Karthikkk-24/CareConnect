@@ -15,6 +15,7 @@ import {
   CREATE_DISCHARGE_MUTATION,
   ME_QUERY,
   PATIENT_QUERY,
+  STAFF_MEMBERS_QUERY,
 } from '@/lib/graphql/queries';
 import { canDischargePatients } from '@/lib/clinical-access';
 
@@ -25,6 +26,7 @@ export default function PatientDischargePage() {
   const [medications, setMedications] = useState('');
   const [instructions, setInstructions] = useState('');
   const [followUpDate, setFollowUpDate] = useState('');
+  const [followUpDoctorId, setFollowUpDoctorId] = useState('');
   const [error, setError] = useState('');
 
   const { data: meData } = useQuery(ME_QUERY);
@@ -48,6 +50,22 @@ export default function PatientDischargePage() {
     skip: !hospitalId,
   });
 
+  const {
+    data: staffData,
+    error: staffError,
+    refetch: refetchStaff,
+  } = useQuery(STAFF_MEMBERS_QUERY, {
+    variables: { hospitalId },
+    skip: !hospitalId || !canDischarge,
+  });
+
+  const doctors = staffError
+    ? []
+    : (staffData?.staffMembers ?? []).filter(
+        (s: { roleSlug: string; isActive: boolean }) =>
+          s.isActive && (s.roleSlug === 'doctor' || s.roleSlug === 'hospital_admin'),
+      );
+
   const admission = admissionsData?.activeAdmissions?.find(
     (item: { patientId: string }) => item.patientId === id,
   );
@@ -65,6 +83,17 @@ export default function PatientDischargePage() {
       return;
     }
 
+    if (followUpDate) {
+      if (staffError) {
+        setError('Could not load doctors. Please retry before scheduling a follow-up.');
+        return;
+      }
+      if (!followUpDoctorId) {
+        setError('Doctor is required when scheduling a follow-up.');
+        return;
+      }
+    }
+
     try {
       await createDischarge({
         variables: {
@@ -76,6 +105,7 @@ export default function PatientDischargePage() {
             instructions: instructions || undefined,
             followUpScheduledAt: followUpDate ? new Date(followUpDate).toISOString() : undefined,
             followUpType: followUpDate ? 'post_discharge' : undefined,
+            followUpDoctorId: followUpDate ? followUpDoctorId : undefined,
           },
         },
       });
@@ -193,10 +223,43 @@ export default function PatientDischargePage() {
                 id="follow-up-date"
                 type="datetime-local"
                 value={followUpDate}
-                onChange={(e) => setFollowUpDate(e.target.value)}
+                onChange={(e) => {
+                  setFollowUpDate(e.target.value);
+                  if (!e.target.value) setFollowUpDoctorId('');
+                }}
                 className="w-full rounded-2xl border border-white/60 bg-clay-surface px-4 py-3 text-clay-text shadow-clay-inset outline-none focus:ring-2 focus:ring-clay-primary/30"
               />
             </div>
+
+            {followUpDate ? (
+              <div className="flex w-full flex-col gap-2">
+                <label htmlFor="follow-up-doctor" className="text-sm font-medium text-clay-text">
+                  Follow-up Doctor *
+                </label>
+                {staffError ? (
+                  <QueryError
+                    message="We could not load doctors. Please try again."
+                    onRetry={() => void refetchStaff()}
+                    className="text-left"
+                  />
+                ) : (
+                  <select
+                    id="follow-up-doctor"
+                    value={followUpDoctorId}
+                    onChange={(e) => setFollowUpDoctorId(e.target.value)}
+                    required
+                    className="w-full rounded-2xl border border-white/60 bg-clay-surface px-4 py-3 text-clay-text shadow-clay-inset outline-none focus:ring-2 focus:ring-clay-primary/30"
+                  >
+                    <option value="">Select doctor</option>
+                    {doctors.map((d: { userId: string; fullName: string }) => (
+                      <option key={d.userId} value={d.userId}>
+                        {d.fullName}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            ) : null}
 
             {error ? <p className="text-sm text-clay-error">{error}</p> : null}
 

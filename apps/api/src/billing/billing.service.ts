@@ -21,6 +21,7 @@ import {
   InvoiceType,
   PaymentType,
   RecordPaymentInput,
+  BillingPatientLookupType,
 } from './billing.types';
 
 @Injectable()
@@ -213,20 +214,65 @@ export class BillingService {
   }
 
   async listInvoices(hospitalId: string): Promise<InvoiceType[]> {
-    const invoices = await this.invoicesRepo.find({
-      where: { hospitalId },
-      relations: ['items', 'payments', 'patient'],
-      take: 200,
-      order: { createdAt: 'DESC' },
-    });
+    const invoices = await this.invoicesRepo
+      .createQueryBuilder('invoice')
+      .innerJoinAndSelect('invoice.patient', 'patient')
+      .leftJoinAndSelect('invoice.items', 'items')
+      .leftJoinAndSelect('invoice.payments', 'payments')
+      .where('invoice.hospital_id = :hospitalId', { hospitalId })
+      .andWhere('patient.deleted_at IS NULL')
+      .orderBy('invoice.created_at', 'DESC')
+      .take(200)
+      .getMany();
     return invoices.map((invoice) => this.toInvoiceType(invoice));
   }
 
+  /**
+   * Constrained patient search for invoice creation. Returns id, MRN, and
+   * fullName only — gated on billing:read rather than patients:read.
+   */
+  async searchPatientsForBilling(
+    hospitalId: string,
+    search: string,
+    limit = 8,
+  ): Promise<BillingPatientLookupType[]> {
+    const trimmed = search?.trim() ?? '';
+    if (trimmed.length < 2) return [];
+
+    const safeLimit = Math.min(20, Math.max(1, Math.floor(limit) || 8));
+    const literal = trimmed.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+    const pattern = `%${literal}%`;
+
+    const patients = await this.patientsRepo
+      .createQueryBuilder('patient')
+      .select(['patient.id', 'patient.fullName', 'patient.identificationNumber'])
+      .where('patient.hospital_id = :hospitalId', { hospitalId })
+      .andWhere('patient.deleted_at IS NULL')
+      .andWhere(
+        `(patient.full_name ILIKE :pattern ESCAPE '\\' OR patient.identification_number ILIKE :pattern ESCAPE '\\')`,
+        { pattern },
+      )
+      .orderBy('patient.full_name', 'ASC')
+      .take(safeLimit)
+      .getMany();
+
+    return patients.map((p) => ({
+      id: p.id,
+      mrn: p.identificationNumber,
+      fullName: p.fullName,
+    }));
+  }
+
   async getInvoice(hospitalId: string, id: string): Promise<InvoiceType> {
-    const invoice = await this.invoicesRepo.findOne({
-      where: { id, hospitalId },
-      relations: ['items', 'payments', 'patient'],
-    });
+    const invoice = await this.invoicesRepo
+      .createQueryBuilder('invoice')
+      .innerJoinAndSelect('invoice.patient', 'patient')
+      .leftJoinAndSelect('invoice.items', 'items')
+      .leftJoinAndSelect('invoice.payments', 'payments')
+      .where('invoice.id = :id', { id })
+      .andWhere('invoice.hospital_id = :hospitalId', { hospitalId })
+      .andWhere('patient.deleted_at IS NULL')
+      .getOne();
     if (!invoice) throw new NotFoundException('Invoice not found');
     return this.toInvoiceType(invoice);
   }
@@ -246,6 +292,7 @@ export class BillingService {
           .andWhere('invoice.hospital_id = :hospitalId', { hospitalId })
           .getOne();
         if (!invoice) throw new NotFoundException('Invoice not found');
+        await this.assertPatient(hospitalId, invoice.patientId);
         if (invoice.status === 'void') {
           throw new BadRequestException(
             'Cannot record payment on a void invoice',
@@ -319,6 +366,7 @@ export class BillingService {
         .andWhere('invoice.hospital_id = :hospitalId', { hospitalId })
         .getOne();
       if (!invoice) throw new NotFoundException('Invoice not found');
+      await this.assertPatient(hospitalId, invoice.patientId);
       if (invoice.status === 'void') {
         throw new BadRequestException('Invoice is already void');
       }

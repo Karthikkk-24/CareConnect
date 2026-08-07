@@ -76,9 +76,18 @@ Dependency scanning:
 snyk test --all-projects
 ```
 
-Snyk Code (SAST / OWASP-oriented code analysis) must be enabled for the Snyk organization
-before `snyk code test` works. If you see `SNYK-CODE-0005`, an org admin should enable
-**Snyk Code** in the Snyk UI (Settings → Snyk Code), then re-run:
+### Enabling Snyk Code (SAST)
+
+Snyk Code cannot be turned on from application code or CI alone. For org
+**`kkshettigar24`**, an organization admin must enable it in the Snyk UI:
+
+1. Sign in at [https://app.snyk.io](https://app.snyk.io) as an org admin for `kkshettigar24`.
+2. Open **Settings → Snyk Code** (or Organization settings → Snyk Code).
+3. Enable **Snyk Code** / code analysis for the organization.
+4. Confirm billing/plan allows Snyk Code if prompted.
+
+Until that is done, `snyk code test` returns **SNYK-CODE-0005** / 403 and OWASP/AI
+code analysis stays unavailable. After an admin enables it, re-run:
 
 ```bash
 snyk code test --all-projects

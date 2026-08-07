@@ -47,6 +47,16 @@ export const CREATE_STAFF_MUTATION = gql`
   }
 `;
 
+export const RESEND_STAFF_INVITE_MUTATION = gql`
+  mutation ResendStaffInvite($id: String!) {
+    resendStaffInvite(id: $id) {
+      id
+      inviteToken
+      inviteUrl
+    }
+  }
+`;
+
 export const COMPLETE_PATIENT_ONBOARDING = gql`
   mutation CompletePatientOnboarding($fullName: String!) {
     completePatientOnboarding(fullName: $fullName) {
@@ -167,6 +177,17 @@ export const DELETE_WARD_MUTATION = gql`
 export const DELETE_BED_MUTATION = gql`
   mutation DeleteBed($id: String!, $hospitalId: String) {
     deleteBed(id: $id, hospitalId: $hospitalId)
+  }
+`;
+
+export const UPDATE_BED_STATUS_MUTATION = gql`
+  mutation UpdateBedStatus($input: UpdateBedStatusInput!, $hospitalId: String) {
+    updateBedStatus(input: $input, hospitalId: $hospitalId) {
+      id
+      label
+      status
+      wardId
+    }
   }
 `;
 
@@ -797,6 +818,7 @@ export const CREATE_FOLLOW_UP_MUTATION = gql`
     createFollowUp(input: $input, hospitalId: $hospitalId) {
       id
       patientId
+      doctorId
       scheduledAt
       type
       status
@@ -898,6 +920,16 @@ export const INVOICES_QUERY = gql`
         method
         paidAt
       }
+    }
+  }
+`;
+
+export const BILLING_PATIENT_SEARCH_QUERY = gql`
+  query BillingPatientSearch($search: String!, $limit: Int, $hospitalId: String) {
+    billingPatientSearch(search: $search, limit: $limit, hospitalId: $hospitalId) {
+      id
+      mrn
+      fullName
     }
   }
 `;

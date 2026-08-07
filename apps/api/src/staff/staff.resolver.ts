@@ -75,6 +75,19 @@ export class StaffResolver {
     return this.staffService.toStaffType(full!);
   }
 
+  @Mutation(() => StaffType)
+  @Roles(ROLES.HOSPITAL_ADMIN, ROLES.HOSPITAL_MANAGER, ROLES.SUPER_ADMIN)
+  @Permissions(PERMISSIONS.STAFF_WRITE)
+  async resendStaffInvite(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('id') id: string,
+  ): Promise<StaffType> {
+    const member = await this.staffService.resendStaffInvite(id, user);
+    const inviteToken = member.inviteToken;
+    const full = await this.staffService.findById(member.id);
+    return this.staffService.toStaffType({ ...full!, inviteToken });
+  }
+
   @Mutation(() => Boolean)
   @Roles(ROLES.HOSPITAL_ADMIN, ROLES.SUPER_ADMIN)
   @Permissions(PERMISSIONS.STAFF_WRITE)

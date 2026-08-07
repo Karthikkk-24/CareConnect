@@ -77,7 +77,10 @@ export default function InvoiceDetailPage() {
           <div className="flex items-center justify-between">
             <ClayBadge>{invoice.status}</ClayBadge>
             <div className="flex items-center gap-3">
-              {canWriteBilling && invoice.status !== 'void' && invoice.status !== 'paid' ? (
+              {canWriteBilling &&
+              invoice.status !== 'void' &&
+              invoice.status !== 'paid' &&
+              (invoice.payments ?? []).length === 0 ? (
                 <ClayButton
                   size="sm"
                   variant="ghost"

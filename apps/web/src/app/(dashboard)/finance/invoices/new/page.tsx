@@ -6,10 +6,11 @@ import { useMutation, useQuery } from '@apollo/client';
 import { ClayButton, ClayCard, ClayInput } from '@careconnect/ui';
 import { ForbiddenAccess } from '@/components/auth/forbidden-access';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
+import { QueryError } from '@/components/query-error';
 import {
   CREATE_INVOICE_MUTATION,
   ME_QUERY,
-  PATIENTS_QUERY,
+  BILLING_PATIENT_SEARCH_QUERY,
 } from '@/lib/graphql/queries';
 
 type LineItem = {
@@ -32,10 +33,13 @@ export default function NewInvoicePage() {
   const hospitalId = meData?.me?.hospitalId;
   const canWriteBilling = (meData?.me?.permissions ?? []).includes('billing:write');
 
-  const { data: patientsData } = useQuery(PATIENTS_QUERY, {
-    variables: { search: patientSearch, limit: 8, hospitalId },
-    skip: !hospitalId || patientSearch.length < 2,
-  });
+  const { data: patientsData, error: patientsError, refetch: refetchPatients } = useQuery(
+    BILLING_PATIENT_SEARCH_QUERY,
+    {
+      variables: { search: patientSearch, limit: 8, hospitalId },
+      skip: !hospitalId || patientSearch.length < 2,
+    },
+  );
 
   const [createInvoice, { loading }] = useMutation(CREATE_INVOICE_MUTATION, {
     onCompleted: () => router.push('/finance/invoices'),
@@ -120,21 +124,32 @@ export default function NewInvoicePage() {
             value={patientSearch}
             onChange={(e) => setPatientSearch(e.target.value)}
           />
-          {patientsData?.patients?.items?.length ? (
+          {patientsError ? (
+            <QueryError
+              message="We could not search patients. Please try again."
+              onRetry={() => void refetchPatients()}
+              className="text-left"
+            />
+          ) : patientsData?.billingPatientSearch?.length ? (
             <div className="rounded-2xl bg-clay-primary-light/30 p-2">
-              {patientsData.patients.items.map((p: { id: string; fullName: string }) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => {
-                    setPatientId(p.id);
-                    setPatientSearch(p.fullName);
-                  }}
-                  className="block w-full rounded-xl px-3 py-2 text-left text-sm text-clay-text hover:bg-clay-primary-light/50"
-                >
-                  {p.fullName}
-                </button>
-              ))}
+              {patientsData.billingPatientSearch.map(
+                (p: { id: string; fullName: string; mrn?: string }) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => {
+                      setPatientId(p.id);
+                      setPatientSearch(p.fullName);
+                    }}
+                    className="block w-full rounded-xl px-3 py-2 text-left text-sm text-clay-text hover:bg-clay-primary-light/50"
+                  >
+                    {p.fullName}
+                    {p.mrn ? (
+                      <span className="ml-2 text-clay-text-muted">({p.mrn})</span>
+                    ) : null}
+                  </button>
+                ),
+              )}
             </div>
           ) : null}
           <ClayInput

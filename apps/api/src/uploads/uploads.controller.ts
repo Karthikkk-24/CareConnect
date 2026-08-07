@@ -102,12 +102,12 @@ export class UploadsController {
       },
     }),
   )
-  uploadPatientDocument(
+  async uploadPatientDocument(
     @UploadedFile() file: Express.Multer.File,
     @Req() req: AuthedRequest,
   ) {
     if (!req.user) throw new ForbiddenException('Authentication required');
-    this.uploadsService.assertCanUpload(req.user);
+    await this.uploadsService.assertCanUpload(req.user);
 
     if (!file) throw new BadRequestException('file is required');
     // Prefer configured public base; otherwise return a stable relative path

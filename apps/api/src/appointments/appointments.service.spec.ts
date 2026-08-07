@@ -80,6 +80,19 @@ describe('AppointmentsService status machine', () => {
       Object.assign(state, a);
       return Promise.resolve(state);
     });
+    apptManager.findOne.mockResolvedValue({
+      id: state.patientId ?? 'patient-1',
+      hospitalId: 'hospital-a',
+      status: 'registered',
+    });
+    const fetchQb = {
+      innerJoinAndSelect: jest.fn().mockReturnThis(),
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getOne: jest.fn().mockImplementation(() => Promise.resolve({ ...state })),
+    };
+    appointmentsRepo.createQueryBuilder.mockReturnValue(fetchQb);
     appointmentsRepo.findOne.mockImplementation(() =>
       Promise.resolve({ ...state }),
     );
@@ -144,8 +157,22 @@ describe('AppointmentsService status machine', () => {
   });
 
   describe('doctor appointment scoping', () => {
+    const listQb = () => {
+      const qb = {
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      };
+      appointmentsRepo.createQueryBuilder.mockReturnValue(qb);
+      return qb;
+    };
+
     it('forces doctorId for doctor-only actors', async () => {
-      appointmentsRepo.find.mockResolvedValue([]);
+      const qb = listQb();
       const doctor: AuthenticatedUser = {
         ...actor,
         id: 'doc-9',
@@ -161,15 +188,14 @@ describe('AppointmentsService status machine', () => {
         doctor,
       );
 
-      expect(appointmentsRepo.find).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { hospitalId: 'hospital-a', doctorId: 'doc-9' },
-        }),
+      expect(qb.andWhere).toHaveBeenCalledWith(
+        'appointment.doctor_id = :doctorId',
+        { doctorId: 'doc-9' },
       );
     });
 
     it('keeps hospital-wide list for receptionists', async () => {
-      appointmentsRepo.find.mockResolvedValue([]);
+      const qb = listQb();
 
       await service.findAll(
         'hospital-a',
@@ -179,10 +205,9 @@ describe('AppointmentsService status machine', () => {
         actor,
       );
 
-      expect(appointmentsRepo.find).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { hospitalId: 'hospital-a' },
-        }),
+      expect(qb.andWhere).not.toHaveBeenCalledWith(
+        'appointment.doctor_id = :doctorId',
+        expect.anything(),
       );
     });
   });

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -7,7 +8,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { existsSync } from 'fs';
 import { basename, join } from 'path';
-import { EntityManager, In, Repository } from 'typeorm';
+import { EntityManager, In, QueryFailedError, Repository } from 'typeorm';
 import {
   Admission,
   ClinicalNote,
@@ -481,46 +482,61 @@ export class ClinicalService {
     input: CompleteLabResultInput,
     actor: AuthenticatedUser,
   ): Promise<LabResultType> {
-    const resultId = await this.labOrdersRepo.manager.transaction(
-      async (manager) => {
-        const order = await manager
-          .createQueryBuilder(LabOrder, 'order')
-          .setLock('pessimistic_write')
-          .where('order.id = :id', { id: input.labOrderId })
-          .andWhere('order.hospital_id = :hospitalId', { hospitalId })
-          .getOne();
-        if (!order) throw new NotFoundException('Lab order not found');
+    let resultId: string;
+    try {
+      resultId = await this.labOrdersRepo.manager.transaction(
+        async (manager) => {
+          const order = await manager
+            .createQueryBuilder(LabOrder, 'order')
+            .setLock('pessimistic_write')
+            .where('order.id = :id', { id: input.labOrderId })
+            .andWhere('order.hospital_id = :hospitalId', { hospitalId })
+            .getOne();
+          if (!order) throw new NotFoundException('Lab order not found');
 
-        if (order.status === 'completed' || order.status === 'cancelled') {
-          throw new BadRequestException(
-            `Cannot complete lab order with status "${order.status}"`,
+          await this.assertPatient(hospitalId, order.patientId);
+
+          if (order.status === 'completed' || order.status === 'cancelled') {
+            throw new BadRequestException(
+              `Cannot complete lab order with status "${order.status}"`,
+            );
+          }
+          assertLabTransition(order.status, 'completed');
+
+          const safeResultFileUrl = await this.assertExclusiveLabUploadUrl(
+            manager,
+            input.resultFileUrl,
           );
-        }
-        assertLabTransition(order.status, 'completed');
 
-        const safeResultFileUrl = await this.assertExclusiveLabUploadUrl(
-          manager,
-          input.resultFileUrl,
+          const result = await manager.save(
+            manager.create(LabResult, {
+              labOrderId: order.id,
+              hospitalId,
+              resultValue: input.resultValue,
+              referenceRange: input.referenceRange,
+              unit: input.unit,
+              resultFileUrl: safeResultFileUrl,
+              enteredById: actor.id,
+              completedAt: new Date(),
+            }),
+          );
+
+          order.status = 'completed';
+          await manager.save(order);
+          return result.id;
+        },
+      );
+    } catch (error) {
+      if (
+        error instanceof QueryFailedError &&
+        (error as QueryFailedError & { code?: string }).code === '23505'
+      ) {
+        throw new ConflictException(
+          'Upload file is already linked to a lab result',
         );
-
-        const result = await manager.save(
-          manager.create(LabResult, {
-            labOrderId: order.id,
-            hospitalId,
-            resultValue: input.resultValue,
-            referenceRange: input.referenceRange,
-            unit: input.unit,
-            resultFileUrl: safeResultFileUrl,
-            enteredById: actor.id,
-            completedAt: new Date(),
-          }),
-        );
-
-        order.status = 'completed';
-        await manager.save(order);
-        return result.id;
-      },
-    );
+      }
+      throw error;
+    }
 
     const result = await this.labResultsRepo.findOne({
       where: { id: resultId, hospitalId },
@@ -560,6 +576,8 @@ export class ClinicalService {
           .andWhere('order.hospital_id = :hospitalId', { hospitalId })
           .getOne();
         if (!order) throw new NotFoundException('Lab order not found');
+
+        await this.assertPatient(hospitalId, order.patientId);
 
         assertLabTransition(order.status, input.status);
         order.status = input.status;
@@ -603,6 +621,8 @@ export class ClinicalService {
         if (!prescription)
           throw new NotFoundException('Prescription not found');
 
+        await this.assertPatient(hospitalId, prescription.patientId);
+
         assertPrescriptionTransition(prescription.status, 'cancelled');
         prescription.status = 'cancelled';
         await manager.save(prescription);
@@ -632,19 +652,23 @@ export class ClinicalService {
     hospitalId: string,
     status?: string,
   ): Promise<LabOrderType[]> {
-    const where: { hospitalId: string; status?: string } = { hospitalId };
-    if (status) {
-      if (!(status in LAB_ALLOWED_TRANSITIONS)) {
-        throw new BadRequestException(`Invalid lab order status "${status}"`);
-      }
-      where.status = status;
+    if (status && !(status in LAB_ALLOWED_TRANSITIONS)) {
+      throw new BadRequestException(`Invalid lab order status "${status}"`);
     }
-    const orders = await this.labOrdersRepo.find({
-      where,
-      relations: ['patient', 'orderedBy'],
-      order: { createdAt: 'DESC' },
-      take: 200,
-    });
+
+    const qb = this.labOrdersRepo
+      .createQueryBuilder('order')
+      .innerJoinAndSelect('order.patient', 'patient')
+      .leftJoinAndSelect('order.orderedBy', 'orderedBy')
+      .where('order.hospital_id = :hospitalId', { hospitalId })
+      .andWhere('patient.deleted_at IS NULL');
+    if (status) {
+      qb.andWhere('order.status = :status', { status });
+    }
+    const orders = await qb
+      .orderBy('order.created_at', 'DESC')
+      .take(200)
+      .getMany();
 
     const completedOrderIds = orders
       .filter((o) => o.status === 'completed')

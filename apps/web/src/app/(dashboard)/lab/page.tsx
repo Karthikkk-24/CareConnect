@@ -85,10 +85,13 @@ export default function LabPage() {
     skip: !hospitalId,
   });
 
-  const { data: patientsData } = useQuery(PATIENTS_QUERY, {
-    variables: { search: patientSearch, limit: 8, hospitalId },
-    skip: !hospitalId || !canCreateOrders || patientSearch.length < 2,
-  });
+  const { data: patientsData, error: patientsError, refetch: refetchPatients } = useQuery(
+    PATIENTS_QUERY,
+    {
+      variables: { search: patientSearch, limit: 8, hospitalId },
+      skip: !hospitalId || !canCreateOrders || patientSearch.length < 2,
+    },
+  );
 
   const resetCompleteForm = () => {
     setSelectedOrderId(null);
@@ -285,7 +288,13 @@ export default function LabPage() {
               value={patientSearch}
               onChange={(e) => setPatientSearch(e.target.value)}
             />
-            {patientsData?.patients?.items?.length ? (
+            {patientsError ? (
+              <QueryError
+                message="We could not search patients. Please try again."
+                onRetry={() => void refetchPatients()}
+                className="text-left"
+              />
+            ) : patientsData?.patients?.items?.length ? (
               <div className="rounded-2xl bg-clay-primary-light/30 p-2">
                 {patientsData.patients.items.map((p: { id: string; fullName: string }) => (
                   <button

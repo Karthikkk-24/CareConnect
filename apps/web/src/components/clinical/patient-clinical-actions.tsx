@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { ClayButton, ClayCard, ClayInput } from '@careconnect/ui';
 import { ClayTextarea } from '@/components/clinical/clay-textarea';
+import { QueryError } from '@/components/query-error';
 import {
   ADMIT_PATIENT_MUTATION,
   BEDS_QUERY,
@@ -108,10 +109,14 @@ export function PatientClinicalActions({ patientId, hospitalId }: PatientClinica
     skip: !hospitalId || !admitWardId || expanded !== 'admit',
   });
 
-  const wards: Array<{ id: string; name: string; floor?: string }> =
-    wardsQuery.data?.wards ?? [];
-  const beds: Array<{ id: string; label: string; status: string }> = bedsQuery.data?.beds ?? [];
+  const wards: Array<{ id: string; name: string; floor?: string }> = wardsQuery.error
+    ? []
+    : (wardsQuery.data?.wards ?? []);
+  const beds: Array<{ id: string; label: string; status: string }> = bedsQuery.error
+    ? []
+    : (bedsQuery.data?.beds ?? []);
   const availableBeds = beds.filter((b) => b.status === 'available');
+  const facilityQueryError = wardsQuery.error || bedsQuery.error;
 
   const toggle = (key: ActionKey) => {
     setExpanded((prev) => (prev === key ? null : key));
@@ -389,7 +394,16 @@ export function PatientClinicalActions({ patientId, hospitalId }: PatientClinica
                           </option>
                         ))}
                       </select>
-                      {wards.length === 0 && !wardsQuery.loading ? (
+                      {facilityQueryError ? (
+                        <QueryError
+                          message="We could not load wards or beds. Please try again."
+                          onRetry={() => {
+                            void wardsQuery.refetch();
+                            if (admitWardId) void bedsQuery.refetch();
+                          }}
+                          className="text-left"
+                        />
+                      ) : wards.length === 0 && !wardsQuery.loading ? (
                         canManageFacility ? (
                           <Link
                             href="/settings/facility"
@@ -428,7 +442,10 @@ export function PatientClinicalActions({ patientId, hospitalId }: PatientClinica
                           </option>
                         ))}
                       </select>
-                      {admitWardId && availableBeds.length === 0 && !bedsQuery.loading ? (
+                      {admitWardId &&
+                      !bedsQuery.error &&
+                      availableBeds.length === 0 &&
+                      !bedsQuery.loading ? (
                         <p className="text-xs text-clay-text-muted">
                           No available beds in this ward.
                         </p>
@@ -526,33 +543,43 @@ export function PatientClinicalActions({ patientId, hospitalId }: PatientClinica
 }
 
 function DoctorSelect({ hospitalId }: { hospitalId?: string }) {
-  const { data } = useQuery(STAFF_MEMBERS_QUERY, {
+  const { data, error, refetch } = useQuery(STAFF_MEMBERS_QUERY, {
     variables: { hospitalId },
     skip: !hospitalId,
   });
-  const doctors = (data?.staffMembers ?? []).filter(
-    (s: { roleSlug: string; isActive: boolean }) =>
-      s.isActive && (s.roleSlug === 'doctor' || s.roleSlug === 'hospital_admin'),
-  );
+  const doctors = error
+    ? []
+    : (data?.staffMembers ?? []).filter(
+        (s: { roleSlug: string; isActive: boolean }) =>
+          s.isActive && (s.roleSlug === 'doctor' || s.roleSlug === 'hospital_admin'),
+      );
 
   return (
     <div className="flex flex-col gap-2">
       <label htmlFor="clinical-doctor" className="text-sm font-medium text-clay-text">
         Doctor (optional)
       </label>
-      <select
-        id="clinical-doctor"
-        name="doctorId"
-        className="rounded-2xl border border-white/60 bg-clay-surface px-4 py-3 text-sm shadow-clay-inset"
-        defaultValue=""
-      >
-        <option value="">Unassigned</option>
-        {doctors.map((d: { userId: string; fullName: string }) => (
-          <option key={d.userId} value={d.userId}>
-            {d.fullName}
-          </option>
-        ))}
-      </select>
+      {error ? (
+        <QueryError
+          message="We could not load doctors. Please try again."
+          onRetry={() => void refetch()}
+          className="text-left"
+        />
+      ) : (
+        <select
+          id="clinical-doctor"
+          name="doctorId"
+          className="rounded-2xl border border-white/60 bg-clay-surface px-4 py-3 text-sm shadow-clay-inset"
+          defaultValue=""
+        >
+          <option value="">Unassigned</option>
+          {doctors.map((d: { userId: string; fullName: string }) => (
+            <option key={d.userId} value={d.userId}>
+              {d.fullName}
+            </option>
+          ))}
+        </select>
+      )}
     </div>
   );
 }

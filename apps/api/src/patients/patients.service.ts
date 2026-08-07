@@ -9,7 +9,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { existsSync, unlinkSync } from 'fs';
 import { basename, join } from 'path';
-import { ILike, EntityManager, Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import {
   Patient,
   PatientAllergy,
@@ -466,7 +466,7 @@ export class PatientsService {
     });
 
     for (const fileUrl of fileUrlsToUnlink) {
-      this.unlinkStoredUpload(fileUrl);
+      await this.unlinkStoredUploadIfUnreferenced(fileUrl);
     }
 
     await this.audit.log({
@@ -556,8 +556,12 @@ export class PatientsService {
     if (!document) throw new NotFoundException('Patient document not found');
 
     const fileUrl = document.fileUrl;
+    // Unlink while this row still owns the unique file_url so a concurrent
+    // re-bind cannot claim the path and then have its disk file deleted (#222).
+    await this.unlinkStoredUploadIfUnreferenced(fileUrl, {
+      excludeDocumentId: document.id,
+    });
     await this.documentsRepo.remove(document);
-    this.unlinkStoredUpload(fileUrl);
 
     await this.audit.log({
       actorId: actor.id,
@@ -571,8 +575,15 @@ export class PatientsService {
     return true;
   }
 
-  /** Remove PHI file from local uploads/ when the document row is deleted. */
-  private unlinkStoredUpload(fileUrl: string | undefined) {
+  /**
+   * Remove PHI file from local uploads/ only when no document or lab result
+   * still references it. Pass excludeDocumentId while the row still exists
+   * so we can unlink-before-remove safely (#210 / #222).
+   */
+  private async unlinkStoredUploadIfUnreferenced(
+    fileUrl: string | undefined,
+    options?: { excludeDocumentId?: string },
+  ) {
     if (!fileUrl) return;
     try {
       const marker = '/uploads/';
@@ -581,6 +592,32 @@ export class PatientsService {
         idx >= 0 ? fileUrl.slice(idx + marker.length) : basename(fileUrl);
       const safe = basename(rawName.split('?')[0] ?? '');
       if (!safe || safe.includes('..')) return;
+
+      const suffix = `/uploads/${safe}`;
+      const docsQb = this.documentsRepo
+        .createQueryBuilder('doc')
+        .where(
+          '(doc.file_url = :relative OR doc.file_url = :filename OR RIGHT(doc.file_url, :len) = :suffix)',
+          { relative: suffix, filename: safe, len: suffix.length, suffix },
+        );
+      if (options?.excludeDocumentId) {
+        docsQb.andWhere('doc.id != :excludeId', {
+          excludeId: options.excludeDocumentId,
+        });
+      }
+      const otherDocs = await docsQb.getMany();
+      if (otherDocs.length > 0) return;
+
+      const labs = await this.documentsRepo.manager
+        .getRepository(LabResult)
+        .createQueryBuilder('result')
+        .where(
+          '(result.result_file_url = :relative OR result.result_file_url = :filename OR RIGHT(result.result_file_url, :len) = :suffix)',
+          { relative: suffix, filename: safe, len: suffix.length, suffix },
+        )
+        .getMany();
+      if (labs.length > 0) return;
+
       const path = join(process.cwd(), 'uploads', safe);
       if (existsSync(path)) {
         unlinkSync(path);
@@ -646,6 +683,14 @@ export class PatientsService {
     if (!hasPatientRole) {
       throw new BadRequestException(
         'Only users with the patient role can be linked to a patient chart',
+      );
+    }
+
+    const chartEmail = patient.email?.trim().toLowerCase();
+    const portalEmail = targetUser.email?.trim().toLowerCase();
+    if (!chartEmail || !portalEmail || chartEmail !== portalEmail) {
+      throw new BadRequestException(
+        'Portal account email must match the patient chart email',
       );
     }
 
@@ -1083,14 +1128,34 @@ export class PatientsService {
       throw new BadRequestException('Upload file not found on server');
     }
 
-    const existingDocs = await this.documentsRepo.find({
-      where: { fileUrl: ILike(`%/uploads/${filename}`) },
-      take: 20,
-    });
+    const suffix = `/uploads/${filename}`;
+    const existingDocs = await this.documentsRepo
+      .createQueryBuilder('doc')
+      .where(
+        '(doc.file_url = :relative OR doc.file_url = :filename OR RIGHT(doc.file_url, :len) = :suffix)',
+        { relative: suffix, filename, len: suffix.length, suffix },
+      )
+      .getMany();
 
     if (existingDocs.length > 0) {
       throw new BadRequestException(
         'Upload file is already linked to a patient document',
+      );
+    }
+
+    // Mirror lab exclusivity: a lab-owned upload must not be re-bound as a
+    // document (cross-patient PHI / shared-disk unlink risk) (#210).
+    const existingLabs = await this.documentsRepo.manager
+      .getRepository(LabResult)
+      .createQueryBuilder('result')
+      .where(
+        '(result.result_file_url = :relative OR result.result_file_url = :filename OR RIGHT(result.result_file_url, :len) = :suffix)',
+        { relative: suffix, filename, len: suffix.length, suffix },
+      )
+      .getMany();
+    if (existingLabs.length > 0) {
+      throw new BadRequestException(
+        'Upload file is already linked to a lab result',
       );
     }
 

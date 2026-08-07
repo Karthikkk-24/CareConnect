@@ -74,11 +74,10 @@ export default function InventoryPage() {
     }
   };
 
-  const handleAdjust = async (id: string, currentQty: number, delta: number) => {
-    const newQty = Math.max(0, currentQty + delta);
+  const handleAdjust = async (id: string, delta: number) => {
     try {
       await updateQuantity({
-        variables: { hospitalId, input: { id, quantity: newQty } },
+        variables: { hospitalId, input: { id, delta } },
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update quantity');
@@ -197,7 +196,7 @@ export default function InventoryPage() {
                           size="sm"
                           variant="secondary"
                           disabled={updating}
-                          onClick={() => handleAdjust(item.id, item.quantity, -1)}
+                          onClick={() => handleAdjust(item.id, -1)}
                         >
                           −
                         </ClayButton>
@@ -205,7 +204,7 @@ export default function InventoryPage() {
                           size="sm"
                           variant="secondary"
                           disabled={updating}
-                          onClick={() => handleAdjust(item.id, item.quantity, 1)}
+                          onClick={() => handleAdjust(item.id, 1)}
                         >
                           +
                         </ClayButton>
