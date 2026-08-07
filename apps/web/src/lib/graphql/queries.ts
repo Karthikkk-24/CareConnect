@@ -170,6 +170,17 @@ export const DELETE_BED_MUTATION = gql`
   }
 `;
 
+export const UPDATE_BED_STATUS_MUTATION = gql`
+  mutation UpdateBedStatus($input: UpdateBedStatusInput!, $hospitalId: String) {
+    updateBedStatus(input: $input, hospitalId: $hospitalId) {
+      id
+      label
+      status
+      wardId
+    }
+  }
+`;
+
 export const CANCEL_APPOINTMENT_MUTATION = gql`
   mutation CancelAppointment($input: CancelAppointmentInput!, $hospitalId: String) {
     cancelAppointment(input: $input, hospitalId: $hospitalId) {

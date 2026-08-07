@@ -17,6 +17,7 @@ import {
   DELETE_WARD_MUTATION,
   DEPARTMENTS_QUERY,
   ME_QUERY,
+  UPDATE_BED_STATUS_MUTATION,
   WARDS_QUERY,
 } from '@/lib/graphql/queries';
 
@@ -124,6 +125,17 @@ export default function FacilitySettingsPage() {
     },
     onError: (err) => setError(err.message),
   });
+
+  const [updateBedStatus, { loading: updatingBedStatus }] = useMutation(
+    UPDATE_BED_STATUS_MUTATION,
+    {
+      onCompleted: () => {
+        setMessage('Bed status updated');
+        bedsQuery.refetch();
+      },
+      onError: (err) => setError(err.message),
+    },
+  );
 
   const departments: Department[] = departmentsQuery.data?.departments ?? [];
   const wards: Ward[] = wardsQuery.data?.wards ?? [];
@@ -461,19 +473,45 @@ export default function FacilitySettingsPage() {
                       {b.status}
                     </ClayBadge>
                     {b.status !== 'occupied' && canWriteFacility ? (
-                      <ClayButton
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        aria-label={`Delete ${b.label}`}
-                        onClick={() => {
-                          if (confirm(`Delete bed “${b.label}”?`)) {
-                            deleteBed({ variables: { id: b.id, hospitalId } });
+                      <>
+                        <ClayButton
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          isLoading={updatingBedStatus}
+                          aria-label={
+                            b.status === 'maintenance'
+                              ? `Mark ${b.label} available`
+                              : `Mark ${b.label} maintenance`
                           }
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4 text-clay-error" />
-                      </ClayButton>
+                          onClick={() => {
+                            resetFlash();
+                            const nextStatus =
+                              b.status === 'maintenance' ? 'available' : 'maintenance';
+                            updateBedStatus({
+                              variables: {
+                                hospitalId,
+                                input: { bedId: b.id, status: nextStatus },
+                              },
+                            });
+                          }}
+                        >
+                          {b.status === 'maintenance' ? 'Set available' : 'Set maintenance'}
+                        </ClayButton>
+                        <ClayButton
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          aria-label={`Delete ${b.label}`}
+                          onClick={() => {
+                            if (confirm(`Delete bed “${b.label}”?`)) {
+                              deleteBed({ variables: { id: b.id, hospitalId } });
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 text-clay-error" />
+                        </ClayButton>
+                      </>
                     ) : null}
                   </div>
                 </div>
