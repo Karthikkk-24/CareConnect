@@ -222,8 +222,23 @@ export class UploadsService implements OnApplicationBootstrap {
     throw new ForbiddenException('Access denied');
   }
 
-  /** Staff with patients:write or lab:write may upload files. */
-  assertCanUpload(user: AuthenticatedUser): void {
+  /**
+   * Staff with patients:write or lab:write may upload files.
+   * Refuse when the actor's hospital is inactive (fail-closed, incl. super_admin
+   * with a hospitalId scoped to an inactive tenant).
+   */
+  async assertCanUpload(user: AuthenticatedUser): Promise<void> {
+    if (user.hospitalId) {
+      const hospital = await this.hospitalsRepo.findOne({
+        where: { id: user.hospitalId },
+      });
+      if (!hospital || !hospital.isActive) {
+        throw new ForbiddenException(
+          'This hospital is currently inactive; uploads are unavailable',
+        );
+      }
+    }
+
     if (user.roles.includes('super_admin')) return;
     if (user.permissions.includes(PERMISSIONS.PATIENTS_WRITE)) return;
     if (user.permissions.includes(PERMISSIONS.LAB_WRITE)) return;

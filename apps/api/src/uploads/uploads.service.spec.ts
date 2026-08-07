@@ -125,43 +125,81 @@ describe('UploadsService', () => {
   };
 
   describe('assertCanUpload', () => {
-    it('allows staff with patients:write', () => {
-      expect(() => service.assertCanUpload(staffUser)).not.toThrow();
+    it('allows staff with patients:write', async () => {
+      await expect(service.assertCanUpload(staffUser)).resolves.toBeUndefined();
     });
 
-    it('allows super_admin', () => {
-      expect(() =>
+    it('allows super_admin', async () => {
+      await expect(
         service.assertCanUpload({
           ...staffUser,
           roles: ['super_admin'],
           permissions: [],
         }),
-      ).not.toThrow();
+      ).resolves.toBeUndefined();
     });
 
-    it('denies patient role', () => {
-      expect(() => service.assertCanUpload(patientUser)).toThrow(
+    it('denies patient role', async () => {
+      await expect(service.assertCanUpload(patientUser)).rejects.toThrow(
         ForbiddenException,
       );
     });
 
-    it('denies staff without patients:write', () => {
-      expect(() =>
+    it('denies staff without patients:write', async () => {
+      await expect(
         service.assertCanUpload({
           ...staffUser,
           permissions: ['patients:read'],
         }),
-      ).toThrow(ForbiddenException);
+      ).rejects.toThrow(ForbiddenException);
     });
 
-    it('allows lab technicians with lab:write', () => {
-      expect(() =>
+    it('allows lab technicians with lab:write', async () => {
+      await expect(
         service.assertCanUpload({
           ...staffUser,
           roles: ['lab_technician'],
           permissions: ['lab:write'],
         }),
-      ).not.toThrow();
+      ).resolves.toBeUndefined();
+    });
+
+    it('denies upload when actor hospital is inactive', async () => {
+      hospitalsRepo.findOne.mockResolvedValue({
+        id: 'hospital-a',
+        isActive: false,
+      });
+
+      await expect(service.assertCanUpload(staffUser)).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('denies super_admin upload when their hospitalId is inactive', async () => {
+      hospitalsRepo.findOne.mockResolvedValue({
+        id: 'hospital-a',
+        isActive: false,
+      });
+
+      await expect(
+        service.assertCanUpload({
+          ...staffUser,
+          roles: ['super_admin'],
+          permissions: [],
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('allows super_admin without hospitalId when hospital check cannot apply', async () => {
+      await expect(
+        service.assertCanUpload({
+          ...staffUser,
+          hospitalId: undefined,
+          roles: ['super_admin'],
+          permissions: [],
+        }),
+      ).resolves.toBeUndefined();
+      expect(hospitalsRepo.findOne).not.toHaveBeenCalled();
     });
   });
 
