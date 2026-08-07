@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -116,6 +117,10 @@ export class InventoryService {
     input: UpdateInventoryQuantityInput,
     actor: AuthenticatedUser,
   ): Promise<InventoryItemType> {
+    if (!Number.isFinite(input.delta)) {
+      throw new BadRequestException('delta must be a finite number');
+    }
+
     const saved = await this.inventoryRepo.manager.transaction(
       async (manager) => {
         const item = await manager
@@ -126,7 +131,8 @@ export class InventoryService {
           .getOne();
         if (!item) throw new NotFoundException('Inventory item not found');
 
-        item.quantity = input.quantity.toFixed(2);
+        const next = Math.max(0, Number(item.quantity) + input.delta);
+        item.quantity = next.toFixed(2);
         return manager.save(item);
       },
     );
@@ -137,7 +143,7 @@ export class InventoryService {
       action: 'update',
       resource: 'inventory_item',
       resourceId: saved.id,
-      metadata: { quantity: input.quantity },
+      metadata: { delta: input.delta, quantity: Number(saved.quantity) },
     });
 
     return this.toInventoryItemType(saved);

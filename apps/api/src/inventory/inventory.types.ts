@@ -74,8 +74,8 @@ export class UpdateInventoryQuantityInput {
   @IsUUID()
   id: string;
 
+  /** Signed adjustment applied under row lock (e.g. +1 / -1). */
   @Field(() => Float)
   @IsNumber()
-  @Min(0)
-  quantity: number;
+  delta: number;
 }
