@@ -686,6 +686,14 @@ export class PatientsService {
       );
     }
 
+    const chartEmail = patient.email?.trim().toLowerCase();
+    const portalEmail = targetUser.email?.trim().toLowerCase();
+    if (!chartEmail || !portalEmail || chartEmail !== portalEmail) {
+      throw new BadRequestException(
+        'Portal account email must match the patient chart email',
+      );
+    }
+
     const existingLink = await this.patientsRepo.findOne({
       where: { userId: targetUserId },
     });

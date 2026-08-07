@@ -346,4 +346,82 @@ describe('PatientsService', () => {
       ).rejects.toThrow(BadRequestException);
     });
   });
+
+  describe('linkPatientAccount', () => {
+    const patientBase = {
+      id: 'patient-1',
+      hospitalId: 'hospital-1',
+      fullName: 'Jane Doe',
+      email: 'jane@example.com',
+      userId: null as string | null,
+    };
+
+    const patientRoleUser = {
+      id: 'portal-1',
+      email: 'jane@example.com',
+      userRoles: [{ role: { slug: 'patient' } }],
+    };
+
+    it('links when chart email matches portal user email', async () => {
+      patientsRepo.findOne
+        .mockResolvedValueOnce({ ...patientBase })
+        .mockResolvedValueOnce(null);
+      usersRepo.findOne.mockResolvedValue(patientRoleUser);
+      patientsRepo.save.mockImplementation((row: unknown) =>
+        Promise.resolve(row),
+      );
+
+      const result = await service.linkPatientAccount(
+        'patient-1',
+        'hospital-1',
+        actor,
+        'portal-1',
+      );
+
+      expect(result.userId).toBe('portal-1');
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'link_account',
+          resource: 'patient',
+          resourceId: 'patient-1',
+        }),
+      );
+    });
+
+    it('rejects when portal email does not match chart email', async () => {
+      patientsRepo.findOne.mockResolvedValue({ ...patientBase });
+      usersRepo.findOne.mockResolvedValue({
+        ...patientRoleUser,
+        email: 'other@example.com',
+      });
+
+      await expect(
+        service.linkPatientAccount(
+          'patient-1',
+          'hospital-1',
+          actor,
+          'portal-1',
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(patientsRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('rejects when chart email is missing', async () => {
+      patientsRepo.findOne.mockResolvedValue({
+        ...patientBase,
+        email: null,
+      });
+      usersRepo.findOne.mockResolvedValue(patientRoleUser);
+
+      await expect(
+        service.linkPatientAccount(
+          'patient-1',
+          'hospital-1',
+          actor,
+          'portal-1',
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(patientsRepo.save).not.toHaveBeenCalled();
+    });
+  });
 });
