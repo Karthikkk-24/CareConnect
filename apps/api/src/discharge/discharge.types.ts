@@ -135,10 +135,9 @@ export class CreateFollowUpInput {
   @IsUUID()
   dischargeId?: string;
 
-  @Field({ nullable: true })
-  @IsOptional()
+  @Field()
   @IsUUID()
-  doctorId?: string;
+  doctorId: string;
 
   @Field()
   @IsDateString()
