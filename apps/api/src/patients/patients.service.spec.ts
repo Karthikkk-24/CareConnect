@@ -154,17 +154,58 @@ describe('PatientsService', () => {
         fullName: 'Jane Doe',
         userId: 'portal-1',
       };
-      patientsRepo.findOne.mockResolvedValue(patient);
-      admissionsRepo.findOne.mockResolvedValue(null);
+      const patientQb = {
+        setLock: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(patient),
+      };
       patientsRepo.manager.transaction.mockImplementation(
         (cb: (m: Record<string, unknown>) => unknown) => {
+          const repoByEntity = new Map<unknown, Record<string, unknown>>([
+            [
+              Patient,
+              {
+                save: jest.fn().mockResolvedValue(patient),
+                softRemove: jest.fn().mockResolvedValue(patient),
+              },
+            ],
+            [
+              Admission,
+              {
+                findOne: jest.fn().mockResolvedValue(null),
+              },
+            ],
+            [
+              PatientDocument,
+              {
+                find: jest.fn().mockResolvedValue([]),
+                remove: jest.fn(),
+              },
+            ],
+            [
+              // LabOrder / LabResult repos still used via getRepository
+              'LabOrder',
+              {
+                find: jest.fn().mockResolvedValue([]),
+              },
+            ],
+          ]);
           const manager = {
-            getRepository: () => ({
-              save: jest.fn().mockResolvedValue(patient),
-              find: jest.fn().mockResolvedValue([]),
-              remove: jest.fn(),
-              softRemove: jest.fn().mockResolvedValue(patient),
-            }),
+            createQueryBuilder: jest.fn().mockReturnValue(patientQb),
+            getRepository: (entity: unknown) => {
+              if (entity === Patient) return repoByEntity.get(Patient);
+              if (entity === Admission) return repoByEntity.get(Admission);
+              if (entity === PatientDocument)
+                return repoByEntity.get(PatientDocument);
+              return {
+                find: jest.fn().mockResolvedValue([]),
+                remove: jest.fn(),
+                save: jest.fn(),
+                softRemove: jest.fn(),
+                findOne: jest.fn().mockResolvedValue(null),
+              };
+            },
           };
           return Promise.resolve(cb(manager));
         },
@@ -178,6 +219,7 @@ describe('PatientsService', () => {
 
       expect(result).toBe(true);
       expect(patientsRepo.manager.transaction).toHaveBeenCalled();
+      expect(patientQb.setLock).toHaveBeenCalledWith('pessimistic_write');
       expect(audit.log).toHaveBeenCalledWith(
         expect.objectContaining({
           action: 'delete',
@@ -185,6 +227,49 @@ describe('PatientsService', () => {
           resourceId: 'patient-1',
         }),
       );
+    });
+
+    it('refuses delete when an active admission exists under the patient lock', async () => {
+      const patient = {
+        id: 'patient-1',
+        hospitalId: 'hospital-1',
+        fullName: 'Jane Doe',
+      };
+      const patientQb = {
+        setLock: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(patient),
+      };
+      patientsRepo.manager.transaction.mockImplementation(
+        (cb: (m: Record<string, unknown>) => unknown) => {
+          const manager = {
+            createQueryBuilder: jest.fn().mockReturnValue(patientQb),
+            getRepository: (entity: unknown) => {
+              if (entity === Admission) {
+                return {
+                  findOne: jest
+                    .fn()
+                    .mockResolvedValue({ id: 'adm-1', status: 'active' }),
+                };
+              }
+              return {
+                save: jest.fn(),
+                softRemove: jest.fn(),
+                find: jest.fn().mockResolvedValue([]),
+                remove: jest.fn(),
+              };
+            },
+          };
+          return Promise.resolve(cb(manager));
+        },
+      );
+
+      await expect(
+        service.deletePatient('patient-1', 'hospital-1', actor),
+      ).rejects.toThrow(BadRequestException);
+      expect(patientQb.setLock).toHaveBeenCalledWith('pessimistic_write');
+      expect(audit.log).not.toHaveBeenCalled();
     });
   });
 
