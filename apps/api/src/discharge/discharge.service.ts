@@ -191,13 +191,16 @@ export class DischargeService {
           if (input.followUpScheduledAt) {
             const followUpDoctorId =
               input.followUpDoctorId ?? admission.attendingDoctorId;
-            if (followUpDoctorId) {
-              await this.doctorValidator.assertHospitalDoctor(
-                hospitalId,
-                followUpDoctorId,
-                'Follow-up doctor',
+            if (!followUpDoctorId) {
+              throw new BadRequestException(
+                'Follow-up doctor is required when scheduling a follow-up',
               );
             }
+            await this.doctorValidator.assertHospitalDoctor(
+              hospitalId,
+              followUpDoctorId,
+              'Follow-up doctor',
+            );
             await manager.save(
               manager.create(FollowUp, {
                 hospitalId,
@@ -265,13 +268,14 @@ export class DischargeService {
       }
     }
 
-    if (input.doctorId) {
-      await this.doctorValidator.assertHospitalDoctor(
-        hospitalId,
-        input.doctorId,
-        'Follow-up doctor',
-      );
+    if (!input.doctorId) {
+      throw new BadRequestException('Follow-up doctor is required');
     }
+    await this.doctorValidator.assertHospitalDoctor(
+      hospitalId,
+      input.doctorId,
+      'Follow-up doctor',
+    );
 
     const followUp = await this.followUpsRepo.save(
       this.followUpsRepo.create({

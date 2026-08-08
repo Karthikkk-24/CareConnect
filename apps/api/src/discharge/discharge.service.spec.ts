@@ -53,6 +53,7 @@ describe('DischargeService', () => {
   const audit = { log: jest.fn() };
   const doctorValidator = {
     assertHospitalDoctor: jest.fn().mockResolvedValue(undefined),
+    assertHospitalDoctorOrThrow: jest.fn().mockResolvedValue(undefined),
   };
 
   const actor: AuthenticatedUser = {
@@ -110,6 +111,64 @@ describe('DischargeService', () => {
       ).rejects.toThrow(
         'A discharge summary already exists for this admission',
       );
+    });
+
+    it('rejects scheduled follow-up when no doctor is provided or attending', async () => {
+      const qb = {
+        setLock: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue({
+          id: 'adm-1',
+          hospitalId: 'hospital-a',
+          patientId: 'patient-1',
+          status: 'active',
+          bedId: null,
+          attendingDoctorId: null,
+        }),
+      };
+      manager.createQueryBuilder.mockReturnValue(qb);
+      manager.findOne
+        .mockResolvedValueOnce(null) // no existing discharge
+        .mockResolvedValueOnce({ id: 'patient-1', hospitalId: 'hospital-a' });
+      manager.save.mockImplementation((entity: Record<string, unknown>) =>
+        Promise.resolve({ id: 'discharge-1', ...entity }),
+      );
+
+      await expect(
+        service.createDischarge(
+          'hospital-a',
+          {
+            admissionId: 'adm-1',
+            summary: 'Recovered',
+            followUpScheduledAt: '2026-08-20T10:00:00.000Z',
+          },
+          actor,
+        ),
+      ).rejects.toThrow(
+        'Follow-up doctor is required when scheduling a follow-up',
+      );
+    });
+  });
+
+  describe('createFollowUp', () => {
+    it('rejects missing doctorId', async () => {
+      patientsRepo.findOne.mockResolvedValue({
+        id: 'patient-1',
+        hospitalId: 'hospital-a',
+      });
+
+      await expect(
+        service.createFollowUp(
+          'hospital-a',
+          {
+            patientId: 'patient-1',
+            doctorId: '',
+            scheduledAt: '2026-08-20T10:00:00.000Z',
+          },
+          actor,
+        ),
+      ).rejects.toThrow('Follow-up doctor is required');
     });
   });
 
