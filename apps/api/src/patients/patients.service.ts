@@ -415,28 +415,43 @@ export class PatientsService {
     hospitalId: string,
     actor: AuthenticatedUser,
   ): Promise<boolean> {
-    const patient = await this.findPatientOrThrow(id, hospitalId);
-
-    const activeAdmission = await this.admissionsRepo.findOne({
-      where: { patientId: id, hospitalId, status: 'active' },
-    });
-    if (activeAdmission) {
-      throw new BadRequestException(
-        'Cannot delete a patient with an active admission; discharge first',
-      );
-    }
-
     // Soft-delete policy: soft-remove the patient row; hard-remove linked
     // document metadata and unlink PHI files from disk. Other related rows
     // remain for audit but are unreachable via patient queries.
-    const previousUserId = patient.userId;
+    // Lock the patient row and re-check active admissions inside the txn so a
+    // concurrent admit cannot attach a live bed after the pre-check (#230).
+    let previousUserId: string | undefined;
+    let patientFullName = '';
     const fileUrlsToUnlink: string[] = [];
+    let patientId = id;
 
     await this.patientsRepo.manager.transaction(async (manager) => {
       const patientsRepo = manager.getRepository(Patient);
+      const admissionsRepo = manager.getRepository(Admission);
       const documentsRepo = manager.getRepository(PatientDocument);
       const labOrdersRepo = manager.getRepository(LabOrder);
       const labResultsRepo = manager.getRepository(LabResult);
+
+      const patient = await manager
+        .createQueryBuilder(Patient, 'patient')
+        .setLock('pessimistic_write')
+        .where('patient.id = :id', { id })
+        .andWhere('patient.hospital_id = :hospitalId', { hospitalId })
+        .getOne();
+      if (!patient) throw new NotFoundException('Patient not found');
+
+      const activeAdmission = await admissionsRepo.findOne({
+        where: { patientId: id, hospitalId, status: 'active' },
+      });
+      if (activeAdmission) {
+        throw new BadRequestException(
+          'Cannot delete a patient with an active admission; discharge first',
+        );
+      }
+
+      previousUserId = patient.userId;
+      patientFullName = patient.fullName;
+      patientId = patient.id;
 
       patient.userId = null as unknown as string | undefined;
       await patientsRepo.save(patient);
@@ -474,9 +489,9 @@ export class PatientsService {
       hospitalId,
       action: 'delete',
       resource: 'patient',
-      resourceId: patient.id,
+      resourceId: patientId,
       metadata: {
-        fullName: patient.fullName,
+        fullName: patientFullName,
         documentsRemoved: fileUrlsToUnlink.length,
         previousUserId,
       },

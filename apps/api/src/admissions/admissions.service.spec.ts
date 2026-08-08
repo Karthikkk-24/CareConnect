@@ -70,27 +70,39 @@ describe('AdmissionsService', () => {
   });
 
   describe('admitPatient concurrency guards', () => {
-    it('rejects when bed is already occupied after lock', async () => {
-      manager.findOne
-        .mockResolvedValueOnce({
-          id: 'patient-1',
-          hospitalId: 'hospital-a',
-          status: 'registered',
-        })
-        .mockResolvedValueOnce({ id: 'ward-1', hospitalId: 'hospital-a' });
+    const patientQb = (patient: Record<string, unknown> | null) => ({
+      setLock: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getOne: jest.fn().mockResolvedValue(patient),
+    });
 
-      const qb = {
-        setLock: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        getOne: jest.fn().mockResolvedValue({
-          id: 'bed-1',
-          status: 'occupied',
-          hospitalId: 'hospital-a',
-          wardId: 'ward-1',
-        }),
-      };
-      manager.createQueryBuilder.mockReturnValue(qb);
+    const bedQb = (bed: Record<string, unknown>) => ({
+      setLock: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getOne: jest.fn().mockResolvedValue(bed),
+    });
+
+    it('rejects when bed is already occupied after lock', async () => {
+      const lockedPatient = patientQb({
+        id: 'patient-1',
+        hospitalId: 'hospital-a',
+        status: 'registered',
+      });
+      const lockedBed = bedQb({
+        id: 'bed-1',
+        status: 'occupied',
+        hospitalId: 'hospital-a',
+        wardId: 'ward-1',
+      });
+      manager.createQueryBuilder
+        .mockReturnValueOnce(lockedPatient)
+        .mockReturnValueOnce(lockedBed);
+      manager.findOne.mockResolvedValueOnce({
+        id: 'ward-1',
+        hospitalId: 'hospital-a',
+      });
 
       await expect(
         service.admitPatient(
@@ -103,31 +115,28 @@ describe('AdmissionsService', () => {
           actor,
         ),
       ).rejects.toThrow(BadRequestException);
-      expect(qb.setLock).toHaveBeenCalledWith('pessimistic_write');
+      expect(lockedPatient.setLock).toHaveBeenCalledWith('pessimistic_write');
+      expect(lockedBed.setLock).toHaveBeenCalledWith('pessimistic_write');
     });
 
     it('rejects when patient already has an active admission', async () => {
+      const lockedPatient = patientQb({
+        id: 'patient-1',
+        hospitalId: 'hospital-a',
+        status: 'registered',
+      });
+      const lockedBed = bedQb({
+        id: 'bed-1',
+        status: 'available',
+        hospitalId: 'hospital-a',
+        wardId: 'ward-1',
+      });
+      manager.createQueryBuilder
+        .mockReturnValueOnce(lockedPatient)
+        .mockReturnValueOnce(lockedBed);
       manager.findOne
-        .mockResolvedValueOnce({
-          id: 'patient-1',
-          hospitalId: 'hospital-a',
-          status: 'registered',
-        })
         .mockResolvedValueOnce({ id: 'ward-1', hospitalId: 'hospital-a' })
         .mockResolvedValueOnce({ id: 'adm-existing', status: 'active' });
-
-      const qb = {
-        setLock: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        getOne: jest.fn().mockResolvedValue({
-          id: 'bed-1',
-          status: 'available',
-          hospitalId: 'hospital-a',
-          wardId: 'ward-1',
-        }),
-      };
-      manager.createQueryBuilder.mockReturnValue(qb);
 
       await expect(
         service.admitPatient(
@@ -140,10 +149,12 @@ describe('AdmissionsService', () => {
           actor,
         ),
       ).rejects.toThrow('Patient already has an active admission');
+      expect(lockedPatient.setLock).toHaveBeenCalledWith('pessimistic_write');
     });
 
-    it('throws NotFound when patient missing', async () => {
-      manager.findOne.mockResolvedValueOnce(null);
+    it('throws NotFound when patient missing or soft-deleted', async () => {
+      const lockedPatient = patientQb(null);
+      manager.createQueryBuilder.mockReturnValueOnce(lockedPatient);
       await expect(
         service.admitPatient(
           'hospital-a',
@@ -155,6 +166,7 @@ describe('AdmissionsService', () => {
           actor,
         ),
       ).rejects.toThrow(NotFoundException);
+      expect(lockedPatient.setLock).toHaveBeenCalledWith('pessimistic_write');
     });
   });
 

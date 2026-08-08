@@ -158,9 +158,14 @@ export class AdmissionsService {
     try {
       const savedId = await this.admissionsRepo.manager.transaction(
         async (manager) => {
-          const patient = await manager.findOne(Patient, {
-            where: { id: input.patientId, hospitalId },
-          });
+          // Lock patient before bed so admit serializes with soft-delete (#230).
+          // Soft-deleted patients are excluded by TypeORM DeleteDateColumn.
+          const patient = await manager
+            .createQueryBuilder(Patient, 'patient')
+            .setLock('pessimistic_write')
+            .where('patient.id = :id', { id: input.patientId })
+            .andWhere('patient.hospital_id = :hospitalId', { hospitalId })
+            .getOne();
           if (!patient) throw new NotFoundException('Patient not found');
 
           const ward = await manager.findOne(Ward, {
