@@ -229,9 +229,14 @@ describe('AdmissionsService', () => {
         getOne: jest.fn().mockResolvedValue({
           id: 'adm-1',
           status: 'discharged',
+          patientId: 'patient-1',
         }),
       };
       manager.createQueryBuilder.mockReturnValue(admissionQb);
+      manager.findOne.mockResolvedValue({
+        id: 'patient-1',
+        hospitalId: 'hospital-a',
+      });
 
       await expect(
         service.transferOutAdmission(
@@ -240,6 +245,88 @@ describe('AdmissionsService', () => {
           actor,
         ),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects transfer-out when patient is soft-deleted', async () => {
+      const admissionQb = {
+        setLock: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue({
+          id: 'adm-1',
+          hospitalId: 'hospital-a',
+          patientId: 'patient-1',
+          bedId: 'bed-1',
+          status: 'active',
+        }),
+      };
+      manager.createQueryBuilder.mockReturnValue(admissionQb);
+      manager.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.transferOutAdmission(
+          'hospital-a',
+          { admissionId: 'adm-1' },
+          actor,
+        ),
+      ).rejects.toThrow(NotFoundException);
+      expect(manager.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('transferAdmission soft-delete', () => {
+    it('rejects bed transfer when patient is soft-deleted', async () => {
+      const admissionQb = {
+        setLock: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue({
+          id: 'adm-1',
+          hospitalId: 'hospital-a',
+          patientId: 'patient-1',
+          bedId: 'bed-1',
+          status: 'active',
+        }),
+      };
+      manager.createQueryBuilder.mockReturnValue(admissionQb);
+      manager.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.transferAdmission(
+          'hospital-a',
+          {
+            admissionId: 'adm-1',
+            wardId: 'ward-2',
+            bedId: 'bed-2',
+          },
+          actor,
+        ),
+      ).rejects.toThrow(NotFoundException);
+      expect(manager.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('activeAdmissions', () => {
+    it('excludes soft-deleted patients via deleted_at filter', async () => {
+      const qb = {
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      };
+      admissionsRepo.createQueryBuilder = jest.fn().mockReturnValue(qb);
+
+      await service.activeAdmissions('hospital-a');
+
+      expect(admissionsRepo.createQueryBuilder).toHaveBeenCalledWith(
+        'admission',
+      );
+      expect(qb.andWhere).toHaveBeenCalledWith(
+        'patient.deleted_at IS NULL',
+      );
     });
   });
 });

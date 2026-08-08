@@ -150,6 +150,24 @@ export class AdmissionsService {
     return admission;
   }
 
+  /** Live in-tenant patient only — soft-deleted charts are excluded by DeleteDateColumn. */
+  private async requireLivePatient(
+    manager: {
+      findOne: (
+        entity: typeof Patient,
+        options: { where: { id: string; hospitalId: string } },
+      ) => Promise<Patient | null>;
+    },
+    patientId: string,
+    hospitalId: string,
+  ): Promise<Patient> {
+    const patient = await manager.findOne(Patient, {
+      where: { id: patientId, hospitalId },
+    });
+    if (!patient) throw new NotFoundException('Patient not found');
+    return patient;
+  }
+
   async admitPatient(
     hospitalId: string,
     input: AdmitPatientInput,
@@ -251,12 +269,18 @@ export class AdmissionsService {
   }
 
   async activeAdmissions(hospitalId: string): Promise<AdmissionType[]> {
-    const admissions = await this.admissionsRepo.find({
-      where: { hospitalId, status: 'active' },
-      relations: ['patient', 'attendingDoctor', 'ward', 'bed'],
-      order: { admittedAt: 'DESC' },
-      take: 200,
-    });
+    const admissions = await this.admissionsRepo
+      .createQueryBuilder('admission')
+      .innerJoinAndSelect('admission.patient', 'patient')
+      .leftJoinAndSelect('admission.attendingDoctor', 'attendingDoctor')
+      .leftJoinAndSelect('admission.ward', 'ward')
+      .leftJoinAndSelect('admission.bed', 'bed')
+      .where('admission.hospital_id = :hospitalId', { hospitalId })
+      .andWhere('admission.status = :status', { status: 'active' })
+      .andWhere('patient.deleted_at IS NULL')
+      .orderBy('admission.admitted_at', 'DESC')
+      .take(200)
+      .getMany();
     return admissions.map((a) => this.toAdmissionType(a));
   }
 
@@ -299,6 +323,12 @@ export class AdmissionsService {
             'Only active admissions can be transferred to another bed',
           );
         }
+
+        // Soft-deleted charts must not move beds (#231).
+        const patient = await manager.findOne(Patient, {
+          where: { id: admission.patientId, hospitalId },
+        });
+        if (!patient) throw new NotFoundException('Admission not found');
 
         const ward = await manager.findOne(Ward, {
           where: { id: input.wardId, hospitalId },
@@ -386,6 +416,12 @@ export class AdmissionsService {
 
       assertAdmissionTransition(admission.status, 'transferred');
 
+      // Soft-deleted charts must not transfer-out / free beds (#231).
+      const patient = await manager.findOne(Patient, {
+        where: { id: admission.patientId, hospitalId },
+      });
+      if (!patient) throw new NotFoundException('Admission not found');
+
       if (admission.bedId) {
         const bed = await manager
           .createQueryBuilder(Bed, 'bed')
@@ -408,13 +444,8 @@ export class AdmissionsService {
       }
       await manager.save(admission);
 
-      const patient = await manager.findOne(Patient, {
-        where: { id: admission.patientId, hospitalId },
-      });
-      if (patient) {
-        patient.status = 'discharged';
-        await manager.save(patient);
-      }
+      patient.status = 'discharged';
+      await manager.save(patient);
     });
 
     const admission = await this.findAdmissionOrThrow(
