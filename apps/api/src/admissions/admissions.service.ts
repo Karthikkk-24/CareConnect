@@ -325,10 +325,7 @@ export class AdmissionsService {
         }
 
         // Soft-deleted charts must not move beds (#231).
-        const patient = await manager.findOne(Patient, {
-          where: { id: admission.patientId, hospitalId },
-        });
-        if (!patient) throw new NotFoundException('Admission not found');
+        await this.requireLivePatient(manager, admission.patientId, hospitalId);
 
         const ward = await manager.findOne(Ward, {
           where: { id: input.wardId, hospitalId },
@@ -417,10 +414,11 @@ export class AdmissionsService {
       assertAdmissionTransition(admission.status, 'transferred');
 
       // Soft-deleted charts must not transfer-out / free beds (#231).
-      const patient = await manager.findOne(Patient, {
-        where: { id: admission.patientId, hospitalId },
-      });
-      if (!patient) throw new NotFoundException('Admission not found');
+      const patient = await this.requireLivePatient(
+        manager,
+        admission.patientId,
+        hospitalId,
+      );
 
       if (admission.bedId) {
         const bed = await manager
