@@ -53,7 +53,6 @@ describe('DischargeService', () => {
   const audit = { log: jest.fn() };
   const doctorValidator = {
     assertHospitalDoctor: jest.fn().mockResolvedValue(undefined),
-    assertHospitalDoctorOrThrow: jest.fn().mockResolvedValue(undefined),
   };
 
   const actor: AuthenticatedUser = {
