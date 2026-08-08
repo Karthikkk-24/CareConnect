@@ -67,3 +67,14 @@ NEXT_PUBLIC_API_URL=http://localhost:4000/graphql
 EOF
 
 echo "start.sh: PostgreSQL ready and env files written"
+
+# --- 5. Run the dev servers (Turbo runs both api :4000 and web :3000) ---------
+# `start` stays attached running the dev servers; the platform runs it detached.
+# Skip if something is already bound to the dev ports (idempotent re-runs).
+if (exec 3<>/dev/tcp/127.0.0.1/3000) 2>/dev/null; then
+  exec 3>&- 3<&-
+  echo "start.sh: web already listening on :3000, not starting dev servers"
+else
+  echo "start.sh: starting dev servers (pnpm dev)"
+  exec pnpm dev
+fi
