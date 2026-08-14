@@ -63,7 +63,8 @@ export default function PatientDischargePage() {
     ? []
     : (staffData?.staffMembers ?? []).filter(
         (s: { roleSlug: string; isActive: boolean }) =>
-          s.isActive && (s.roleSlug === 'doctor' || s.roleSlug === 'hospital_admin'),
+          // Match HospitalDoctorValidator / appointments/new: doctor role only.
+          s.isActive && s.roleSlug === 'doctor',
       );
 
   const admission = admissionsData?.activeAdmissions?.find(

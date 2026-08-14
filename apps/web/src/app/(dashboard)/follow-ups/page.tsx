@@ -79,7 +79,8 @@ export default function FollowUpsPage() {
     ? []
     : (staffData?.staffMembers ?? []).filter(
         (s: { roleSlug: string; isActive: boolean }) =>
-          s.isActive && (s.roleSlug === 'doctor' || s.roleSlug === 'hospital_admin'),
+          // Match HospitalDoctorValidator / appointments/new: doctor role only.
+          s.isActive && s.roleSlug === 'doctor',
       );
 
   const [updateStatus] = useMutation(UPDATE_FOLLOW_UP_STATUS_MUTATION, {

@@ -551,7 +551,8 @@ function DoctorSelect({ hospitalId }: { hospitalId?: string }) {
     ? []
     : (data?.staffMembers ?? []).filter(
         (s: { roleSlug: string; isActive: boolean }) =>
-          s.isActive && (s.roleSlug === 'doctor' || s.roleSlug === 'hospital_admin'),
+          // Match HospitalDoctorValidator / appointments/new: doctor role only.
+          s.isActive && s.roleSlug === 'doctor',
       );
 
   return (
