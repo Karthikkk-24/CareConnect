@@ -1094,3 +1094,21 @@ export const HOSPITAL_REPORTS_QUERY = gql`
     }
   }
 `;
+
+export const AUDIT_LOGS_QUERY = gql`
+  query AuditLogs($hospitalId: String, $resource: String, $limit: Int) {
+    auditLogs(hospitalId: $hospitalId, resource: $resource, limit: $limit) {
+      total
+      items {
+        id
+        actorId
+        actorEmail
+        actorName
+        action
+        resource
+        resourceId
+        createdAt
+      }
+    }
+  }
+`;
