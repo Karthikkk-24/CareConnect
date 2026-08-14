@@ -159,14 +159,16 @@ export async function sniffAndValidateUpload(
     detectedMime = 'text/plain';
   }
 
-  const ext = detectedMime ? MIME_TO_EXT[detectedMime] : undefined;
-  if (!detectedMime || !ext) {
+  if (!detectedMime) {
     await rejectUpload(
       filePath,
-      detectedMime
-        ? `Unsupported file type: ${detectedMime}`
-        : 'Could not determine file type from content',
+      'Could not determine file type from content',
     );
+  }
+
+  const ext = MIME_TO_EXT[detectedMime];
+  if (!ext) {
+    await rejectUpload(filePath, `Unsupported file type: ${detectedMime}`);
   }
 
   if (claimedMime !== detectedMime) {
