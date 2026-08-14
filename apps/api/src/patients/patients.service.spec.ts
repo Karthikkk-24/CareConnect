@@ -5,6 +5,8 @@ import { existsSync } from 'fs';
 import { QueryFailedError } from 'typeorm';
 import {
   Admission,
+  Appointment,
+  LabOrder,
   Patient,
   PatientAllergy,
   PatientConsent,
@@ -14,6 +16,7 @@ import {
   PatientInsurance,
   PatientMedicalHistory,
   PatientMedication,
+  Prescription,
   User,
 } from '../database/entities';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -94,9 +97,13 @@ describe('PatientsService', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     relatedRepo.find.mockResolvedValue([]);
-    relatedRepo.createQueryBuilder.mockImplementation(() => mockUploadUrlQb([]));
+    relatedRepo.createQueryBuilder.mockImplementation(() =>
+      mockUploadUrlQb([]),
+    );
     relatedRepo.manager.getRepository.mockReturnValue(labResultsRepo);
-    labResultsRepo.createQueryBuilder.mockImplementation(() => mockUploadUrlQb([]));
+    labResultsRepo.createQueryBuilder.mockImplementation(() =>
+      mockUploadUrlQb([]),
+    );
     existsSyncMock.mockReturnValue(true);
 
     const module: TestingModule = await Test.createTestingModule({
@@ -271,6 +278,108 @@ describe('PatientsService', () => {
       ).rejects.toThrow(BadRequestException);
       expect(patientQb.setLock).toHaveBeenCalledWith('pessimistic_write');
       expect(audit.log).not.toHaveBeenCalled();
+    });
+
+    it('cancels open Rx, labs, and appointments before soft-delete', async () => {
+      const patient = {
+        id: 'patient-1',
+        hospitalId: 'hospital-1',
+        fullName: 'Jane Doe',
+        userId: undefined,
+      };
+      const patientQb = {
+        setLock: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(patient),
+      };
+      const pendingRx = { id: 'rx-1', status: 'pending' };
+      const openLab = { id: 'lab-1', status: 'ordered' };
+      const openAppt = { id: 'appt-1', status: 'scheduled', notes: undefined };
+      const rxSave = jest.fn().mockResolvedValue(pendingRx);
+      const labSave = jest.fn().mockResolvedValue(openLab);
+      const apptSave = jest.fn().mockResolvedValue(openAppt);
+      const labFind = jest
+        .fn()
+        .mockResolvedValueOnce([openLab])
+        .mockResolvedValueOnce([]);
+
+      patientsRepo.manager.transaction.mockImplementation(
+        (cb: (m: Record<string, unknown>) => unknown) => {
+          const manager = {
+            createQueryBuilder: jest.fn().mockReturnValue(patientQb),
+            getRepository: (entity: unknown) => {
+              if (entity === Patient) {
+                return {
+                  save: jest.fn().mockResolvedValue(patient),
+                  softRemove: jest.fn().mockResolvedValue(patient),
+                };
+              }
+              if (entity === Admission) {
+                return { findOne: jest.fn().mockResolvedValue(null) };
+              }
+              if (entity === PatientDocument) {
+                return {
+                  find: jest.fn().mockResolvedValue([]),
+                  remove: jest.fn(),
+                };
+              }
+              if (entity === Prescription) {
+                return {
+                  find: jest.fn().mockResolvedValue([pendingRx]),
+                  save: rxSave,
+                };
+              }
+              if (entity === Appointment) {
+                return {
+                  find: jest.fn().mockResolvedValue([openAppt]),
+                  save: apptSave,
+                };
+              }
+              if (entity === LabOrder) {
+                return { find: labFind, save: labSave };
+              }
+              return {
+                find: jest.fn().mockResolvedValue([]),
+                save: jest.fn(),
+                remove: jest.fn(),
+              };
+            },
+          };
+          return Promise.resolve(cb(manager));
+        },
+      );
+
+      await service.deletePatient('patient-1', 'hospital-1', actor);
+
+      expect(rxSave).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'rx-1', status: 'cancelled' }),
+      );
+      expect(labSave).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'lab-1', status: 'cancelled' }),
+      );
+      expect(apptSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'appt-1',
+          status: 'cancelled',
+          notes: 'Cancelled: patient soft-deleted',
+        }),
+      );
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'delete',
+          resource: 'patient',
+          resourceId: 'patient-1',
+          metadata: {
+            fullName: 'Jane Doe',
+            documentsRemoved: 0,
+            previousUserId: undefined,
+            cancelledPrescriptions: 1,
+            cancelledLabOrders: 1,
+            cancelledAppointments: 1,
+          },
+        }),
+      );
     });
   });
 
