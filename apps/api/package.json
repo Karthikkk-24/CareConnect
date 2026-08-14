@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@apollo/server": "^5.5.1",
+    "@as-integrations/express5": "^1.1.2",
     "@careconnect/types": "workspace:*",
     "@clerk/backend": "^2.33.6",
     "@nestjs/apollo": "^13.4.2",

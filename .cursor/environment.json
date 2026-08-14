@@ -1,0 +1,21 @@
+{
+  "name": "CareConnect",
+  "install": "bash .cursor/install.sh",
+  "start": "bash .cursor/start.sh",
+  "terminals": [
+    {
+      "name": "api",
+      "command": "pnpm --filter api dev",
+      "description": "NestJS GraphQL API — http://localhost:4000/graphql"
+    },
+    {
+      "name": "web",
+      "command": "pnpm --filter web dev",
+      "description": "Next.js web app — http://localhost:3000"
+    }
+  ],
+  "ports": [
+    { "name": "web", "port": 3000 },
+    { "name": "api", "port": 4000 }
+  ]
+}

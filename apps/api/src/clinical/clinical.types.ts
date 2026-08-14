@@ -178,6 +178,42 @@ export class PrescriptionType {
   updatedAt: Date;
 }
 
+// Declared before LabOrderType: `emitDecoratorMetadata` emits an eager
+// `design:type` reference to LabResultType for LabOrderType.result, so the
+// class must exist first to avoid a temporal-dead-zone ReferenceError at load.
+@ObjectType()
+export class LabResultType {
+  @Field(() => ID)
+  id: string;
+
+  @Field(() => ID)
+  labOrderId: string;
+
+  @Field(() => ID)
+  hospitalId: string;
+
+  @Field({ nullable: true })
+  resultValue?: string;
+
+  @Field({ nullable: true })
+  referenceRange?: string;
+
+  @Field({ nullable: true })
+  unit?: string;
+
+  @Field({ nullable: true })
+  resultFileUrl?: string;
+
+  @Field(() => ID, { nullable: true })
+  enteredById?: string;
+
+  @Field({ nullable: true })
+  completedAt?: Date;
+
+  @Field()
+  createdAt: Date;
+}
+
 @ObjectType()
 export class LabOrderType {
   @Field(() => ID)
@@ -218,39 +254,6 @@ export class LabOrderType {
 
   @Field(() => LabResultType, { nullable: true })
   result?: LabResultType;
-}
-
-@ObjectType()
-export class LabResultType {
-  @Field(() => ID)
-  id: string;
-
-  @Field(() => ID)
-  labOrderId: string;
-
-  @Field(() => ID)
-  hospitalId: string;
-
-  @Field({ nullable: true })
-  resultValue?: string;
-
-  @Field({ nullable: true })
-  referenceRange?: string;
-
-  @Field({ nullable: true })
-  unit?: string;
-
-  @Field({ nullable: true })
-  resultFileUrl?: string;
-
-  @Field(() => ID, { nullable: true })
-  enteredById?: string;
-
-  @Field({ nullable: true })
-  completedAt?: Date;
-
-  @Field()
-  createdAt: Date;
 }
 
 @InputType()
