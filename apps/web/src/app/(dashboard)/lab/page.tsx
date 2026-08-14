@@ -130,7 +130,10 @@ export default function LabPage() {
     (o) => o.status !== 'completed' && o.status !== 'cancelled',
   );
 
-  const handleAdvanceStatus = async (labOrderId: string, status: string) => {
+  const handleAdvanceStatus = async (
+    labOrderId: string,
+    status: string,
+  ): Promise<boolean> => {
     setError('');
     try {
       await updateLabStatus({
@@ -139,8 +142,10 @@ export default function LabPage() {
           input: { labOrderId, status },
         },
       });
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update lab order status');
+      return false;
     }
   };
 
@@ -392,6 +397,32 @@ export default function LabPage() {
                         <FileText className="h-3.5 w-3.5" />
                         File
                       </button>
+                    ) : null}
+                    {canWriteLab &&
+                    !['completed', 'cancelled'].includes(order.status) ? (
+                      <ClayButton
+                        size="sm"
+                        variant="danger"
+                        isLoading={updatingStatus}
+                        onClick={() => {
+                          if (
+                            !confirm(
+                              'Cancel this lab order? This cannot be undone from the queue.',
+                            )
+                          ) {
+                            return;
+                          }
+                          void handleAdvanceStatus(order.id, 'cancelled').then(
+                            (ok) => {
+                              if (ok && selectedOrderId === order.id) {
+                                setSelectedOrderId(null);
+                              }
+                            },
+                          );
+                        }}
+                      >
+                        Cancel
+                      </ClayButton>
                     ) : null}
                     {canWriteLab && nextLabStatus(order.status) ? (
                       <ClayButton
