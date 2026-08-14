@@ -211,4 +211,26 @@ describe('AppointmentsService status machine', () => {
       );
     });
   });
+
+  describe('countAppointmentsToday', () => {
+    it('joins patients and excludes soft-deleted rows', async () => {
+      const qb = {
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getCount: jest.fn().mockResolvedValue(3),
+      };
+      appointmentsRepo.createQueryBuilder.mockReturnValue(qb);
+
+      const count = await service.countAppointmentsToday('hospital-a');
+
+      expect(count).toBe(3);
+      expect(qb.innerJoin).toHaveBeenCalledWith('a.patient', 'patient');
+      expect(qb.andWhere).toHaveBeenCalledWith('patient.deleted_at IS NULL');
+      expect(qb.andWhere).toHaveBeenCalledWith(
+        'a.status NOT IN (:...excluded)',
+        { excluded: ['cancelled'] },
+      );
+    });
+  });
 });

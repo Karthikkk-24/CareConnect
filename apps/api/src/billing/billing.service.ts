@@ -152,7 +152,6 @@ export class BillingService {
       throw new BadRequestException('Invoice must have at least one item');
     }
 
-    await this.assertPatient(hospitalId, input.patientId);
     await this.assertAdmission(hospitalId, input.patientId, input.admissionId);
 
     const status = input.status ?? 'draft';
@@ -168,6 +167,16 @@ export class BillingService {
 
     const invoiceId = await this.invoicesRepo.manager.transaction(
       async (manager) => {
+        // Lock the live patient row so a concurrent soft-delete's open-invoice
+        // check (#244) serializes against this insert (same pattern as admit).
+        const patient = await manager
+          .createQueryBuilder(Patient, 'patient')
+          .setLock('pessimistic_write')
+          .where('patient.id = :id', { id: input.patientId })
+          .andWhere('patient.hospital_id = :hospitalId', { hospitalId })
+          .getOne();
+        if (!patient) throw new NotFoundException('Patient not found');
+
         const invoice = await manager.save(
           manager.create(Invoice, {
             hospitalId,
@@ -398,10 +407,15 @@ export class BillingService {
   }
 
   async sumRevenue(hospitalId: string): Promise<number> {
+    // Exclude payments whose patient has been soft-deleted so dashboard/report
+    // revenue matches invoice lists that already hide those patients (#244).
     const result = await this.paymentsRepo
       .createQueryBuilder('payment')
+      .innerJoin('payment.invoice', 'invoice')
+      .innerJoin('invoice.patient', 'patient')
       .select('COALESCE(SUM(payment.amount), 0)', 'total')
       .where('payment.hospital_id = :hospitalId', { hospitalId })
+      .andWhere('patient.deleted_at IS NULL')
       .getRawOne<{ total: string }>();
 
     return this.toNumber(result?.total);

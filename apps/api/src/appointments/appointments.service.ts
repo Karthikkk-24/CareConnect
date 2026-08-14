@@ -368,10 +368,12 @@ export class AppointmentsService {
 
     return this.appointmentsRepo
       .createQueryBuilder('a')
+      .innerJoin('a.patient', 'patient')
       .where('a.hospital_id = :hospitalId', { hospitalId })
       .andWhere('a.scheduled_at >= :start', { start: today })
       .andWhere('a.scheduled_at < :end', { end: tomorrow })
       .andWhere('a.status NOT IN (:...excluded)', { excluded: ['cancelled'] })
+      .andWhere('patient.deleted_at IS NULL')
       .getCount();
   }
 }

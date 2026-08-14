@@ -22,6 +22,7 @@ import {
   PatientMedication,
   Admission,
   Appointment,
+  Invoice,
   LabOrder,
   LabResult,
   Prescription,
@@ -422,6 +423,8 @@ export class PatientsService {
     // workflows (pending Rx, open labs, scheduled/checked-in appointments)
     // are cancelled in the same transaction so they cannot become invisible
     // and uncancelable after lists hide soft-deleted patients (#235).
+    // Open invoices (draft/issued) block delete so receivables are not stuck
+    // behind a 404 on pay/void (#244). Paid/void invoices are left as-is.
     // Lock the patient row and re-check active admissions inside the txn so a
     // concurrent admit cannot attach a live bed after the pre-check (#230).
     let previousUserId: string | undefined;
@@ -455,6 +458,20 @@ export class PatientsService {
       if (activeAdmission) {
         throw new BadRequestException(
           'Cannot delete a patient with an active admission; discharge first',
+        );
+      }
+
+      const invoicesRepo = manager.getRepository(Invoice);
+      const openInvoice = await invoicesRepo.findOne({
+        where: {
+          patientId: id,
+          hospitalId,
+          status: In(['draft', 'issued']),
+        },
+      });
+      if (openInvoice) {
+        throw new BadRequestException(
+          'Cannot delete a patient with open invoices; void or collect payment first',
         );
       }
 

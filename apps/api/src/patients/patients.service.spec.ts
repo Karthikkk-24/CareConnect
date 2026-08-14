@@ -2,10 +2,11 @@ import { BadRequestException, ConflictException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { existsSync } from 'fs';
-import { QueryFailedError } from 'typeorm';
+import { In, QueryFailedError } from 'typeorm';
 import {
   Admission,
   Appointment,
+  Invoice,
   LabOrder,
   Patient,
   PatientAllergy,
@@ -280,6 +281,60 @@ describe('PatientsService', () => {
       expect(audit.log).not.toHaveBeenCalled();
     });
 
+    it('refuses delete when open invoices exist under the patient lock', async () => {
+      const patient = {
+        id: 'patient-1',
+        hospitalId: 'hospital-1',
+        fullName: 'Jane Doe',
+      };
+      const patientQb = {
+        setLock: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(patient),
+      };
+      const invoiceFindOne = jest.fn().mockResolvedValue({
+        id: 'inv-1',
+        status: 'issued',
+      });
+      patientsRepo.manager.transaction.mockImplementation(
+        (cb: (m: Record<string, unknown>) => unknown) => {
+          const manager = {
+            createQueryBuilder: jest.fn().mockReturnValue(patientQb),
+            getRepository: (entity: unknown) => {
+              if (entity === Admission) {
+                return { findOne: jest.fn().mockResolvedValue(null) };
+              }
+              if (entity === Invoice) {
+                return { findOne: invoiceFindOne };
+              }
+              return {
+                save: jest.fn(),
+                softRemove: jest.fn(),
+                find: jest.fn().mockResolvedValue([]),
+                findOne: jest.fn().mockResolvedValue(null),
+                remove: jest.fn(),
+              };
+            },
+          };
+          return Promise.resolve(cb(manager));
+        },
+      );
+
+      await expect(
+        service.deletePatient('patient-1', 'hospital-1', actor),
+      ).rejects.toThrow(BadRequestException);
+      expect(invoiceFindOne).toHaveBeenCalledWith({
+        where: {
+          patientId: 'patient-1',
+          hospitalId: 'hospital-1',
+          status: In(['draft', 'issued']),
+        },
+      });
+      expect(patientQb.setLock).toHaveBeenCalledWith('pessimistic_write');
+      expect(audit.log).not.toHaveBeenCalled();
+    });
+
     it('cancels open Rx, labs, and appointments before soft-delete', async () => {
       const patient = {
         id: 'patient-1',
@@ -339,8 +394,12 @@ describe('PatientsService', () => {
               if (entity === LabOrder) {
                 return { find: labFind, save: labSave };
               }
+              if (entity === Invoice) {
+                return { findOne: jest.fn().mockResolvedValue(null) };
+              }
               return {
                 find: jest.fn().mockResolvedValue([]),
+                findOne: jest.fn().mockResolvedValue(null),
                 save: jest.fn(),
                 remove: jest.fn(),
               };
