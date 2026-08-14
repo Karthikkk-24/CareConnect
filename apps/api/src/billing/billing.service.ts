@@ -152,7 +152,6 @@ export class BillingService {
       throw new BadRequestException('Invoice must have at least one item');
     }
 
-    await this.assertPatient(hospitalId, input.patientId);
     await this.assertAdmission(hospitalId, input.patientId, input.admissionId);
 
     const status = input.status ?? 'draft';
@@ -168,6 +167,16 @@ export class BillingService {
 
     const invoiceId = await this.invoicesRepo.manager.transaction(
       async (manager) => {
+        // Lock the live patient row so a concurrent soft-delete's open-invoice
+        // check (#244) serializes against this insert (same pattern as admit).
+        const patient = await manager
+          .createQueryBuilder(Patient, 'patient')
+          .setLock('pessimistic_write')
+          .where('patient.id = :id', { id: input.patientId })
+          .andWhere('patient.hospital_id = :hospitalId', { hospitalId })
+          .getOne();
+        if (!patient) throw new NotFoundException('Patient not found');
+
         const invoice = await manager.save(
           manager.create(Invoice, {
             hospitalId,
