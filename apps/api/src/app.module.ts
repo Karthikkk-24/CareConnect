@@ -8,6 +8,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import depthLimit from 'graphql-depth-limit';
 import { join } from 'path';
 import type { Request, Response } from 'express';
+import { graphqlQueryComplexityPlugin } from './common/graphql-query-complexity.plugin';
 import { validateEnv } from './config/env.validation';
 import { AuthModule } from './auth/auth.module';
 import { AppThrottlerGuard } from './common/app-throttler.guard';
@@ -158,7 +159,9 @@ import { UploadsModule } from './uploads/uploads.module';
           // Playground + introspection only outside production.
           playground: !isProduction,
           introspection: !isProduction,
+          // Depth 10 (#207). Max complexity 1000 via graphql-query-complexity (#238).
           validationRules: [depthLimit(10)],
+          plugins: [graphqlQueryComplexityPlugin],
           context: ({ req, res }: { req: Request; res: Response }) => ({
             req,
             res,
