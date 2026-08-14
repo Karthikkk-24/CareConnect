@@ -130,7 +130,10 @@ export default function LabPage() {
     (o) => o.status !== 'completed' && o.status !== 'cancelled',
   );
 
-  const handleAdvanceStatus = async (labOrderId: string, status: string) => {
+  const handleAdvanceStatus = async (
+    labOrderId: string,
+    status: string,
+  ): Promise<boolean> => {
     setError('');
     try {
       await updateLabStatus({
@@ -139,8 +142,10 @@ export default function LabPage() {
           input: { labOrderId, status },
         },
       });
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update lab order status');
+      return false;
     }
   };
 
@@ -408,8 +413,8 @@ export default function LabPage() {
                             return;
                           }
                           void handleAdvanceStatus(order.id, 'cancelled').then(
-                            () => {
-                              if (selectedOrderId === order.id) {
+                            (ok) => {
+                              if (ok && selectedOrderId === order.id) {
                                 setSelectedOrderId(null);
                               }
                             },
