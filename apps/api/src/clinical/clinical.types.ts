@@ -10,11 +10,13 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Max,
   Min,
   MinLength,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { NUMERIC_10_2_MAX } from '../common/money';
 import { PatientType } from '../patients/patients.types';
 import { UserSummaryType } from '../users/users.types';
 import { LAB_ORDER_STATUSES } from '../database/entities/lab-order.entity';
@@ -375,6 +377,7 @@ export class PrescriptionItemInput {
   @IsOptional()
   @IsNumber()
   @Min(0.01)
+  @Max(NUMERIC_10_2_MAX)
   quantity?: number;
 
   @Field({ nullable: true })
