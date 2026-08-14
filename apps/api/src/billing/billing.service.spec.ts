@@ -179,4 +179,24 @@ describe('BillingService', () => {
       ).rejects.toThrow('Admission does not belong to the given patient');
     });
   });
+
+  describe('sumRevenue', () => {
+    it('joins invoice and patient and excludes soft-deleted patients', async () => {
+      const qb = {
+        innerJoin: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getRawOne: jest.fn().mockResolvedValue({ total: '125.50' }),
+      };
+      paymentsRepo.createQueryBuilder.mockReturnValue(qb);
+
+      const total = await service.sumRevenue('hospital-a');
+
+      expect(total).toBe(125.5);
+      expect(qb.innerJoin).toHaveBeenCalledWith('payment.invoice', 'invoice');
+      expect(qb.innerJoin).toHaveBeenCalledWith('invoice.patient', 'patient');
+      expect(qb.andWhere).toHaveBeenCalledWith('patient.deleted_at IS NULL');
+    });
+  });
 });

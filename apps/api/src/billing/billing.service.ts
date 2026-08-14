@@ -398,10 +398,15 @@ export class BillingService {
   }
 
   async sumRevenue(hospitalId: string): Promise<number> {
+    // Exclude payments whose patient has been soft-deleted so dashboard/report
+    // revenue matches invoice lists that already hide those patients (#244).
     const result = await this.paymentsRepo
       .createQueryBuilder('payment')
+      .innerJoin('payment.invoice', 'invoice')
+      .innerJoin('invoice.patient', 'patient')
       .select('COALESCE(SUM(payment.amount), 0)', 'total')
       .where('payment.hospital_id = :hospitalId', { hospitalId })
+      .andWhere('patient.deleted_at IS NULL')
       .getRawOne<{ total: string }>();
 
     return this.toNumber(result?.total);
