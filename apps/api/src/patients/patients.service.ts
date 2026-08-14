@@ -9,7 +9,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { existsSync, unlinkSync } from 'fs';
 import { basename, join } from 'path';
-import { EntityManager, QueryFailedError, Repository } from 'typeorm';
+import { EntityManager, In, QueryFailedError, Repository } from 'typeorm';
 import {
   Patient,
   PatientAllergy,
@@ -21,8 +21,10 @@ import {
   PatientMedicalHistory,
   PatientMedication,
   Admission,
+  Appointment,
   LabOrder,
   LabResult,
+  Prescription,
   User,
 } from '../database/entities';
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -416,14 +418,19 @@ export class PatientsService {
     actor: AuthenticatedUser,
   ): Promise<boolean> {
     // Soft-delete policy: soft-remove the patient row; hard-remove linked
-    // document metadata and unlink PHI files from disk. Other related rows
-    // remain for audit but are unreachable via patient queries.
+    // document metadata and unlink PHI files from disk. Open clinical
+    // workflows (pending Rx, open labs, scheduled/checked-in appointments)
+    // are cancelled in the same transaction so they cannot become invisible
+    // and uncancelable after lists hide soft-deleted patients (#235).
     // Lock the patient row and re-check active admissions inside the txn so a
     // concurrent admit cannot attach a live bed after the pre-check (#230).
     let previousUserId: string | undefined;
     let patientFullName = '';
     const fileUrlsToUnlink: string[] = [];
     let patientId = id;
+    let cancelledPrescriptions = 0;
+    let cancelledLabOrders = 0;
+    let cancelledAppointments = 0;
 
     await this.patientsRepo.manager.transaction(async (manager) => {
       const patientsRepo = manager.getRepository(Patient);
@@ -431,6 +438,8 @@ export class PatientsService {
       const documentsRepo = manager.getRepository(PatientDocument);
       const labOrdersRepo = manager.getRepository(LabOrder);
       const labResultsRepo = manager.getRepository(LabResult);
+      const prescriptionsRepo = manager.getRepository(Prescription);
+      const appointmentsRepo = manager.getRepository(Appointment);
 
       const patient = await manager
         .createQueryBuilder(Patient, 'patient')
@@ -452,6 +461,47 @@ export class PatientsService {
       previousUserId = patient.userId;
       patientFullName = patient.fullName;
       patientId = patient.id;
+
+      // Terminalize open workflows before soft-delete so staff are not left
+      // with invisible pending Rx / labs / appointments.
+      const pendingRx = await prescriptionsRepo.find({
+        where: { patientId: id, hospitalId, status: 'pending' },
+      });
+      for (const rx of pendingRx) {
+        rx.status = 'cancelled';
+        await prescriptionsRepo.save(rx);
+      }
+      cancelledPrescriptions = pendingRx.length;
+
+      const openLabs = await labOrdersRepo.find({
+        where: {
+          patientId: id,
+          hospitalId,
+          status: In(['ordered', 'collected', 'processing']),
+        },
+      });
+      for (const lab of openLabs) {
+        lab.status = 'cancelled';
+        await labOrdersRepo.save(lab);
+      }
+      cancelledLabOrders = openLabs.length;
+
+      const openAppointments = await appointmentsRepo.find({
+        where: {
+          patientId: id,
+          hospitalId,
+          status: In(['scheduled', 'checked_in']),
+        },
+      });
+      for (const appointment of openAppointments) {
+        appointment.status = 'cancelled';
+        const cancelNote = 'Cancelled: patient soft-deleted';
+        appointment.notes = appointment.notes
+          ? `${appointment.notes}\n${cancelNote}`
+          : cancelNote;
+        await appointmentsRepo.save(appointment);
+      }
+      cancelledAppointments = openAppointments.length;
 
       patient.userId = null as unknown as string | undefined;
       await patientsRepo.save(patient);
@@ -494,6 +544,9 @@ export class PatientsService {
         fullName: patientFullName,
         documentsRemoved: fileUrlsToUnlink.length,
         previousUserId,
+        cancelledPrescriptions,
+        cancelledLabOrders,
+        cancelledAppointments,
       },
     });
 
