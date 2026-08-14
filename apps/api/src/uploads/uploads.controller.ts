@@ -26,35 +26,15 @@ import { AllowAuthenticated } from '../rbac/allow-authenticated.decorator';
 import { PermissionsAny } from '../rbac/permissions-any.decorator';
 import { RolesGuard } from '../rbac/roles.guard';
 import { UploadsService } from './uploads.service';
+import {
+  MIME_TO_EXT,
+  EXT_TO_MIME,
+  INLINE_MIME,
+  sniffAndValidateUpload,
+  ensureStoredExtension,
+} from './upload-file-type';
 
 const UPLOAD_DIR = join(process.cwd(), 'uploads');
-
-/** MIME → allowed extension (server-chosen; never trust client extension alone). */
-const MIME_TO_EXT: Record<string, string> = {
-  'application/pdf': '.pdf',
-  'image/jpeg': '.jpg',
-  'image/png': '.png',
-  'image/webp': '.webp',
-  'image/gif': '.gif',
-  'text/plain': '.txt',
-  'application/msword': '.doc',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-    '.docx',
-};
-
-const EXT_TO_MIME: Record<string, string> = Object.fromEntries(
-  Object.entries(MIME_TO_EXT).map(([mime, ext]) => [ext, mime]),
-);
-
-/** Preview-safe types may be inline; everything else downloads as attachment. */
-const INLINE_MIME = new Set([
-  'application/pdf',
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'image/gif',
-  'text/plain',
-]);
 
 type AuthedRequest = Request & { user?: AuthenticatedUser };
 
@@ -126,16 +106,21 @@ export class UploadsController {
     await this.uploadsService.assertCanUpload(req.user, hospitalId);
 
     if (!file) throw new BadRequestException('file is required');
+
+    const storedPath = file.path || join(UPLOAD_DIR, file.filename);
+    const sniffed = await sniffAndValidateUpload(storedPath, file.mimetype);
+    const filename = await ensureStoredExtension(storedPath, sniffed.ext);
+
     // Prefer configured public base; otherwise return a stable relative path
     // so client-controlled Host headers cannot poison stored document URLs.
     const configured = process.env.API_PUBLIC_URL?.replace(/\/$/, '');
     const url = configured
-      ? `${configured}/uploads/${file.filename}`
-      : `/uploads/${file.filename}`;
+      ? `${configured}/uploads/${filename}`
+      : `/uploads/${filename}`;
     return {
       url,
       fileName: file.originalname,
-      fileType: file.mimetype,
+      fileType: sniffed.mime,
       size: file.size,
     };
   }
