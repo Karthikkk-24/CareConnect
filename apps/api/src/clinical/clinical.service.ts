@@ -217,6 +217,7 @@ export class ClinicalService {
       items: (prescription.items ?? []).map((item) => ({
         id: item.id,
         drugName: item.drugName,
+        quantity: Number(item.quantity) || 1,
         dosage: item.dosage,
         frequency: item.frequency,
         duration: item.duration,
@@ -412,6 +413,7 @@ export class ClinicalService {
             manager.create(PrescriptionItem, {
               prescriptionId: prescription.id,
               drugName: item.drugName,
+              quantity: (item.quantity ?? 1).toFixed(2),
               dosage: item.dosage,
               frequency: item.frequency,
               duration: item.duration,

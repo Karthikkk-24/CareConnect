@@ -69,6 +69,10 @@ export default function PharmacyPage() {
       return;
     }
     try {
+      const existing = stock.find(
+        (item: { drugName: string; quantity: number }) =>
+          item.drugName.trim().toLowerCase() === drugName.trim().toLowerCase(),
+      );
       await upsertStock({
         variables: {
           hospitalId,
@@ -76,6 +80,9 @@ export default function PharmacyPage() {
             drugName: drugName.trim(),
             quantity: Number(quantity),
             unit: unit || 'each',
+            ...(existing
+              ? { expectedQuantity: Number(existing.quantity) }
+              : {}),
           },
         },
       });
@@ -121,7 +128,7 @@ export default function PharmacyPage() {
                   id: string;
                   createdAt: string;
                   patient?: { fullName: string };
-                  items: { drugName: string; dosage?: string }[];
+                  items: { drugName: string; quantity?: number; dosage?: string }[];
                 }) => (
                   <div key={rx.id} className="flex items-start gap-4 px-6 py-4">
                     <div className="min-w-0 flex-1">
@@ -135,6 +142,7 @@ export default function PharmacyPage() {
                         {rx.items.map((item, i) => (
                           <li key={i} className="text-sm text-clay-text">
                             {item.drugName}
+                            {item.quantity != null ? ` × ${item.quantity}` : ''}
                             {item.dosage ? ` · ${item.dosage}` : ''}
                           </li>
                         ))}

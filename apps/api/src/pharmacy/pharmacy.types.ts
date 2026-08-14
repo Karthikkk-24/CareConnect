@@ -82,6 +82,13 @@ export class UpsertPharmacyStockInput {
   @Min(0)
   quantity: number;
 
+  /** When set on update, must match the locked row quantity (optimistic concurrency). */
+  @Field(() => Float, { nullable: true })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  expectedQuantity?: number;
+
   @Field({ nullable: true })
   @IsOptional()
   @IsString()

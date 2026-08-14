@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -9,6 +10,7 @@ import { Repository } from 'typeorm';
 import { PharmacyStock, Prescription, Patient } from '../database/entities';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
+import { roundMoney } from '../common/money';
 import {
   DispensePrescriptionInput,
   PendingPrescriptionType,
@@ -43,7 +45,15 @@ export class PharmacyService {
 
   private toNumber(value: string | number | undefined | null): number {
     if (value == null) return 0;
-    return Number(value);
+    return roundMoney(Number(value));
+  }
+
+  /** NUMERIC(10, 2) equality — avoids raw float `!==` on quantities. */
+  private quantitiesEqual(
+    a: string | number | undefined | null,
+    b: string | number | undefined | null,
+  ): boolean {
+    return roundMoney(this.toNumber(a)) === roundMoney(this.toNumber(b));
   }
 
   toPharmacyStockType(stock: PharmacyStock): PharmacyStockType {
@@ -86,6 +96,7 @@ export class PharmacyService {
       items: (prescription.items ?? []).map((item) => ({
         id: item.id,
         drugName: item.drugName,
+        quantity: roundMoney(Number(item.quantity) || 1),
         dosage: item.dosage,
         frequency: item.frequency,
         duration: item.duration,
@@ -125,7 +136,15 @@ export class PharmacyService {
           .getOne();
 
         if (existing) {
-          existing.quantity = input.quantity.toFixed(2);
+          if (
+            input.expectedQuantity != null &&
+            !this.quantitiesEqual(existing.quantity, input.expectedQuantity)
+          ) {
+            throw new ConflictException(
+              'Pharmacy stock was modified concurrently; refresh and try again',
+            );
+          }
+          existing.quantity = roundMoney(input.quantity).toFixed(2);
           if (input.unit) existing.unit = input.unit;
           return { stock: await manager.save(existing), created: false };
         }
@@ -135,7 +154,7 @@ export class PharmacyService {
             manager.create(PharmacyStock, {
               hospitalId,
               drugName,
-              quantity: input.quantity.toFixed(2),
+              quantity: roundMoney(input.quantity).toFixed(2),
               unit: input.unit ?? 'each',
             }),
           );
@@ -158,7 +177,15 @@ export class PharmacyService {
             .andWhere('LOWER(stock.drug_name) = LOWER(:drugName)', { drugName })
             .getOne();
           if (!raced) throw error;
-          raced.quantity = input.quantity.toFixed(2);
+          if (
+            input.expectedQuantity != null &&
+            !this.quantitiesEqual(raced.quantity, input.expectedQuantity)
+          ) {
+            throw new ConflictException(
+              'Pharmacy stock was modified concurrently; refresh and try again',
+            );
+          }
+          raced.quantity = roundMoney(input.quantity).toFixed(2);
           if (input.unit) raced.unit = input.unit;
           return { stock: await manager.save(raced), created: false };
         }
@@ -229,18 +256,22 @@ export class PharmacyService {
           );
         }
 
-        // Aggregate required units by normalized drug name (1 unit per line item)
+        // Aggregate required units by normalized drug name using line quantity
         const requiredByDrug = new Map<
           string,
           { label: string; qty: number }
         >();
         for (const item of items) {
           const key = item.drugName.trim().toLowerCase();
+          const lineQty = roundMoney(Number(item.quantity) || 1);
           const existing = requiredByDrug.get(key);
           if (existing) {
-            existing.qty += 1;
+            existing.qty = roundMoney(existing.qty + lineQty);
           } else {
-            requiredByDrug.set(key, { label: item.drugName.trim(), qty: 1 });
+            requiredByDrug.set(key, {
+              label: item.drugName.trim(),
+              qty: lineQty,
+            });
           }
         }
 
@@ -258,14 +289,15 @@ export class PharmacyService {
             );
           }
 
-          const available = this.toNumber(stock.quantity);
-          if (available < qty) {
+          const available = roundMoney(this.toNumber(stock.quantity));
+          const needed = roundMoney(qty);
+          if (available < needed) {
             throw new BadRequestException(
-              `Insufficient stock for "${label}": need ${qty}, have ${available}`,
+              `Insufficient stock for "${label}": need ${needed}, have ${available}`,
             );
           }
 
-          stock.quantity = (available - qty).toFixed(2);
+          stock.quantity = roundMoney(available - needed).toFixed(2);
           await manager.save(stock);
         }
 

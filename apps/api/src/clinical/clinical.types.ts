@@ -6,13 +6,17 @@ import {
   IsBoolean,
   IsIn,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
+  Max,
+  Min,
   MinLength,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { NUMERIC_10_2_MAX } from '../common/money';
 import { PatientType } from '../patients/patients.types';
 import { UserSummaryType } from '../users/users.types';
 import { LAB_ORDER_STATUSES } from '../database/entities/lab-order.entity';
@@ -131,6 +135,9 @@ export class PrescriptionItemType {
 
   @Field()
   drugName: string;
+
+  @Field(() => Float)
+  quantity: number;
 
   @Field({ nullable: true })
   dosage?: string;
@@ -365,6 +372,13 @@ export class PrescriptionItemInput {
   @IsString()
   @MinLength(1)
   drugName: string;
+
+  @Field(() => Float, { nullable: true })
+  @IsOptional()
+  @IsNumber()
+  @Min(0.01)
+  @Max(NUMERIC_10_2_MAX)
+  quantity?: number;
 
   @Field({ nullable: true })
   @IsOptional()
