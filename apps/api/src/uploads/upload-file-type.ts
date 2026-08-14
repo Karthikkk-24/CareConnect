@@ -160,25 +160,25 @@ export async function sniffAndValidateUpload(
   }
 
   if (!detectedMime) {
-    await rejectUpload(
-      filePath,
-      'Could not determine file type from content',
-    );
+    await unlinkQuiet(filePath);
+    throw new BadRequestException('Could not determine file type from content');
   }
 
-  const ext = MIME_TO_EXT[detectedMime];
+  const mime: string = detectedMime;
+  const ext = MIME_TO_EXT[mime];
   if (!ext) {
-    await rejectUpload(filePath, `Unsupported file type: ${detectedMime}`);
+    await unlinkQuiet(filePath);
+    throw new BadRequestException(`Unsupported file type: ${mime}`);
   }
 
-  if (claimedMime !== detectedMime) {
-    await rejectUpload(
-      filePath,
-      `File content type ${detectedMime} does not match claimed type ${claimedMime}`,
+  if (claimedMime !== mime) {
+    await unlinkQuiet(filePath);
+    throw new BadRequestException(
+      `File content type ${mime} does not match claimed type ${claimedMime}`,
     );
   }
 
-  return { mime: detectedMime, ext };
+  return { mime, ext };
 }
 
 /** Rename the stored file so its extension matches the sniffed MIME. */
