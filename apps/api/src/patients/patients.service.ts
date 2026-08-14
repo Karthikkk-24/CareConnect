@@ -9,7 +9,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { existsSync, unlinkSync } from 'fs';
 import { basename, join } from 'path';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, QueryFailedError, Repository } from 'typeorm';
 import {
   Patient,
   PatientAllergy,
@@ -1085,16 +1085,30 @@ export class PatientsService {
 
     const safeFileUrl = await this.assertOwnedUploadFileUrl(input.fileUrl);
 
-    return this.documentsRepo.save(
-      this.documentsRepo.create({
-        patientId,
-        name: input.name,
-        fileUrl: safeFileUrl,
-        fileType: input.fileType,
-        documentType: input.documentType,
-        uploadedById,
-      }),
-    );
+    try {
+      return await this.documentsRepo.save(
+        this.documentsRepo.create({
+          patientId,
+          name: input.name,
+          fileUrl: safeFileUrl,
+          fileType: input.fileType,
+          documentType: input.documentType,
+          uploadedById,
+        }),
+      );
+    } catch (error) {
+      // Concurrent binds of the same upload can race past assertOwnedUploadFileUrl
+      // and hit uq_patient_documents_file_url (#234).
+      if (
+        error instanceof QueryFailedError &&
+        (error as QueryFailedError & { code?: string }).code === '23505'
+      ) {
+        throw new ConflictException(
+          'Upload file is already linked to a patient document',
+        );
+      }
+      throw error;
+    }
   }
 
   /**

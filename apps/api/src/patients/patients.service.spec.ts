@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { existsSync } from 'fs';
+import { QueryFailedError } from 'typeorm';
 import {
   Admission,
   Patient,
@@ -429,6 +430,30 @@ describe('PatientsService', () => {
           'user-1',
         ),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('maps unique file_url violation to ConflictException', async () => {
+      patientsRepo.findOne.mockResolvedValue({
+        id: 'patient-1',
+        hospitalId: 'hospital-1',
+      });
+      relatedRepo.create.mockImplementation((row: unknown) => row);
+      const uniqueError = new QueryFailedError('INSERT', [], new Error('dup'));
+      (uniqueError as QueryFailedError & { code?: string }).code = '23505';
+      relatedRepo.save.mockRejectedValue(uniqueError);
+      existsSyncMock.mockReturnValue(true);
+
+      await expect(
+        service.addDocument(
+          'patient-1',
+          'hospital-1',
+          {
+            name: 'scan.pdf',
+            fileUrl: '/uploads/a1b2c3d4-e5f6.pdf',
+          },
+          'user-1',
+        ),
+      ).rejects.toThrow(ConflictException);
     });
   });
 
