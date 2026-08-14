@@ -97,9 +97,13 @@ describe('PatientsService', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     relatedRepo.find.mockResolvedValue([]);
-    relatedRepo.createQueryBuilder.mockImplementation(() => mockUploadUrlQb([]));
+    relatedRepo.createQueryBuilder.mockImplementation(() =>
+      mockUploadUrlQb([]),
+    );
     relatedRepo.manager.getRepository.mockReturnValue(labResultsRepo);
-    labResultsRepo.createQueryBuilder.mockImplementation(() => mockUploadUrlQb([]));
+    labResultsRepo.createQueryBuilder.mockImplementation(() =>
+      mockUploadUrlQb([]),
+    );
     existsSyncMock.mockReturnValue(true);
 
     const module: TestingModule = await Test.createTestingModule({
@@ -363,11 +367,17 @@ describe('PatientsService', () => {
       );
       expect(audit.log).toHaveBeenCalledWith(
         expect.objectContaining({
-          metadata: expect.objectContaining({
+          action: 'delete',
+          resource: 'patient',
+          resourceId: 'patient-1',
+          metadata: {
+            fullName: 'Jane Doe',
+            documentsRemoved: 0,
+            previousUserId: undefined,
             cancelledPrescriptions: 1,
             cancelledLabOrders: 1,
             cancelledAppointments: 1,
-          }),
+          },
         }),
       );
     });
