@@ -194,8 +194,9 @@ export class UploadsService implements OnApplicationBootstrap {
       throw new NotFoundException('File not found');
     }
 
-    if (user.roles.includes('super_admin')) return;
-
+    // Inactive-tenant policy (#239): hospital-scoped PHI is unavailable when the
+    // tenant is inactive — including for super_admin. No silent break-glass;
+    // reactivation (or an audited platform path) is required first.
     const hospital = await this.hospitalsRepo.findOne({
       where: { id: patient.hospitalId },
     });
@@ -204,6 +205,8 @@ export class UploadsService implements OnApplicationBootstrap {
         'This hospital is currently inactive; file access is unavailable',
       );
     }
+
+    if (user.roles.includes('super_admin')) return;
 
     const isHospitalStaff =
       !!user.hospitalId &&
@@ -224,19 +227,35 @@ export class UploadsService implements OnApplicationBootstrap {
 
   /**
    * Staff with patients:write or lab:write may upload files.
-   * Refuse when the actor's hospital is inactive (fail-closed, incl. super_admin
-   * with a hospitalId scoped to an inactive tenant).
+   *
+   * Inactive-tenant / hospital-context policy (#239):
+   * - Every upload (including super_admin) requires an active hospital context.
+   * - Context is `user.hospitalId`, or for unbound super_admin an explicit
+   *   `hospitalId` override (query/body) that resolves to an active hospital.
+   * - Inactive tenants cannot stage PHI; there is no unaudited break-glass path.
    */
-  async assertCanUpload(user: AuthenticatedUser): Promise<void> {
-    if (user.hospitalId) {
-      const hospital = await this.hospitalsRepo.findOne({
-        where: { id: user.hospitalId },
-      });
-      if (!hospital || !hospital.isActive) {
-        throw new ForbiddenException(
-          'This hospital is currently inactive; uploads are unavailable',
-        );
-      }
+  async assertCanUpload(
+    user: AuthenticatedUser,
+    hospitalIdOverride?: string,
+  ): Promise<void> {
+    const hospitalId =
+      user.roles.includes('super_admin') && hospitalIdOverride
+        ? hospitalIdOverride
+        : user.hospitalId;
+
+    if (!hospitalId) {
+      throw new ForbiddenException(
+        'Active hospital context is required to upload documents',
+      );
+    }
+
+    const hospital = await this.hospitalsRepo.findOne({
+      where: { id: hospitalId },
+    });
+    if (!hospital || !hospital.isActive) {
+      throw new ForbiddenException(
+        'This hospital is currently inactive; uploads are unavailable',
+      );
     }
 
     if (user.roles.includes('super_admin')) return;

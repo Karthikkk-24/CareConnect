@@ -3,6 +3,7 @@ import { Reflector } from '@nestjs/core';
 import { GqlExecutionContext } from '@nestjs/graphql';
 import { ROLES_KEY } from './roles.decorator';
 import { PERMISSIONS_KEY } from './permissions.decorator';
+import { PERMISSIONS_ANY_KEY } from './permissions-any.decorator';
 import { RolesGuard } from './roles.guard';
 import type { AuthenticatedUser } from '../auth/auth.types';
 
@@ -10,15 +11,32 @@ describe('RolesGuard', () => {
   let guard: RolesGuard;
   let reflector: Reflector;
 
-  const createContext = (user?: AuthenticatedUser): ExecutionContext => {
+  const createGqlContext = (user?: AuthenticatedUser): ExecutionContext => {
     const gqlCtx = {
       getContext: () => ({ req: { user } }),
     };
     jest.spyOn(GqlExecutionContext, 'create').mockReturnValue(gqlCtx as never);
 
     return {
+      getType: () => 'graphql',
       getHandler: () => jest.fn(),
       getClass: () => jest.fn(),
+      switchToHttp: () => ({
+        getRequest: () => {
+          throw new Error('HTTP request should not be used for GraphQL');
+        },
+      }),
+    } as unknown as ExecutionContext;
+  };
+
+  const createHttpContext = (user?: AuthenticatedUser): ExecutionContext => {
+    return {
+      getType: () => 'http',
+      getHandler: () => jest.fn(),
+      getClass: () => jest.fn(),
+      switchToHttp: () => ({
+        getRequest: () => ({ user }),
+      }),
     } as unknown as ExecutionContext;
   };
 
@@ -35,7 +53,7 @@ describe('RolesGuard', () => {
   it('denies access when no roles or permissions are required', () => {
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(undefined);
 
-    expect(guard.canActivate(createContext())).toBe(false);
+    expect(guard.canActivate(createGqlContext())).toBe(false);
   });
 
   it('requires an authenticated user when AllowAuthenticated is set', () => {
@@ -44,10 +62,10 @@ describe('RolesGuard', () => {
       return undefined;
     });
 
-    expect(guard.canActivate(createContext())).toBe(false);
+    expect(guard.canActivate(createGqlContext())).toBe(false);
     expect(
       guard.canActivate(
-        createContext({
+        createGqlContext({
           id: 'u1',
           authId: 'a1',
           email: 'a@b.c',
@@ -68,7 +86,7 @@ describe('RolesGuard', () => {
         return undefined;
       });
 
-    expect(guard.canActivate(createContext())).toBe(false);
+    expect(guard.canActivate(createGqlContext())).toBe(false);
   });
 
   it('allows super_admin regardless of required roles', () => {
@@ -89,7 +107,7 @@ describe('RolesGuard', () => {
       onboardingCompleted: true,
     };
 
-    expect(guard.canActivate(createContext(user))).toBe(true);
+    expect(guard.canActivate(createGqlContext(user))).toBe(true);
   });
 
   it('checks required roles', () => {
@@ -113,8 +131,8 @@ describe('RolesGuard', () => {
 
     const nurse: AuthenticatedUser = { ...doctor, roles: ['nurse'] };
 
-    expect(guard.canActivate(createContext(doctor))).toBe(true);
-    expect(guard.canActivate(createContext(nurse))).toBe(false);
+    expect(guard.canActivate(createGqlContext(doctor))).toBe(true);
+    expect(guard.canActivate(createGqlContext(nurse))).toBe(false);
   });
 
   it('checks required permissions', () => {
@@ -136,10 +154,78 @@ describe('RolesGuard', () => {
       onboardingCompleted: true,
     };
 
-    expect(guard.canActivate(createContext(user))).toBe(false);
+    expect(guard.canActivate(createGqlContext(user))).toBe(false);
 
     user.permissions.push('patients:write');
-    expect(guard.canActivate(createContext(user))).toBe(true);
+    expect(guard.canActivate(createGqlContext(user))).toBe(true);
+  });
+
+  it('checks required any-permissions with OR semantics', () => {
+    jest
+      .spyOn(reflector, 'getAllAndOverride')
+      .mockImplementation((key: string) => {
+        if (key === PERMISSIONS_ANY_KEY) {
+          return ['patients:write', 'lab:write'];
+        }
+        return undefined;
+      });
+
+    const doctor: AuthenticatedUser = {
+      id: '5',
+      authId: 'auth-5',
+      email: 'doc@hospital.com',
+      fullName: 'Doctor',
+      hospitalId: 'h-1',
+      roles: ['doctor'],
+      permissions: ['patients:write'],
+      onboardingCompleted: true,
+    };
+
+    const labTech: AuthenticatedUser = {
+      ...doctor,
+      id: '6',
+      roles: ['lab_technician'],
+      permissions: ['lab:write'],
+    };
+
+    const receptionist: AuthenticatedUser = {
+      ...doctor,
+      id: '7',
+      roles: ['receptionist'],
+      permissions: ['appointments:write'],
+    };
+
+    expect(guard.canActivate(createGqlContext(doctor))).toBe(true);
+    expect(guard.canActivate(createGqlContext(labTech))).toBe(true);
+    expect(guard.canActivate(createGqlContext(receptionist))).toBe(false);
+  });
+
+  it('reads the user from HTTP request context for REST', () => {
+    jest
+      .spyOn(reflector, 'getAllAndOverride')
+      .mockImplementation((key: string) => {
+        if (key === PERMISSIONS_ANY_KEY) {
+          return ['patients:write', 'lab:write'];
+        }
+        return undefined;
+      });
+
+    const createSpy = jest.spyOn(GqlExecutionContext, 'create');
+
+    const allowed: AuthenticatedUser = {
+      id: '8',
+      authId: 'auth-8',
+      email: 'lab@hospital.com',
+      fullName: 'Lab',
+      hospitalId: 'h-1',
+      roles: ['lab_technician'],
+      permissions: ['lab:write'],
+      onboardingCompleted: true,
+    };
+
+    expect(guard.canActivate(createHttpContext(allowed))).toBe(true);
+    expect(guard.canActivate(createHttpContext())).toBe(false);
+    expect(createSpy).not.toHaveBeenCalled();
   });
 
   it('denies patient role on staff-only hospital list endpoints', () => {
@@ -173,6 +259,6 @@ describe('RolesGuard', () => {
       onboardingCompleted: true,
     };
 
-    expect(guard.canActivate(createContext(patient))).toBe(false);
+    expect(guard.canActivate(createGqlContext(patient))).toBe(false);
   });
 });
