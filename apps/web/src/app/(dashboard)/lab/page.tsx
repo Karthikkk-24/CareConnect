@@ -393,6 +393,32 @@ export default function LabPage() {
                         File
                       </button>
                     ) : null}
+                    {canWriteLab &&
+                    !['completed', 'cancelled'].includes(order.status) ? (
+                      <ClayButton
+                        size="sm"
+                        variant="danger"
+                        isLoading={updatingStatus}
+                        onClick={() => {
+                          if (
+                            !confirm(
+                              'Cancel this lab order? This cannot be undone from the queue.',
+                            )
+                          ) {
+                            return;
+                          }
+                          void handleAdvanceStatus(order.id, 'cancelled').then(
+                            () => {
+                              if (selectedOrderId === order.id) {
+                                setSelectedOrderId(null);
+                              }
+                            },
+                          );
+                        }}
+                      >
+                        Cancel
+                      </ClayButton>
+                    ) : null}
                     {canWriteLab && nextLabStatus(order.status) ? (
                       <ClayButton
                         size="sm"
