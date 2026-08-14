@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -86,6 +87,7 @@ export class PharmacyService {
       items: (prescription.items ?? []).map((item) => ({
         id: item.id,
         drugName: item.drugName,
+        quantity: Number(item.quantity) || 1,
         dosage: item.dosage,
         frequency: item.frequency,
         duration: item.duration,
@@ -125,6 +127,15 @@ export class PharmacyService {
           .getOne();
 
         if (existing) {
+          if (
+            input.expectedQuantity != null &&
+            this.toNumber(existing.quantity) !==
+              this.toNumber(input.expectedQuantity)
+          ) {
+            throw new ConflictException(
+              'Pharmacy stock was modified concurrently; refresh and try again',
+            );
+          }
           existing.quantity = input.quantity.toFixed(2);
           if (input.unit) existing.unit = input.unit;
           return { stock: await manager.save(existing), created: false };
@@ -158,6 +169,15 @@ export class PharmacyService {
             .andWhere('LOWER(stock.drug_name) = LOWER(:drugName)', { drugName })
             .getOne();
           if (!raced) throw error;
+          if (
+            input.expectedQuantity != null &&
+            this.toNumber(raced.quantity) !==
+              this.toNumber(input.expectedQuantity)
+          ) {
+            throw new ConflictException(
+              'Pharmacy stock was modified concurrently; refresh and try again',
+            );
+          }
           raced.quantity = input.quantity.toFixed(2);
           if (input.unit) raced.unit = input.unit;
           return { stock: await manager.save(raced), created: false };
@@ -229,18 +249,22 @@ export class PharmacyService {
           );
         }
 
-        // Aggregate required units by normalized drug name (1 unit per line item)
+        // Aggregate required units by normalized drug name using line quantity
         const requiredByDrug = new Map<
           string,
           { label: string; qty: number }
         >();
         for (const item of items) {
           const key = item.drugName.trim().toLowerCase();
+          const lineQty = Number(item.quantity) || 1;
           const existing = requiredByDrug.get(key);
           if (existing) {
-            existing.qty += 1;
+            existing.qty += lineQty;
           } else {
-            requiredByDrug.set(key, { label: item.drugName.trim(), qty: 1 });
+            requiredByDrug.set(key, {
+              label: item.drugName.trim(),
+              qty: lineQty,
+            });
           }
         }
 

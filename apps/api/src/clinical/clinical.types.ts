@@ -6,9 +6,11 @@ import {
   IsBoolean,
   IsIn,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
+  Min,
   MinLength,
   ValidateNested,
 } from 'class-validator';
@@ -131,6 +133,9 @@ export class PrescriptionItemType {
 
   @Field()
   drugName: string;
+
+  @Field(() => Float)
+  quantity: number;
 
   @Field({ nullable: true })
   dosage?: string;
@@ -365,6 +370,12 @@ export class PrescriptionItemInput {
   @IsString()
   @MinLength(1)
   drugName: string;
+
+  @Field(() => Float, { nullable: true })
+  @IsOptional()
+  @IsNumber()
+  @Min(0.01)
+  quantity?: number;
 
   @Field({ nullable: true })
   @IsOptional()

@@ -22,6 +22,9 @@ export class PrescriptionItem {
   @Column({ name: 'drug_name', length: 255 })
   drugName: string;
 
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 1 })
+  quantity: string;
+
   @Column({ length: 100, nullable: true })
   dosage?: string;
 

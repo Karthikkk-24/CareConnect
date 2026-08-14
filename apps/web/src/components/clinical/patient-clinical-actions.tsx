@@ -263,6 +263,7 @@ export function PatientClinicalActions({ patientId, hospitalId }: PatientClinica
             items: [
               {
                 drugName: form.get('drugName') as string,
+                quantity: Number(form.get('quantity') || 1),
                 dosage: form.get('dosage') as string,
                 frequency: form.get('frequency') as string,
                 duration: (form.get('duration') as string) || undefined,
@@ -508,6 +509,15 @@ export function PatientClinicalActions({ patientId, hospitalId }: PatientClinica
                 {key === 'prescription' ? (
                   <form onSubmit={handlePrescription} className="grid gap-3 sm:grid-cols-2">
                     <ClayInput name="drugName" label="Drug Name *" required />
+                    <ClayInput
+                      name="quantity"
+                      label="Quantity *"
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      defaultValue="1"
+                      required
+                    />
                     <ClayInput name="dosage" label="Dosage *" required placeholder="500mg" />
                     <ClayInput name="frequency" label="Frequency *" required placeholder="Twice daily" />
                     <ClayInput name="duration" label="Duration" placeholder="7 days" />

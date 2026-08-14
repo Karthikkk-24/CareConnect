@@ -1054,6 +1054,7 @@ export const PENDING_PRESCRIPTIONS_QUERY = gql`
       items {
         id
         drugName
+        quantity
         dosage
         frequency
         duration
