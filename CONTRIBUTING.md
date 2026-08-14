@@ -87,13 +87,18 @@ Snyk Code cannot be turned on from application code or CI alone. For org
 4. Confirm billing/plan allows Snyk Code if prompted.
 
 Until that is done, `snyk code test` returns **SNYK-CODE-0005** / 403 and OWASP/AI
-code analysis stays unavailable. After an admin enables it, re-run:
+code analysis stays unavailable. This cannot be fixed in application code or CI.
+
+**Status (rescan 2026-08-08, `main` @ `0f3840d`):** `snyk test --all-projects` is
+clean. `snyk code test --all-projects` is still **SNYK-CODE-0005** / 403 for org
+`kkshettigar24`. Tracked in GitHub issue #246; leave that issue open until an
+org admin enables Snyk Code. After enablement, re-run:
 
 ```bash
 snyk code test --all-projects
 ```
 
-File any new findings as GitHub issues with severity P0–P4.
+File any new code findings as GitHub issues with severity P0–P4.
 
 ## Project layout
 
