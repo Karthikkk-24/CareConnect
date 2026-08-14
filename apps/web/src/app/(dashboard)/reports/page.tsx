@@ -6,18 +6,35 @@ import {
   Activity,
   BedDouble,
   Calendar,
+  ClipboardList,
   DollarSign,
   UserCog,
   Users,
 } from 'lucide-react';
 import { ClayButton, ClayCard, ClayStatCard } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
-import { BED_OCCUPANCY_QUERY, HOSPITAL_REPORTS_QUERY, ME_QUERY } from '@/lib/graphql/queries';
+import {
+  AUDIT_LOGS_QUERY,
+  BED_OCCUPANCY_QUERY,
+  HOSPITAL_REPORTS_QUERY,
+  ME_QUERY,
+} from '@/lib/graphql/queries';
 import { canAccessRoute } from '@/lib/route-access';
+
+const AUDIT_VIEW_ROLES = new Set([
+  'hospital_admin',
+  'hospital_manager',
+  'super_admin',
+]);
 
 export default function ReportsPage() {
   const { data: meData } = useQuery(ME_QUERY);
   const hospitalId = meData?.me?.hospitalId;
+  const roles: string[] = meData?.me?.roles ?? [];
+  const permissions: string[] = meData?.me?.permissions ?? [];
+  const canViewAudit =
+    permissions.includes('reports:read') &&
+    roles.some((r) => AUDIT_VIEW_ROLES.has(r));
 
   const { data, loading, error } = useQuery(HOSPITAL_REPORTS_QUERY, {
     variables: { hospitalId },
@@ -26,6 +43,10 @@ export default function ReportsPage() {
   const occupancyQuery = useQuery(BED_OCCUPANCY_QUERY, {
     variables: { hospitalId },
     skip: !hospitalId,
+  });
+  const auditQuery = useQuery(AUDIT_LOGS_QUERY, {
+    variables: { hospitalId, limit: 25 },
+    skip: !hospitalId || !canViewAudit,
   });
 
   const reports = data?.hospitalReports;
@@ -203,6 +224,90 @@ export default function ReportsPage() {
               hospital database state.
             </p>
           </ClayCard>
+
+          {canViewAudit ? (
+            <ClayCard className="mt-6">
+              <div className="mb-4 flex items-center gap-2">
+                <ClipboardList className="h-5 w-5 text-clay-primary" />
+                <h2 className="text-lg font-semibold text-clay-text">
+                  Recent audit activity
+                </h2>
+              </div>
+              {auditQuery.loading ? (
+                <p className="text-sm text-clay-text-muted">Loading audit log...</p>
+              ) : auditQuery.error ? (
+                <div className="space-y-3">
+                  <p className="text-sm text-clay-error">
+                    We could not load audit events. Please try again.
+                  </p>
+                  <ClayButton
+                    type="button"
+                    size="sm"
+                    onClick={() => void auditQuery.refetch()}
+                  >
+                    Try again
+                  </ClayButton>
+                </div>
+              ) : (auditQuery.data?.auditLogs?.items ?? []).length === 0 ? (
+                <p className="text-sm text-clay-text-muted">
+                  No audit events recorded for this hospital yet.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[36rem] text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-white/40 text-clay-text-muted">
+                        <th className="pb-2 font-medium">When</th>
+                        <th className="pb-2 font-medium">Actor</th>
+                        <th className="pb-2 font-medium">Action</th>
+                        <th className="pb-2 font-medium">Resource</th>
+                        <th className="pb-2 font-medium">Resource ID</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(
+                        auditQuery.data?.auditLogs?.items as Array<{
+                          id: string;
+                          createdAt: string;
+                          actorName?: string;
+                          actorEmail?: string;
+                          action: string;
+                          resource: string;
+                          resourceId?: string;
+                        }>
+                      ).map((row) => (
+                        <tr
+                          key={row.id}
+                          className="border-b border-white/20 text-clay-text"
+                        >
+                          <td className="py-2 whitespace-nowrap">
+                            {new Date(row.createdAt).toLocaleString()}
+                          </td>
+                          <td className="py-2">
+                            {row.actorName || row.actorEmail || '—'}
+                          </td>
+                          <td className="py-2 font-medium">{row.action}</td>
+                          <td className="py-2">{row.resource}</td>
+                          <td className="py-2 font-mono text-xs">
+                            {row.resourceId ?? '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <p className="mt-3 text-xs text-clay-text-muted">
+                    Showing{' '}
+                    {Math.min(
+                      auditQuery.data?.auditLogs?.items?.length ?? 0,
+                      25,
+                    )}{' '}
+                    of {auditQuery.data?.auditLogs?.total ?? 0} events
+                    (metadata omitted from this view).
+                  </p>
+                </div>
+              )}
+            </ClayCard>
+          ) : null}
         </>
       )}
     </div>
