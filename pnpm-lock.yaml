@@ -81,6 +81,9 @@ importers:
       graphql-depth-limit:
         specifier: ^1.1.0
         version: 1.1.0(graphql@16.14.1)
+      graphql-query-complexity:
+        specifier: ^2.0.0
+        version: 2.0.0(graphql@16.14.1)
       jsonwebtoken:
         specifier: ^9.0.3
         version: 9.0.3
@@ -3772,6 +3775,11 @@ packages:
     peerDependencies:
       graphql: '*'
 
+  graphql-query-complexity@2.0.0:
+    resolution: {integrity: sha512-gmdNp8Lq3KbJcWeX9mpIqpIxD2oDEVO5QgZtw7eiDB7Q1RYMlqDFQnGq6ZcaDclBNcwTnyOCHUtEr3qAjnUDVg==}
+    peerDependencies:
+      graphql: ^16.6.0 || ^17.0.0
+
   graphql-tag@2.12.6:
     resolution: {integrity: sha512-FdSNcu2QQcWnM2VNvSCCDCVS5PpPqpzgFT8+GXzqJuoDd0CBncxCY278u4mhRO7tMgo2JjgJA5aZ+nWSQ/Z+xg==}
     engines: {node: '>=10'}
@@ -4412,6 +4420,10 @@ packages:
 
   lodash.clonedeep@4.5.0:
     resolution: {integrity: sha512-H5ZhCF25riFd9uB5UCkVKo61m3S/xZk1x4wA6yp/L3RFP6Z/eHH1ymQcGLo7J3GMPfm0V/7m1tryHuGVxpqEBQ==}
+
+  lodash.get@4.4.2:
+    resolution: {integrity: sha512-z+Uw/vLuy6gQe8cfaFWD7p0wVv8fJl3mbzXh33RS+0oW2wvUqiRXiQ69gLWSLpgB5/6sU+r6BlQR0MBILadqTQ==}
+    deprecated: This package is deprecated. Use the optional chaining (?.) operator instead.
 
   lodash.includes@4.3.0:
     resolution: {integrity: sha512-W3Bx6mdkRTGtlJISOvVD/lbqjTlPPUDTMnlXZFnVwi9NKJ6tiAk6LVdlhZMm17VZisqhKcgzpO5Wz91PCt5b0w==}
@@ -9648,6 +9660,11 @@ snapshots:
       arrify: 1.0.1
       graphql: 16.14.1
 
+  graphql-query-complexity@2.0.0(graphql@16.14.1):
+    dependencies:
+      graphql: 16.14.1
+      lodash.get: 4.4.2
+
   graphql-tag@2.12.6(graphql@16.14.1):
     dependencies:
       graphql: 16.14.1
@@ -10445,6 +10462,8 @@ snapshots:
       p-locate: 5.0.0
 
   lodash.clonedeep@4.5.0: {}
+
+  lodash.get@4.4.2: {}
 
   lodash.includes@4.3.0: {}
 
