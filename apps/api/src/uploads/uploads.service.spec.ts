@@ -139,6 +139,15 @@ describe('UploadsService', () => {
       ).resolves.toBeUndefined();
     });
 
+    it('denies staff without hospitalId', async () => {
+      await expect(
+        service.assertCanUpload({
+          ...staffUser,
+          hospitalId: undefined,
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
     it('denies patient role', async () => {
       await expect(service.assertCanUpload(patientUser)).rejects.toThrow(
         ForbiddenException,
@@ -190,7 +199,7 @@ describe('UploadsService', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('allows super_admin without hospitalId when hospital check cannot apply', async () => {
+    it('denies super_admin without hospital context', async () => {
       await expect(
         service.assertCanUpload({
           ...staffUser,
@@ -198,8 +207,58 @@ describe('UploadsService', () => {
           roles: ['super_admin'],
           permissions: [],
         }),
-      ).resolves.toBeUndefined();
+      ).rejects.toThrow(ForbiddenException);
       expect(hospitalsRepo.findOne).not.toHaveBeenCalled();
+    });
+
+    it('allows unbound super_admin when explicit hospitalId is active', async () => {
+      hospitalsRepo.findOne.mockResolvedValue({
+        id: 'hospital-b',
+        isActive: true,
+      });
+
+      await expect(
+        service.assertCanUpload(
+          {
+            ...staffUser,
+            hospitalId: undefined,
+            roles: ['super_admin'],
+            permissions: [],
+          },
+          'hospital-b',
+        ),
+      ).resolves.toBeUndefined();
+      expect(hospitalsRepo.findOne).toHaveBeenCalledWith({
+        where: { id: 'hospital-b' },
+      });
+    });
+
+    it('denies unbound super_admin when explicit hospitalId is inactive', async () => {
+      hospitalsRepo.findOne.mockResolvedValue({
+        id: 'hospital-b',
+        isActive: false,
+      });
+
+      await expect(
+        service.assertCanUpload(
+          {
+            ...staffUser,
+            hospitalId: undefined,
+            roles: ['super_admin'],
+            permissions: [],
+          },
+          'hospital-b',
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('ignores hospitalId override for non-super_admin staff', async () => {
+      await expect(
+        service.assertCanUpload(staffUser, 'hospital-b'),
+      ).resolves.toBeUndefined();
+      expect(hospitalsRepo.findOne).toHaveBeenCalledWith({
+        where: { id: 'hospital-a' },
+      });
     });
   });
 
@@ -349,7 +408,7 @@ describe('UploadsService', () => {
       ).resolves.toBeUndefined();
     });
 
-    it('allows super_admin across hospitals', async () => {
+    it('allows super_admin across active hospitals', async () => {
       mockDocLookup(document);
       patientsRepo.findOne.mockResolvedValue(patient);
 
@@ -361,6 +420,24 @@ describe('UploadsService', () => {
           permissions: [],
         }),
       ).resolves.toBeUndefined();
+    });
+
+    it('denies super_admin download when patient hospital is inactive', async () => {
+      mockDocLookup(document);
+      patientsRepo.findOne.mockResolvedValue(patient);
+      hospitalsRepo.findOne.mockResolvedValue({
+        id: 'hospital-a',
+        isActive: false,
+      });
+
+      await expect(
+        service.assertCanDownload('abc.pdf', {
+          ...staffUser,
+          roles: ['super_admin'],
+          hospitalId: undefined,
+          permissions: [],
+        }),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 

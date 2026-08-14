@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Param,
+  Query,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -14,12 +15,16 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from '@nestjs/passport';
+import { PERMISSIONS } from '@careconnect/types';
 import { diskStorage } from 'multer';
 import { createReadStream, existsSync, mkdirSync } from 'fs';
 import { extname, join, basename } from 'path';
 import { randomUUID } from 'crypto';
 import type { Request, Response } from 'express';
 import type { AuthenticatedUser } from '../auth/auth.types';
+import { AllowAuthenticated } from '../rbac/allow-authenticated.decorator';
+import { PermissionsAny } from '../rbac/permissions-any.decorator';
+import { RolesGuard } from '../rbac/roles.guard';
 import { UploadsService } from './uploads.service';
 
 const UPLOAD_DIR = join(process.cwd(), 'uploads');
@@ -54,11 +59,12 @@ const INLINE_MIME = new Set([
 type AuthedRequest = Request & { user?: AuthenticatedUser };
 
 @Controller('uploads')
-@UseGuards(AuthGuard('clerk-jwt'))
+@UseGuards(AuthGuard('clerk-jwt'), RolesGuard)
 export class UploadsController {
   constructor(private readonly uploadsService: UploadsService) {}
 
   @Post('patient-documents')
+  @PermissionsAny(PERMISSIONS.PATIENTS_WRITE, PERMISSIONS.LAB_WRITE)
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
@@ -70,7 +76,12 @@ export class UploadsController {
         filename: (_req, file, cb) => {
           const ext = MIME_TO_EXT[file.mimetype];
           if (!ext) {
-            cb(new BadRequestException(`Unsupported file type: ${file.mimetype}`), '');
+            cb(
+              new BadRequestException(
+                `Unsupported file type: ${file.mimetype}`,
+              ),
+              '',
+            );
             return;
           }
           // Ignore client original extension — store only allowlisted ext (#206).
@@ -89,7 +100,11 @@ export class UploadsController {
         const clientExt = extname(file.originalname).toLowerCase();
         const expected = MIME_TO_EXT[file.mimetype];
         // Reject obvious MIME/extension mismatches (e.g. .html claimed as pdf).
-        if (clientExt && clientExt !== expected && !(file.mimetype === 'image/jpeg' && clientExt === '.jpeg')) {
+        if (
+          clientExt &&
+          clientExt !== expected &&
+          !(file.mimetype === 'image/jpeg' && clientExt === '.jpeg')
+        ) {
           cb(
             new BadRequestException(
               `File extension ${clientExt} does not match type ${file.mimetype}`,
@@ -105,9 +120,10 @@ export class UploadsController {
   async uploadPatientDocument(
     @UploadedFile() file: Express.Multer.File,
     @Req() req: AuthedRequest,
+    @Query('hospitalId') hospitalId?: string,
   ) {
     if (!req.user) throw new ForbiddenException('Authentication required');
-    await this.uploadsService.assertCanUpload(req.user);
+    await this.uploadsService.assertCanUpload(req.user, hospitalId);
 
     if (!file) throw new BadRequestException('file is required');
     // Prefer configured public base; otherwise return a stable relative path
@@ -129,6 +145,7 @@ export class UploadsController {
    * Replaces public static serving of PHI; requires a matching patient_documents row.
    */
   @Get(':filename')
+  @AllowAuthenticated()
   async download(
     @Param('filename') filename: string,
     @Req() req: AuthedRequest,
