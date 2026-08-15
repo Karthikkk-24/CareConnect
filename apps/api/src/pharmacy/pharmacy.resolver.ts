@@ -56,7 +56,7 @@ export class PharmacyResolver {
 
   @Mutation(() => PharmacyStockType)
   @Roles(...PHARMACY_ROLES)
-  @Permissions(PERMISSIONS.PATIENTS_WRITE)
+  @Permissions(PERMISSIONS.PHARMACY_WRITE)
   async upsertPharmacyStock(
     @CurrentUser() user: AuthenticatedUser,
     @Args('input') input: UpsertPharmacyStockInput,
@@ -75,7 +75,7 @@ export class PharmacyResolver {
 
   @Mutation(() => PendingPrescriptionType)
   @Roles(...PHARMACY_ROLES)
-  @Permissions(PERMISSIONS.PATIENTS_WRITE)
+  @Permissions(PERMISSIONS.PHARMACY_WRITE)
   async dispensePrescription(
     @CurrentUser() user: AuthenticatedUser,
     @Args('input') input: DispensePrescriptionInput,

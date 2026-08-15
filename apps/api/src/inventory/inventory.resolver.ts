@@ -41,7 +41,7 @@ export class InventoryResolver {
 
   @Mutation(() => InventoryItemType)
   @Roles(...INVENTORY_ROLES)
-  @Permissions(PERMISSIONS.PATIENTS_WRITE)
+  @Permissions(PERMISSIONS.PHARMACY_WRITE)
   async createInventoryItem(
     @CurrentUser() user: AuthenticatedUser,
     @Args('input') input: CreateInventoryItemInput,
@@ -60,7 +60,7 @@ export class InventoryResolver {
 
   @Mutation(() => InventoryItemType)
   @Roles(...INVENTORY_ROLES)
-  @Permissions(PERMISSIONS.PATIENTS_WRITE)
+  @Permissions(PERMISSIONS.PHARMACY_WRITE)
   async updateInventoryQuantity(
     @CurrentUser() user: AuthenticatedUser,
     @Args('input') input: UpdateInventoryQuantityInput,
