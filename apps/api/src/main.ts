@@ -2,6 +2,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import helmet from 'helmet';
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import { AppModule } from './app.module';
@@ -13,6 +14,15 @@ async function bootstrap() {
   const uploadDir = join(process.cwd(), 'uploads');
   if (!existsSync(uploadDir)) mkdirSync(uploadDir, { recursive: true });
   // Files are served only via authenticated GET /uploads/:filename — not public static.
+
+  // Baseline security headers for the GraphQL/JSON API + upload endpoints
+  // (#263). CSP is left off: responses are application/json and the
+  // dev-only GraphQL playground loads its assets from its own origin.
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+    }),
+  );
 
   app.enableCors({
     origin: config.get('CORS_ORIGIN', 'http://localhost:3000'),
