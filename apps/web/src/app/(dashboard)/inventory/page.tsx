@@ -24,7 +24,7 @@ export default function InventoryPage() {
 
   const { data: meData } = useQuery(ME_QUERY);
   const hospitalId = meData?.me?.hospitalId;
-  const canWrite = (meData?.me?.permissions ?? []).includes('patients:write');
+  const canWrite = (meData?.me?.permissions ?? []).includes('pharmacy:write');
 
   const { data, loading, error: listError, refetch } = useQuery(INVENTORY_ITEMS_QUERY, {
     variables: { hospitalId },

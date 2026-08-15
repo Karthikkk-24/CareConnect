@@ -22,7 +22,7 @@ export default function PharmacyPage() {
 
   const { data: meData } = useQuery(ME_QUERY);
   const hospitalId = meData?.me?.hospitalId;
-  const canWrite = (meData?.me?.permissions ?? []).includes('patients:write');
+  const canWrite = (meData?.me?.permissions ?? []).includes('pharmacy:write');
 
   const { data: rxData, loading: rxLoading, error: rxError, refetch: refetchRx } = useQuery(
     PENDING_PRESCRIPTIONS_QUERY,
