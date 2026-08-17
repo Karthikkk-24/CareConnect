@@ -8,6 +8,7 @@ import { Permissions } from '../rbac/permissions.decorator';
 import { Roles } from '../rbac/roles.decorator';
 import { RolesGuard } from '../rbac/roles.guard';
 import { BillingService } from './billing.service';
+import { HospitalContextService } from '../common/hospital-context.service';
 import {
   CreateInvoiceInput,
   InvoiceType,
@@ -31,7 +32,10 @@ const BILLING_ROLES = [
 @Resolver()
 @UseGuards(GqlAuthGuard, RolesGuard)
 export class BillingResolver {
-  constructor(private readonly billingService: BillingService) {}
+  constructor(
+    private readonly billingService: BillingService,
+    private readonly hospitalContext: HospitalContextService,
+  ) {}
 
   @Query(() => [InvoiceType])
   @Roles(...BILLING_ROLES)
@@ -40,9 +44,10 @@ export class BillingResolver {
     @CurrentUser() user: AuthenticatedUser,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<InvoiceType[]> {
-    const resolvedHospitalId = this.billingService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: false },
     );
     return this.billingService.listInvoices(resolvedHospitalId);
   }
@@ -56,9 +61,10 @@ export class BillingResolver {
     @Args('limit', { type: () => Int, nullable: true }) limit?: number,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<BillingPatientLookupType[]> {
-    const resolvedHospitalId = this.billingService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: false },
     );
     return this.billingService.searchPatientsForBilling(
       resolvedHospitalId,
@@ -75,9 +81,10 @@ export class BillingResolver {
     @Args('id') id: string,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<InvoiceType> {
-    const resolvedHospitalId = this.billingService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: false },
     );
     return this.billingService.getInvoice(resolvedHospitalId, id);
   }
@@ -90,9 +97,10 @@ export class BillingResolver {
     @Args('input') input: CreateInvoiceInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<InvoiceType> {
-    const resolvedHospitalId = this.billingService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.billingService.createInvoice(resolvedHospitalId, input, user);
   }
@@ -105,9 +113,10 @@ export class BillingResolver {
     @Args('input') input: RecordPaymentInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<InvoiceType> {
-    const resolvedHospitalId = this.billingService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.billingService.recordPayment(resolvedHospitalId, input, user);
   }
@@ -120,9 +129,10 @@ export class BillingResolver {
     @Args('id') id: string,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<InvoiceType> {
-    const resolvedHospitalId = this.billingService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.billingService.voidInvoice(resolvedHospitalId, id, user);
   }

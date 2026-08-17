@@ -7,6 +7,7 @@ import { Permissions } from '../rbac/permissions.decorator';
 import { Roles } from '../rbac/roles.decorator';
 import { RolesGuard } from '../rbac/roles.guard';
 import { ClinicalService } from './clinical.service';
+import { HospitalContextService } from '../common/hospital-context.service';
 import {
   ClinicalNoteType,
   CompleteLabResultInput,
@@ -62,7 +63,10 @@ const LAB_ORDER_READ_ROLES = [
 @Resolver()
 @UseGuards(GqlAuthGuard, RolesGuard)
 export class ClinicalResolver {
-  constructor(private readonly clinicalService: ClinicalService) {}
+  constructor(
+    private readonly clinicalService: ClinicalService,
+    private readonly hospitalContext: HospitalContextService,
+  ) {}
 
   @Query(() => [LabOrderType])
   @Roles(...LAB_ORDER_READ_ROLES)
@@ -72,9 +76,10 @@ export class ClinicalResolver {
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
     @Args('status', { nullable: true }) status?: string,
   ): Promise<LabOrderType[]> {
-    const resolvedHospitalId = this.clinicalService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: false },
     );
     return this.clinicalService.listLabOrders(resolvedHospitalId, status);
   }
@@ -87,9 +92,10 @@ export class ClinicalResolver {
     @Args('patientId') patientId: string,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<VitalSignType[]> {
-    const resolvedHospitalId = this.clinicalService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: false },
     );
     return this.clinicalService.listVitalSigns(resolvedHospitalId, patientId);
   }
@@ -102,9 +108,10 @@ export class ClinicalResolver {
     @Args('patientId') patientId: string,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<ClinicalNoteType[]> {
-    const resolvedHospitalId = this.clinicalService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: false },
     );
     return this.clinicalService.listClinicalNotes(
       resolvedHospitalId,
@@ -120,9 +127,10 @@ export class ClinicalResolver {
     @Args('patientId') patientId: string,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<DiagnosisType[]> {
-    const resolvedHospitalId = this.clinicalService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: false },
     );
     return this.clinicalService.listDiagnoses(resolvedHospitalId, patientId);
   }
@@ -135,9 +143,10 @@ export class ClinicalResolver {
     @Args('patientId') patientId: string,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<PrescriptionType[]> {
-    const resolvedHospitalId = this.clinicalService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: false },
     );
     return this.clinicalService.listPrescriptions(
       resolvedHospitalId,
@@ -153,9 +162,10 @@ export class ClinicalResolver {
     @Args('input') input: CreateVitalInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<VitalSignType> {
-    const resolvedHospitalId = this.clinicalService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.clinicalService.createVital(resolvedHospitalId, input, user);
   }
@@ -168,9 +178,10 @@ export class ClinicalResolver {
     @Args('input') input: CreateDiagnosisInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<DiagnosisType> {
-    const resolvedHospitalId = this.clinicalService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.clinicalService.createDiagnosis(
       resolvedHospitalId,
@@ -187,9 +198,10 @@ export class ClinicalResolver {
     @Args('input') input: CreateClinicalNoteInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<ClinicalNoteType> {
-    const resolvedHospitalId = this.clinicalService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.clinicalService.createClinicalNote(
       resolvedHospitalId,
@@ -206,9 +218,10 @@ export class ClinicalResolver {
     @Args('input') input: CreatePrescriptionInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<PrescriptionType> {
-    const resolvedHospitalId = this.clinicalService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.clinicalService.createPrescription(
       resolvedHospitalId,
@@ -225,9 +238,10 @@ export class ClinicalResolver {
     @Args('input') input: CreateLabOrderInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<LabOrderType> {
-    const resolvedHospitalId = this.clinicalService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.clinicalService.createLabOrder(resolvedHospitalId, input, user);
   }
@@ -239,9 +253,10 @@ export class ClinicalResolver {
     @Args('input') input: CompleteLabResultInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<LabResultType> {
-    const resolvedHospitalId = this.clinicalService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.clinicalService.completeLabResult(
       resolvedHospitalId,
@@ -257,9 +272,10 @@ export class ClinicalResolver {
     @Args('input') input: UpdateLabOrderStatusInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<LabOrderType> {
-    const resolvedHospitalId = this.clinicalService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.clinicalService.updateLabOrderStatus(
       resolvedHospitalId,
@@ -276,9 +292,10 @@ export class ClinicalResolver {
     @Args('input') input: CancelPrescriptionInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<PrescriptionType> {
-    const resolvedHospitalId = this.clinicalService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.clinicalService.cancelPrescription(
       resolvedHospitalId,

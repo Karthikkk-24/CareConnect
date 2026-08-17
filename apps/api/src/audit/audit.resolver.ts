@@ -9,11 +9,15 @@ import { Roles } from '../rbac/roles.decorator';
 import { RolesGuard } from '../rbac/roles.guard';
 import { AuditService } from './audit.service';
 import { AuditLogsPageType } from './audit.types';
+import { HospitalContextService } from '../common/hospital-context.service';
 
 @Resolver()
 @UseGuards(GqlAuthGuard, RolesGuard)
 export class AuditResolver {
-  constructor(private readonly auditService: AuditService) {}
+  constructor(
+    private readonly auditService: AuditService,
+    private readonly hospitalContext: HospitalContextService,
+  ) {}
 
   @Query(() => AuditLogsPageType)
   @Permissions(PERMISSIONS.REPORTS_READ)
@@ -24,9 +28,10 @@ export class AuditResolver {
     @Args('resource', { nullable: true }) resource?: string,
     @Args('limit', { type: () => Int, nullable: true }) limit?: number,
   ): Promise<AuditLogsPageType> {
-    const resolvedHospitalId = this.auditService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: false },
     );
     return this.auditService.listHospitalLogs(resolvedHospitalId, {
       resource,

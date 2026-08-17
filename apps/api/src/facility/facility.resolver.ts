@@ -7,6 +7,7 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 import { Permissions } from '../rbac/permissions.decorator';
 import { RolesGuard } from '../rbac/roles.guard';
 import { FacilityService } from './facility.service';
+import { HospitalContextService } from '../common/hospital-context.service';
 import {
   BedType,
   CreateBedInput,
@@ -20,7 +21,10 @@ import {
 @Resolver()
 @UseGuards(GqlAuthGuard, RolesGuard)
 export class FacilityResolver {
-  constructor(private readonly facilityService: FacilityService) {}
+  constructor(
+    private readonly facilityService: FacilityService,
+    private readonly hospitalContext: HospitalContextService,
+  ) {}
 
   @Query(() => [DepartmentType])
   @Permissions(PERMISSIONS.HOSPITALS_READ)
@@ -28,9 +32,10 @@ export class FacilityResolver {
     @CurrentUser() user: AuthenticatedUser,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<DepartmentType[]> {
-    const resolvedHospitalId = this.facilityService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: false },
     );
     return this.facilityService.listDepartments(resolvedHospitalId);
   }
@@ -42,9 +47,10 @@ export class FacilityResolver {
     @Args('departmentId', { nullable: true }) departmentId?: string,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<WardType[]> {
-    const resolvedHospitalId = this.facilityService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: false },
     );
     return this.facilityService.listWards(resolvedHospitalId, departmentId);
   }
@@ -56,9 +62,10 @@ export class FacilityResolver {
     @Args('wardId', { nullable: true }) wardId?: string,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<BedType[]> {
-    const resolvedHospitalId = this.facilityService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: false },
     );
     return this.facilityService.listBeds(resolvedHospitalId, wardId);
   }
@@ -70,9 +77,10 @@ export class FacilityResolver {
     @Args('input') input: CreateDepartmentInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<DepartmentType> {
-    const resolvedHospitalId = this.facilityService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.facilityService.createDepartment(
       resolvedHospitalId,
@@ -88,9 +96,10 @@ export class FacilityResolver {
     @Args('input') input: CreateWardInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<WardType> {
-    const resolvedHospitalId = this.facilityService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.facilityService.createWard(resolvedHospitalId, input, user);
   }
@@ -102,9 +111,10 @@ export class FacilityResolver {
     @Args('input') input: CreateBedInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<BedType> {
-    const resolvedHospitalId = this.facilityService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.facilityService.createBed(resolvedHospitalId, input, user);
   }
@@ -116,9 +126,10 @@ export class FacilityResolver {
     @Args('id') id: string,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<boolean> {
-    const resolvedHospitalId = this.facilityService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.facilityService.deleteDepartment(resolvedHospitalId, id, user);
   }
@@ -130,9 +141,10 @@ export class FacilityResolver {
     @Args('id') id: string,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<boolean> {
-    const resolvedHospitalId = this.facilityService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.facilityService.deleteWard(resolvedHospitalId, id, user);
   }
@@ -144,9 +156,10 @@ export class FacilityResolver {
     @Args('id') id: string,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<boolean> {
-    const resolvedHospitalId = this.facilityService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.facilityService.deleteBed(resolvedHospitalId, id, user);
   }
@@ -158,9 +171,10 @@ export class FacilityResolver {
     @Args('input') input: UpdateBedStatusInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<BedType> {
-    const resolvedHospitalId = this.facilityService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.facilityService.updateBedStatus(
       resolvedHospitalId,

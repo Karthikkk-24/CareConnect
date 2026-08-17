@@ -12,6 +12,7 @@ import { graphqlQueryComplexityPlugin } from './common/graphql-query-complexity.
 import { validateEnv } from './config/env.validation';
 import { AuthModule } from './auth/auth.module';
 import { AppThrottlerGuard } from './common/app-throttler.guard';
+import { CommonModule } from './common/common.module';
 import {
   Hospital,
   Patient,
@@ -170,6 +171,7 @@ import { UploadsModule } from './uploads/uploads.module';
       },
     }),
     AuthModule,
+    CommonModule,
     RbacModule,
     ClerkModule,
     AuditModule,

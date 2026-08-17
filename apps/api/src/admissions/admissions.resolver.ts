@@ -8,6 +8,7 @@ import { Permissions } from '../rbac/permissions.decorator';
 import { Roles } from '../rbac/roles.decorator';
 import { RolesGuard } from '../rbac/roles.guard';
 import { AdmissionsService } from './admissions.service';
+import { HospitalContextService } from '../common/hospital-context.service';
 import {
   AdmissionType,
   AdmitPatientInput,
@@ -29,7 +30,10 @@ const CHART_READ_ROLES = [
 @Resolver()
 @UseGuards(GqlAuthGuard, RolesGuard)
 export class AdmissionsResolver {
-  constructor(private readonly admissionsService: AdmissionsService) {}
+  constructor(
+    private readonly admissionsService: AdmissionsService,
+    private readonly hospitalContext: HospitalContextService,
+  ) {}
 
   @Query(() => [AdmissionType])
   @Roles(...CHART_READ_ROLES)
@@ -38,9 +42,10 @@ export class AdmissionsResolver {
     @CurrentUser() user: AuthenticatedUser,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<AdmissionType[]> {
-    const resolvedHospitalId = this.admissionsService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: false },
     );
     return this.admissionsService.activeAdmissions(resolvedHospitalId);
   }
@@ -52,9 +57,10 @@ export class AdmissionsResolver {
     @CurrentUser() user: AuthenticatedUser,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<WardOccupancyType[]> {
-    const resolvedHospitalId = this.admissionsService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: false },
     );
     return this.admissionsService.wardOccupancy(resolvedHospitalId);
   }
@@ -74,9 +80,10 @@ export class AdmissionsResolver {
     @Args('input') input: AdmitPatientInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<AdmissionType> {
-    const resolvedHospitalId = this.admissionsService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.admissionsService.admitPatient(resolvedHospitalId, input, user);
   }
@@ -95,9 +102,10 @@ export class AdmissionsResolver {
     @Args('input') input: DischargeAdmissionInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<AdmissionType> {
-    const resolvedHospitalId = this.admissionsService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.admissionsService.dischargeAdmission(
       resolvedHospitalId,
@@ -121,9 +129,10 @@ export class AdmissionsResolver {
     @Args('input') input: TransferAdmissionInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<AdmissionType> {
-    const resolvedHospitalId = this.admissionsService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.admissionsService.transferAdmission(
       resolvedHospitalId,
@@ -146,9 +155,10 @@ export class AdmissionsResolver {
     @Args('input') input: TransferOutAdmissionInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<AdmissionType> {
-    const resolvedHospitalId = this.admissionsService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.admissionsService.transferOutAdmission(
       resolvedHospitalId,

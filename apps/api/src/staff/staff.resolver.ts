@@ -10,11 +10,15 @@ import { RolesGuard } from '../rbac/roles.guard';
 import { AllowAuthenticated } from '../rbac/allow-authenticated.decorator';
 import { StaffService } from './staff.service';
 import { CreateStaffInput, StaffType, UpdateStaffInput } from './staff.types';
+import { HospitalContextService } from '../common/hospital-context.service';
 
 @Resolver(() => StaffType)
 @UseGuards(GqlAuthGuard, RolesGuard)
 export class StaffResolver {
-  constructor(private readonly staffService: StaffService) {}
+  constructor(
+    private readonly staffService: StaffService,
+    private readonly hospitalContext: HospitalContextService,
+  ) {}
 
   @Query(() => [StaffType])
   @Permissions(PERMISSIONS.STAFF_READ)
@@ -22,9 +26,10 @@ export class StaffResolver {
     @CurrentUser() user: AuthenticatedUser,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<StaffType[]> {
-    const resolvedHospitalId = this.staffService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: false },
     );
     const members = await this.staffService.findByHospital(resolvedHospitalId);
     return members.map((m) => this.staffService.toStaffType(m));
@@ -48,9 +53,10 @@ export class StaffResolver {
     @Args('input') input: CreateStaffInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<StaffType> {
-    const resolvedHospitalId = this.staffService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     const member = await this.staffService.create(
       resolvedHospitalId,
