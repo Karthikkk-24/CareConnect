@@ -8,6 +8,7 @@ import { Permissions } from '../rbac/permissions.decorator';
 import { Roles } from '../rbac/roles.decorator';
 import { RolesGuard } from '../rbac/roles.guard';
 import { InventoryService } from './inventory.service';
+import { HospitalContextService } from '../common/hospital-context.service';
 import {
   CreateInventoryItemInput,
   InventoryItemType,
@@ -23,7 +24,10 @@ const INVENTORY_ROLES = [
 @Resolver()
 @UseGuards(GqlAuthGuard, RolesGuard)
 export class InventoryResolver {
-  constructor(private readonly inventoryService: InventoryService) {}
+  constructor(
+    private readonly inventoryService: InventoryService,
+    private readonly hospitalContext: HospitalContextService,
+  ) {}
 
   @Query(() => [InventoryItemType])
   @Roles(...INVENTORY_ROLES)
@@ -32,9 +36,10 @@ export class InventoryResolver {
     @CurrentUser() user: AuthenticatedUser,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<InventoryItemType[]> {
-    const resolvedHospitalId = this.inventoryService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: false },
     );
     return this.inventoryService.listInventoryItems(resolvedHospitalId);
   }
@@ -47,9 +52,10 @@ export class InventoryResolver {
     @Args('input') input: CreateInventoryItemInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<InventoryItemType> {
-    const resolvedHospitalId = this.inventoryService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.inventoryService.createInventoryItem(
       resolvedHospitalId,
@@ -66,9 +72,10 @@ export class InventoryResolver {
     @Args('input') input: UpdateInventoryQuantityInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<InventoryItemType> {
-    const resolvedHospitalId = this.inventoryService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.inventoryService.updateInventoryQuantity(
       resolvedHospitalId,

@@ -1,4 +1,4 @@
-import { UseGuards } from '@nestjs/common';
+import { NotFoundException, UseGuards } from '@nestjs/common';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { PERMISSIONS, ROLES } from '@careconnect/types';
 import { GqlAuthGuard } from '../auth/gql-auth.guard';
@@ -10,11 +10,15 @@ import { RolesGuard } from '../rbac/roles.guard';
 import { AllowAuthenticated } from '../rbac/allow-authenticated.decorator';
 import { StaffService } from './staff.service';
 import { CreateStaffInput, StaffType, UpdateStaffInput } from './staff.types';
+import { HospitalContextService } from '../common/hospital-context.service';
 
 @Resolver(() => StaffType)
 @UseGuards(GqlAuthGuard, RolesGuard)
 export class StaffResolver {
-  constructor(private readonly staffService: StaffService) {}
+  constructor(
+    private readonly staffService: StaffService,
+    private readonly hospitalContext: HospitalContextService,
+  ) {}
 
   @Query(() => [StaffType])
   @Permissions(PERMISSIONS.STAFF_READ)
@@ -22,9 +26,10 @@ export class StaffResolver {
     @CurrentUser() user: AuthenticatedUser,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<StaffType[]> {
-    const resolvedHospitalId = this.staffService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: false },
     );
     const members = await this.staffService.findByHospital(resolvedHospitalId);
     return members.map((m) => this.staffService.toStaffType(m));
@@ -48,9 +53,10 @@ export class StaffResolver {
     @Args('input') input: CreateStaffInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<StaffType> {
-    const resolvedHospitalId = this.staffService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     const member = await this.staffService.create(
       resolvedHospitalId,
@@ -70,6 +76,11 @@ export class StaffResolver {
     @Args('id') id: string,
     @Args('input') input: UpdateStaffInput,
   ): Promise<StaffType> {
+    const existing = await this.staffService.findByIdForUser(id, user);
+    if (!existing) throw new NotFoundException('Staff member not found');
+    await this.hospitalContext.resolveHospitalId(user, existing.hospitalId, {
+      write: true,
+    });
     const member = await this.staffService.update(id, input, user);
     const full = await this.staffService.findById(member.id);
     return this.staffService.toStaffType(full!);
@@ -82,6 +93,11 @@ export class StaffResolver {
     @CurrentUser() user: AuthenticatedUser,
     @Args('id') id: string,
   ): Promise<StaffType> {
+    const existing = await this.staffService.findByIdForUser(id, user);
+    if (!existing) throw new NotFoundException('Staff member not found');
+    await this.hospitalContext.resolveHospitalId(user, existing.hospitalId, {
+      write: true,
+    });
     const member = await this.staffService.resendStaffInvite(id, user);
     const inviteToken = member.inviteToken;
     const full = await this.staffService.findById(member.id);
@@ -95,6 +111,11 @@ export class StaffResolver {
     @CurrentUser() user: AuthenticatedUser,
     @Args('id') id: string,
   ): Promise<boolean> {
+    const existing = await this.staffService.findByIdForUser(id, user);
+    if (!existing) throw new NotFoundException('Staff member not found');
+    await this.hospitalContext.resolveHospitalId(user, existing.hospitalId, {
+      write: true,
+    });
     return this.staffService.remove(id, user);
   }
 

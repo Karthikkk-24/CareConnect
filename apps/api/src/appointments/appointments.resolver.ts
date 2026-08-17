@@ -9,6 +9,7 @@ import { Roles } from '../rbac/roles.decorator';
 import { RolesGuard } from '../rbac/roles.guard';
 import { STAFF_ROLES } from '../rbac/staff-roles';
 import { AppointmentsService } from './appointments.service';
+import { HospitalContextService } from '../common/hospital-context.service';
 import {
   AppointmentType,
   CancelAppointmentInput,
@@ -18,7 +19,10 @@ import {
 @Resolver()
 @UseGuards(GqlAuthGuard, RolesGuard)
 export class AppointmentsResolver {
-  constructor(private readonly appointmentsService: AppointmentsService) {}
+  constructor(
+    private readonly appointmentsService: AppointmentsService,
+    private readonly hospitalContext: HospitalContextService,
+  ) {}
 
   @Query(() => [AppointmentType])
   @Roles(...STAFF_ROLES)
@@ -30,9 +34,10 @@ export class AppointmentsResolver {
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
     @Args('status', { nullable: true }) status?: string,
   ): Promise<AppointmentType[]> {
-    const resolvedHospitalId = this.appointmentsService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: false },
     );
     return this.appointmentsService.findAll(
       resolvedHospitalId,
@@ -51,9 +56,10 @@ export class AppointmentsResolver {
     @Args('input') input: CreateAppointmentInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<AppointmentType> {
-    const resolvedHospitalId = this.appointmentsService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.appointmentsService.create(resolvedHospitalId, input, user);
   }
@@ -67,9 +73,10 @@ export class AppointmentsResolver {
     @Args('status') status: string,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<AppointmentType> {
-    const resolvedHospitalId = this.appointmentsService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.appointmentsService.updateStatus(
       id,
@@ -87,9 +94,10 @@ export class AppointmentsResolver {
     @Args('input') input: CancelAppointmentInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<AppointmentType> {
-    const resolvedHospitalId = this.appointmentsService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.appointmentsService.cancel(resolvedHospitalId, input, user);
   }

@@ -8,6 +8,7 @@ import { Permissions } from '../rbac/permissions.decorator';
 import { Roles } from '../rbac/roles.decorator';
 import { RolesGuard } from '../rbac/roles.guard';
 import { DischargeService } from './discharge.service';
+import { HospitalContextService } from '../common/hospital-context.service';
 import {
   CreateDischargeInput,
   CreateFollowUpInput,
@@ -29,7 +30,10 @@ const CHART_READ_ROLES = [
 @Resolver()
 @UseGuards(GqlAuthGuard, RolesGuard)
 export class DischargeResolver {
-  constructor(private readonly dischargeService: DischargeService) {}
+  constructor(
+    private readonly dischargeService: DischargeService,
+    private readonly hospitalContext: HospitalContextService,
+  ) {}
 
   @Query(() => [FollowUpType])
   @Roles(...CHART_READ_ROLES)
@@ -39,9 +43,10 @@ export class DischargeResolver {
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
     @Args('status', { nullable: true }) status?: string,
   ): Promise<FollowUpType[]> {
-    const resolvedHospitalId = this.dischargeService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: false },
     );
     return this.dischargeService.followUps(resolvedHospitalId, status);
   }
@@ -54,9 +59,10 @@ export class DischargeResolver {
     @Args('patientId') patientId: string,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<DischargeType[]> {
-    const resolvedHospitalId = this.dischargeService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: false },
     );
     return this.dischargeService.dischargesForPatient(
       resolvedHospitalId,
@@ -78,9 +84,10 @@ export class DischargeResolver {
     @Args('input') input: CreateDischargeInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<DischargeType> {
-    const resolvedHospitalId = this.dischargeService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.dischargeService.createDischarge(
       resolvedHospitalId,
@@ -104,9 +111,10 @@ export class DischargeResolver {
     @Args('input') input: CreateFollowUpInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<FollowUpType> {
-    const resolvedHospitalId = this.dischargeService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.dischargeService.createFollowUp(
       resolvedHospitalId,
@@ -130,9 +138,10 @@ export class DischargeResolver {
     @Args('input') input: UpdateFollowUpStatusInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<FollowUpType> {
-    const resolvedHospitalId = this.dischargeService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.dischargeService.updateFollowUpStatus(
       resolvedHospitalId,

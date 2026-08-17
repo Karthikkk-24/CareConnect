@@ -8,6 +8,7 @@ import { Permissions } from '../rbac/permissions.decorator';
 import { Roles } from '../rbac/roles.decorator';
 import { RolesGuard } from '../rbac/roles.guard';
 import { PatientsService } from './patients.service';
+import { HospitalContextService } from '../common/hospital-context.service';
 import {
   BulkImportResultType,
   BulkPatientRowInput,
@@ -33,7 +34,10 @@ const CHART_READ_ROLES = [
 @Resolver()
 @UseGuards(GqlAuthGuard, RolesGuard)
 export class PatientsResolver {
-  constructor(private readonly patientsService: PatientsService) {}
+  constructor(
+    private readonly patientsService: PatientsService,
+    private readonly hospitalContext: HospitalContextService,
+  ) {}
 
   @Query(() => PatientsPageType)
   @Roles(...CHART_READ_ROLES)
@@ -45,9 +49,10 @@ export class PatientsResolver {
     @Args('search', { nullable: true }) search?: string,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<PatientsPageType> {
-    const resolvedHospitalId = this.patientsService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: false },
     );
     return this.patientsService.findAll(
       resolvedHospitalId,
@@ -65,9 +70,10 @@ export class PatientsResolver {
     @Args('id') id: string,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<PatientDetailType> {
-    const resolvedHospitalId = this.patientsService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: false },
     );
     return this.patientsService.findById(id, resolvedHospitalId);
   }
@@ -87,9 +93,10 @@ export class PatientsResolver {
     @Args('input') input: CreatePatientInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<PatientType> {
-    const resolvedHospitalId = this.patientsService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.patientsService.create(resolvedHospitalId, input, user);
   }
@@ -110,9 +117,10 @@ export class PatientsResolver {
     @Args('input') input: UpdatePatientInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<PatientType> {
-    const resolvedHospitalId = this.patientsService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.patientsService.updatePatient(
       id,
@@ -130,9 +138,10 @@ export class PatientsResolver {
     @Args('id') id: string,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<boolean> {
-    const resolvedHospitalId = this.patientsService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.patientsService.deletePatient(id, resolvedHospitalId, user);
   }
@@ -153,9 +162,10 @@ export class PatientsResolver {
     @Args('status') status: string,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<PatientType> {
-    const resolvedHospitalId = this.patientsService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.patientsService.updatePatientStatus(
       id,
@@ -182,9 +192,10 @@ export class PatientsResolver {
     @Args('dryRun', { defaultValue: true }) dryRun: boolean,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<BulkImportResultType> {
-    const resolvedHospitalId = this.patientsService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.patientsService.bulkImport(
       resolvedHospitalId,
@@ -210,9 +221,10 @@ export class PatientsResolver {
     @Args('input') input: PatientDocumentInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<PatientDocumentType> {
-    const resolvedHospitalId = this.patientsService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     const doc = await this.patientsService.addDocument(
       patientId,
@@ -246,9 +258,10 @@ export class PatientsResolver {
     @Args('patientId') patientId: string,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<boolean> {
-    const resolvedHospitalId = this.patientsService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.patientsService.deletePatientDocument(
       id,
@@ -268,9 +281,10 @@ export class PatientsResolver {
     @Args('email', { nullable: true }) email?: string,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<PatientType> {
-    const resolvedHospitalId = this.patientsService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.patientsService.linkPatientAccount(
       patientId,
@@ -289,9 +303,10 @@ export class PatientsResolver {
     @Args('patientId') patientId: string,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<PatientType> {
-    const resolvedHospitalId = this.patientsService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.patientsService.unlinkPatientAccount(
       patientId,

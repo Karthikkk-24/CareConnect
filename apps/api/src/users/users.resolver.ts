@@ -21,7 +21,9 @@ export class UsersResolver {
       email: user.email,
       fullName: user.fullName,
       hospitalId: user.hospitalId,
-      hospitalActive: user.hospitalActive ?? true,
+      // Fail closed: AuthService.toAuthenticatedUser always sets this flag.
+      // Missing/undefined must not look active (#284).
+      hospitalActive: user.hospitalActive === true,
       roles: user.roles,
       permissions: user.permissions,
       onboardingCompleted: user.onboardingCompleted,
@@ -52,7 +54,7 @@ export class UsersResolver {
       email: refreshed!.email,
       fullName: refreshed!.fullName,
       hospitalId: refreshed!.hospitalId,
-      hospitalActive: refreshed!.hospitalActive ?? true,
+      hospitalActive: refreshed!.hospitalActive === true,
       roles: refreshed!.roles,
       permissions: refreshed!.permissions,
       onboardingCompleted: true,
@@ -75,7 +77,7 @@ export class UsersResolver {
       email: refreshed!.email,
       fullName: refreshed!.fullName,
       hospitalId: refreshed!.hospitalId,
-      hospitalActive: refreshed!.hospitalActive ?? true,
+      hospitalActive: refreshed!.hospitalActive === true,
       roles: refreshed!.roles,
       permissions: refreshed!.permissions,
       onboardingCompleted: true,

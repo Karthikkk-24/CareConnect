@@ -8,6 +8,7 @@ import { Permissions } from '../rbac/permissions.decorator';
 import { Roles } from '../rbac/roles.decorator';
 import { RolesGuard } from '../rbac/roles.guard';
 import { PharmacyService } from './pharmacy.service';
+import { HospitalContextService } from '../common/hospital-context.service';
 import {
   DispensePrescriptionInput,
   PendingPrescriptionType,
@@ -24,7 +25,10 @@ const PHARMACY_ROLES = [
 @Resolver()
 @UseGuards(GqlAuthGuard, RolesGuard)
 export class PharmacyResolver {
-  constructor(private readonly pharmacyService: PharmacyService) {}
+  constructor(
+    private readonly pharmacyService: PharmacyService,
+    private readonly hospitalContext: HospitalContextService,
+  ) {}
 
   @Query(() => [PharmacyStockType])
   @Roles(...PHARMACY_ROLES)
@@ -33,9 +37,10 @@ export class PharmacyResolver {
     @CurrentUser() user: AuthenticatedUser,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<PharmacyStockType[]> {
-    const resolvedHospitalId = this.pharmacyService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: false },
     );
     return this.pharmacyService.listPharmacyStock(resolvedHospitalId);
   }
@@ -47,9 +52,10 @@ export class PharmacyResolver {
     @CurrentUser() user: AuthenticatedUser,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<PendingPrescriptionType[]> {
-    const resolvedHospitalId = this.pharmacyService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: false },
     );
     return this.pharmacyService.listPendingPrescriptions(resolvedHospitalId);
   }
@@ -62,9 +68,10 @@ export class PharmacyResolver {
     @Args('input') input: UpsertPharmacyStockInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<PharmacyStockType> {
-    const resolvedHospitalId = this.pharmacyService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.pharmacyService.upsertPharmacyStock(
       resolvedHospitalId,
@@ -81,9 +88,10 @@ export class PharmacyResolver {
     @Args('input') input: DispensePrescriptionInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<PendingPrescriptionType> {
-    const resolvedHospitalId = this.pharmacyService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.pharmacyService.dispensePrescription(
       resolvedHospitalId,

@@ -8,11 +8,15 @@ import { Permissions } from '../rbac/permissions.decorator';
 import { RolesGuard } from '../rbac/roles.guard';
 import { ReportsService } from './reports.service';
 import { HospitalReportsType } from './reports.types';
+import { HospitalContextService } from '../common/hospital-context.service';
 
 @Resolver()
 @UseGuards(GqlAuthGuard, RolesGuard)
 export class ReportsResolver {
-  constructor(private readonly reportsService: ReportsService) {}
+  constructor(
+    private readonly reportsService: ReportsService,
+    private readonly hospitalContext: HospitalContextService,
+  ) {}
 
   @Query(() => HospitalReportsType)
   @Permissions(PERMISSIONS.REPORTS_READ)
@@ -20,9 +24,10 @@ export class ReportsResolver {
     @CurrentUser() user: AuthenticatedUser,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<HospitalReportsType> {
-    const resolvedHospitalId = this.reportsService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: false },
     );
     return this.reportsService.getHospitalReports(resolvedHospitalId);
   }
