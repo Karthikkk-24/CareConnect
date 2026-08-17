@@ -18,14 +18,33 @@ const EXPECTED_HEADERS = [
   'identification_number',
 ];
 
-function parseCsvLine(line: string): string[] {
-  const values: string[] = [];
+/**
+ * RFC 4180-ish CSV record parser: quoted fields may contain commas, quotes
+ * (`""` escapes), and newlines. Unquoted newlines still start a new record.
+ */
+export function parseCsvRecords(text: string): string[][] {
+  const records: string[][] = [];
+  let row: string[] = [];
   let current = '';
   let inQuotes = false;
 
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-    const next = line[i + 1];
+  const pushField = () => {
+    row.push(current.trim());
+    current = '';
+  };
+
+  const pushRow = () => {
+    if (row.length === 1 && row[0] === '') {
+      row = [];
+      return;
+    }
+    records.push(row);
+    row = [];
+  };
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const next = text[i + 1];
 
     if (inQuotes) {
       if (char === '"') {
@@ -41,26 +60,39 @@ function parseCsvLine(line: string): string[] {
     } else if (char === '"') {
       inQuotes = true;
     } else if (char === ',') {
-      values.push(current.trim());
-      current = '';
+      pushField();
+    } else if (char === '\n') {
+      pushField();
+      pushRow();
+    } else if (char === '\r') {
+      if (next === '\n') continue;
+      pushField();
+      pushRow();
     } else {
       current += char;
     }
   }
 
-  values.push(current.trim());
-  return values;
+  if (current.length > 0 || row.length > 0) {
+    pushField();
+    pushRow();
+  }
+
+  return records;
 }
 
 export function parsePatientCsv(text: string): BulkPatientRow[] {
-  const lines = text.trim().split(/\r?\n/).filter(Boolean);
-  if (lines.length < 2) return [];
+  const records = parseCsvRecords(text.trim());
+  if (records.length < 2) return [];
 
-  const headers = parseCsvLine(lines[0]).map((h) => h.toLowerCase().replace(/\s+/g, '_'));
+  const headerRow = records[0];
+  if (!headerRow) return [];
+
+  const headers = headerRow.map((h) => h.toLowerCase().replace(/\s+/g, '_'));
   const rows: BulkPatientRow[] = [];
 
-  for (let i = 1; i < lines.length; i++) {
-    const values = parseCsvLine(lines[i]);
+  for (let i = 1; i < records.length; i++) {
+    const values = records[i] ?? [];
     const row: Record<string, string> = {};
     headers.forEach((h, idx) => {
       row[h] = values[idx] ?? '';
