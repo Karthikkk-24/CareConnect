@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomBytes, randomUUID } from 'crypto';
-import { QueryFailedError, Repository } from 'typeorm';
+import { EntityManager, QueryFailedError, Repository } from 'typeorm';
 import {
   Role,
   StaffInvite,
@@ -28,6 +28,8 @@ function isUniqueViolation(error: unknown): boolean {
   );
 }
 
+const HOSPITAL_ADMIN_ROLE = 'hospital_admin';
+
 const ASSIGNABLE_STAFF_ROLES = new Set([
   'hospital_manager',
   'doctor',
@@ -36,7 +38,58 @@ const ASSIGNABLE_STAFF_ROLES = new Set([
   'lab_technician',
   'pharmacist',
   'accountant',
+  // hospital_admin: sitting hospital_admin or super_admin may invite a successor.
+  // The unique user_roles row is not inserted until accept (see transfer below).
+  HOSPITAL_ADMIN_ROLE,
 ]);
+
+const LAST_ACTIVE_HOSPITAL_ADMIN_MESSAGE =
+  'Hospital must keep at least one active hospital_admin. Invite a replacement administrator first.';
+
+const HOSPITAL_ADMIN_SLOT_TAKEN_MESSAGE =
+  'This hospital already has a hospital_admin. Invite a successor instead; the role transfers when they accept.';
+
+/**
+ * One hospital_admin role per hospital (UNIQUE idx_user_roles_one_hospital_admin,
+ * including inactive rows). Succession: current admin or super_admin invites a
+ * replacement. The invite does not consume the unique user_roles slot. When the
+ * invite is accepted, the unique hospital_admin role transfers atomically
+ * (delete other hospital_admin rows for that hospital, insert the successor).
+ * Last active admin cannot be deactivated until a successor has accepted, so
+ * the tenant never has zero. Re-bootstrap when zero *active* admins remain is
+ * handled in AuthService.completeOnboarding.
+ */
+
+/** Platform super_admin is not a hospital_admin and must not occupy this slot. */
+const COUNT_ACTIVE_HOSPITAL_ADMINS_SQL = `
+  SELECT COUNT(*)::int AS count
+  FROM user_roles ur
+  INNER JOIN users u ON u.id = ur.user_id
+  INNER JOIN roles r ON r.id = ur.role_id
+  WHERE r.slug = 'hospital_admin'
+    AND ur.hospital_id = $1
+    AND u.is_active = true
+    AND u.deleted_at IS NULL
+`;
+
+const RELEASE_INACTIVE_HOSPITAL_ADMIN_SLOTS_SQL = `
+  DELETE FROM user_roles ur
+  USING users u, roles r
+  WHERE ur.user_id = u.id
+    AND ur.role_id = r.id
+    AND r.slug = 'hospital_admin'
+    AND ur.hospital_id = $1
+    AND (u.is_active = false OR u.deleted_at IS NOT NULL)
+`;
+
+const TRANSFER_HOSPITAL_ADMIN_ROLE_SQL = `
+  DELETE FROM user_roles ur
+  USING roles r
+  WHERE ur.role_id = r.id
+    AND r.slug = 'hospital_admin'
+    AND ur.hospital_id = $1
+    AND ur.user_id <> $2
+`;
 
 @Injectable()
 export class StaffService {
@@ -57,9 +110,114 @@ export class StaffService {
 
   private assertAssignableRole(roleSlug: string, actor: AuthenticatedUser) {
     if (actor.roles.includes('super_admin')) return;
+    if (roleSlug === HOSPITAL_ADMIN_ROLE) {
+      if (!actor.roles.includes('hospital_admin')) {
+        throw new BadRequestException(
+          `Role "${roleSlug}" cannot be assigned via staff invite`,
+        );
+      }
+      return;
+    }
     if (!ASSIGNABLE_STAFF_ROLES.has(roleSlug)) {
       throw new BadRequestException(
         `Role "${roleSlug}" cannot be assigned via staff invite`,
+      );
+    }
+  }
+
+  private isHospitalAdmin(staff: StaffProfile): boolean {
+    return (staff.user?.userRoles ?? []).some(
+      (ur) =>
+        ur.role?.slug === HOSPITAL_ADMIN_ROLE &&
+        (ur.hospitalId == null || ur.hospitalId === staff.hospitalId),
+    );
+  }
+
+  private async countActiveHospitalAdmins(
+    hospitalId: string,
+    excludeUserId?: string,
+  ): Promise<number> {
+    const params: string[] = [hospitalId];
+    let sql = COUNT_ACTIVE_HOSPITAL_ADMINS_SQL;
+    if (excludeUserId) {
+      sql += ` AND ur.user_id <> $2`;
+      params.push(excludeUserId);
+    }
+    const raw: unknown = await this.userRolesRepo.manager.query(sql, params);
+    const rows = raw as Array<{ count: number | string }>;
+    return Number(rows[0]?.count ?? 0);
+  }
+
+  private async assertNotLastActiveHospitalAdmin(staff: StaffProfile) {
+    const others = await this.countActiveHospitalAdmins(
+      staff.hospitalId,
+      staff.userId,
+    );
+    if (others === 0) {
+      throw new BadRequestException(LAST_ACTIVE_HOSPITAL_ADMIN_MESSAGE);
+    }
+  }
+
+  private async assertHospitalAdminSlotAvailable(
+    hospitalId: string,
+    excludeUserId?: string,
+  ) {
+    const active = await this.countActiveHospitalAdmins(
+      hospitalId,
+      excludeUserId,
+    );
+    if (active > 0) {
+      throw new BadRequestException(HOSPITAL_ADMIN_SLOT_TAKEN_MESSAGE);
+    }
+  }
+
+  private async releaseInactiveHospitalAdminSlots(
+    hospitalId: string,
+    runner: {
+      query: (sql: string, parameters?: unknown[]) => Promise<unknown>;
+    },
+  ) {
+    await runner.query(RELEASE_INACTIVE_HOSPITAL_ADMIN_SLOTS_SQL, [hospitalId]);
+  }
+
+  /** Atomically move the unique hospital_admin slot to successorUserId. */
+  private async transferHospitalAdminRole(
+    manager: EntityManager,
+    hospitalId: string,
+    successorUserId: string,
+  ) {
+    await manager.query(`SELECT pg_advisory_xact_lock(hashtext($1::text))`, [
+      `hospital-admin-transfer:${hospitalId}`,
+    ]);
+
+    const rolesRepo = manager.getRepository(Role);
+    const userRolesRepo = manager.getRepository(UserRole);
+    const adminRole = await rolesRepo.findOne({
+      where: { slug: HOSPITAL_ADMIN_ROLE },
+    });
+    if (!adminRole) {
+      throw new NotFoundException(`Role ${HOSPITAL_ADMIN_ROLE} not found`);
+    }
+
+    await manager.query(TRANSFER_HOSPITAL_ADMIN_ROLE_SQL, [
+      hospitalId,
+      successorUserId,
+    ]);
+
+    const existingRole = await userRolesRepo.findOne({
+      where: {
+        userId: successorUserId,
+        roleId: adminRole.id,
+        hospitalId,
+      },
+    });
+    if (!existingRole) {
+      await userRolesRepo.save(
+        userRolesRepo.create({
+          userId: successorUserId,
+          roleId: adminRole.id,
+          hospitalId,
+        }),
       );
     }
   }
@@ -193,17 +351,22 @@ export class StaffService {
           );
         }
 
-        const existingRole = await userRolesRepo.findOne({
-          where: { userId: user.id, roleId: role.id, hospitalId },
-        });
-        if (!existingRole) {
-          await userRolesRepo.save(
-            userRolesRepo.create({
-              userId: user.id,
-              roleId: role.id,
-              hospitalId,
-            }),
-          );
+        // hospital_admin invite is a pending successor: do not insert user_roles
+        // here. The unique index would collide with the sitting admin; the slot
+        // transfers atomically in acceptInvite.
+        if (input.roleSlug !== HOSPITAL_ADMIN_ROLE) {
+          const existingRole = await userRolesRepo.findOne({
+            where: { userId: user.id, roleId: role.id, hospitalId },
+          });
+          if (!existingRole) {
+            await userRolesRepo.save(
+              userRolesRepo.create({
+                userId: user.id,
+                roleId: role.id,
+                hospitalId,
+              }),
+            );
+          }
         }
 
         // Expire any prior pending invite for this email so the unique index allows a new one.
@@ -243,6 +406,12 @@ export class StaffService {
       });
     } catch (error) {
       if (isUniqueViolation(error)) {
+        const constraint =
+          (error as QueryFailedError & { constraint?: string }).constraint ??
+          '';
+        if (constraint.includes('one_hospital_admin')) {
+          throw new ConflictException(HOSPITAL_ADMIN_SLOT_TAKEN_MESSAGE);
+        }
         throw new ConflictException(
           'Staff profile or pending invite already exists for this email',
         );
@@ -272,9 +441,7 @@ export class StaffService {
     const staff = await this.findByIdForUser(id, actor);
     if (!staff) throw new NotFoundException('Staff member not found');
 
-    const targetIsHospitalAdmin = (staff.user?.userRoles ?? []).some(
-      (ur) => ur.role?.slug === 'hospital_admin',
-    );
+    const targetIsHospitalAdmin = this.isHospitalAdmin(staff);
     const actorIsAdmin =
       actor.roles.includes('hospital_admin') ||
       actor.roles.includes('super_admin');
@@ -286,12 +453,31 @@ export class StaffService {
       );
     }
 
+    const demotingAdmin =
+      targetIsHospitalAdmin &&
+      input.roleSlug !== undefined &&
+      input.roleSlug !== HOSPITAL_ADMIN_ROLE;
+    const deactivatingAdmin = targetIsHospitalAdmin && input.isActive === false;
+    if (demotingAdmin || deactivatingAdmin) {
+      await this.assertNotLastActiveHospitalAdmin(staff);
+    }
+
     if (input.fullName) {
       await this.usersRepo.update(staff.userId, { fullName: input.fullName });
     }
 
     if (input.roleSlug) {
       this.assertAssignableRole(input.roleSlug, actor);
+      if (input.roleSlug === HOSPITAL_ADMIN_ROLE) {
+        await this.assertHospitalAdminSlotAvailable(
+          staff.hospitalId,
+          staff.userId,
+        );
+        await this.releaseInactiveHospitalAdminSlots(
+          staff.hospitalId,
+          this.userRolesRepo.manager,
+        );
+      }
       const role = await this.rolesRepo.findOne({
         where: { slug: input.roleSlug },
       });
@@ -349,6 +535,10 @@ export class StaffService {
   async remove(id: string, actor: AuthenticatedUser): Promise<boolean> {
     const staff = await this.findByIdForUser(id, actor);
     if (!staff) throw new NotFoundException('Staff member not found');
+
+    if (this.isHospitalAdmin(staff)) {
+      await this.assertNotLastActiveHospitalAdmin(staff);
+    }
 
     await this.syncClerkActiveState(staff.userId, false);
 
@@ -453,8 +643,9 @@ export class StaffService {
     authId: string,
     email: string,
   ): Promise<StaffProfile> {
-    const staffId = await this.invitesRepo.manager.transaction(
-      async (manager) => {
+    let staffId: string;
+    try {
+      staffId = await this.invitesRepo.manager.transaction(async (manager) => {
         const invitesRepo = manager.getRepository(StaffInvite);
         const usersRepo = manager.getRepository(User);
         const staffRepo = manager.getRepository(StaffProfile);
@@ -503,6 +694,14 @@ export class StaffService {
           );
         }
 
+        if (invite.roleSlug === HOSPITAL_ADMIN_ROLE) {
+          await this.transferHospitalAdminRole(
+            manager,
+            invite.hospitalId,
+            staff.userId,
+          );
+        }
+
         await usersRepo.update(staff.userId, {
           authId,
           onboardingCompleted: true,
@@ -513,8 +712,13 @@ export class StaffService {
         invite.acceptedAt = new Date();
         await invitesRepo.save(invite);
         return staff.id;
-      },
-    );
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new ConflictException(HOSPITAL_ADMIN_SLOT_TAKEN_MESSAGE);
+      }
+      throw error;
+    }
 
     return (await this.findById(staffId))!;
   }

@@ -68,6 +68,10 @@ pnpm --filter @careconnect/ui storybook
 
 Do not commit secrets (`.env`, keys, credentials).
 
+## Hospital admin succession
+
+Each hospital has **one** `hospital_admin` role (`idx_user_roles_one_hospital_admin`, including inactive rows). Sitting `hospital_admin` or platform `super_admin` may invite a replacement. The invite creates the user, staff profile, and pending invite — it does **not** insert a `user_roles` row, so it does not consume the unique slot. When the invite is accepted, `StaffService.acceptInvite` transfers the role atomically: delete other `hospital_admin` rows for that hospital, then insert the successor's. The last active admin cannot be deactivated until a successor has accepted. If zero *active* admins remain, first-time / re-bootstrap in `AuthService.completeOnboarding` may assign a new admin.
+
 ## Security scanning (Snyk)
 
 Dependency scanning:

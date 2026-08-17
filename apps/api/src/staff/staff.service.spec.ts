@@ -42,6 +42,9 @@ describe('StaffService', () => {
     save: jest.fn(),
     create: jest.fn(),
     delete: jest.fn(),
+    manager: {
+      query: jest.fn().mockResolvedValue([{ count: 0 }]),
+    },
   };
   const invitesRepo = {
     save: jest.fn(),
@@ -73,6 +76,12 @@ describe('StaffService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    userRolesRepo.manager.query.mockImplementation((sql: string) => {
+      if (typeof sql === 'string' && sql.includes('COUNT(*)')) {
+        return Promise.resolve([{ count: 0 }]);
+      }
+      return Promise.resolve(undefined);
+    });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -100,6 +109,65 @@ describe('StaffService', () => {
     permissions: [],
     onboardingCompleted: true,
   };
+
+  const hospitalManager: AuthenticatedUser = {
+    ...hospitalAdmin,
+    id: 'manager-1',
+    authId: 'auth-manager',
+    email: 'manager@hospital.com',
+    fullName: 'Manager',
+    roles: ['hospital_manager'],
+  };
+
+  const superAdmin: AuthenticatedUser = {
+    ...hospitalAdmin,
+    id: 'super-1',
+    authId: 'auth-super',
+    email: 'super@platform.com',
+    fullName: 'Super',
+    hospitalId: undefined,
+    roles: ['super_admin'],
+  };
+
+  function mockActiveAdminCount(count: number) {
+    userRolesRepo.manager.query.mockImplementation((sql: string) => {
+      if (typeof sql === 'string' && sql.includes('COUNT(*)')) {
+        return Promise.resolve([{ count }]);
+      }
+      return Promise.resolve(undefined);
+    });
+  }
+
+  function mockCreateTransaction(existingUser: Record<string, unknown> | null) {
+    const query = jest.fn().mockResolvedValue(undefined);
+    staffRepo.manager.transaction.mockImplementation(
+      (cb: (m: Record<string, unknown>) => unknown) => {
+        const manager = {
+          query,
+          getRepository: (entity: unknown) => {
+            if (entity === User) {
+              return {
+                createQueryBuilder: () => ({
+                  leftJoinAndSelect: jest.fn().mockReturnThis(),
+                  where: jest.fn().mockReturnThis(),
+                  getOne: jest.fn().mockResolvedValue(existingUser),
+                }),
+                update: usersRepo.update,
+                save: usersRepo.save,
+                create: usersRepo.create,
+              };
+            }
+            if (entity === UserRole) return userRolesRepo;
+            if (entity === StaffProfile) return staffRepo;
+            if (entity === StaffInvite) return invitesRepo;
+            return {};
+          },
+        };
+        return Promise.resolve(cb(manager));
+      },
+    );
+    return { query };
+  }
 
   describe('assertHospitalAccess', () => {
     it('allows super_admin for any hospital', () => {
@@ -146,36 +214,6 @@ describe('StaffService', () => {
   });
 
   describe('create — cross-hospital invite', () => {
-    function mockCreateTransaction(
-      existingUser: Record<string, unknown> | null,
-    ) {
-      staffRepo.manager.transaction.mockImplementation(
-        (cb: (m: Record<string, unknown>) => unknown) => {
-          const manager = {
-            getRepository: (entity: unknown) => {
-              if (entity === User) {
-                return {
-                  createQueryBuilder: () => ({
-                    leftJoinAndSelect: jest.fn().mockReturnThis(),
-                    where: jest.fn().mockReturnThis(),
-                    getOne: jest.fn().mockResolvedValue(existingUser),
-                  }),
-                  update: usersRepo.update,
-                  save: usersRepo.save,
-                  create: usersRepo.create,
-                };
-              }
-              if (entity === UserRole) return userRolesRepo;
-              if (entity === StaffProfile) return staffRepo;
-              if (entity === StaffInvite) return invitesRepo;
-              return {};
-            },
-          };
-          return Promise.resolve(cb(manager));
-        },
-      );
-    }
-
     it('rejects inviting a user who already belongs to another hospital', async () => {
       rolesRepo.findOne.mockResolvedValue({
         id: 'role-doctor',
@@ -425,6 +463,335 @@ describe('StaffService', () => {
       await expect(
         service.resendStaffInvite('missing', hospitalAdmin),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('hospital_admin last-admin lockout', () => {
+    const lastAdminStaff = {
+      id: 'staff-admin',
+      userId: 'admin-1',
+      hospitalId: 'hospital-a',
+      isActive: true,
+      user: {
+        email: 'admin@hospital.com',
+        userRoles: [
+          { role: { slug: 'hospital_admin' }, hospitalId: 'hospital-a' },
+        ],
+      },
+    };
+
+    it('rejects removing the last active hospital_admin', async () => {
+      staffRepo.findOne.mockResolvedValue({ ...lastAdminStaff });
+      mockActiveAdminCount(0);
+      usersRepo.findOne.mockResolvedValue({
+        id: 'admin-1',
+        authId: 'user_live_admin',
+      });
+
+      await expect(
+        service.remove('staff-admin', hospitalAdmin),
+      ).rejects.toThrow(/Invite a replacement administrator first/);
+
+      expect(staffRepo.save).not.toHaveBeenCalled();
+      expect(usersRepo.update).not.toHaveBeenCalled();
+      expect(clerkAdmin.deactivateUser).not.toHaveBeenCalled();
+    });
+
+    it('allows removing a hospital_admin when another remains active', async () => {
+      staffRepo.findOne.mockResolvedValue({ ...lastAdminStaff });
+      mockActiveAdminCount(1);
+      staffRepo.save.mockImplementation((row: { isActive: boolean }) =>
+        Promise.resolve(row),
+      );
+      usersRepo.findOne.mockResolvedValue({
+        id: 'admin-1',
+        authId: 'pending_abc',
+      });
+
+      await expect(service.remove('staff-admin', superAdmin)).resolves.toBe(
+        true,
+      );
+
+      expect(usersRepo.update).toHaveBeenCalledWith('admin-1', {
+        isActive: false,
+      });
+    });
+
+    it('rejects deactivating the last active hospital_admin', async () => {
+      staffRepo.findOne.mockResolvedValue({ ...lastAdminStaff });
+      mockActiveAdminCount(0);
+
+      await expect(
+        service.update('staff-admin', { isActive: false }, hospitalAdmin),
+      ).rejects.toThrow(/Invite a replacement administrator first/);
+
+      expect(staffRepo.save).not.toHaveBeenCalled();
+      expect(clerkAdmin.deactivateUser).not.toHaveBeenCalled();
+    });
+
+    it('rejects demoting the last active hospital_admin', async () => {
+      staffRepo.findOne.mockResolvedValue({ ...lastAdminStaff });
+      mockActiveAdminCount(0);
+
+      await expect(
+        service.update('staff-admin', { roleSlug: 'doctor' }, hospitalAdmin),
+      ).rejects.toThrow(/Invite a replacement administrator first/);
+
+      expect(userRolesRepo.delete).not.toHaveBeenCalled();
+    });
+
+    it('does not treat super_admin as filling the hospital_admin slot', async () => {
+      staffRepo.findOne.mockResolvedValue({ ...lastAdminStaff });
+      mockActiveAdminCount(0);
+
+      await expect(service.remove('staff-admin', superAdmin)).rejects.toThrow(
+        /Invite a replacement administrator first/,
+      );
+    });
+  });
+
+  describe('hospital_admin replacement invite', () => {
+    function setupHospitalAdminInviteCreate() {
+      rolesRepo.findOne.mockResolvedValue({
+        id: 'role-admin',
+        slug: 'hospital_admin',
+      });
+      usersRepo.create.mockImplementation((row: unknown) => row);
+      usersRepo.save.mockResolvedValue({
+        id: 'user-new',
+        hospitalId: 'hospital-a',
+      });
+      staffRepo.findOne.mockResolvedValueOnce(null).mockResolvedValue({
+        id: 'staff-new',
+        userId: 'user-new',
+        hospitalId: 'hospital-a',
+        user: {
+          fullName: 'New Admin',
+          email: 'new-admin@hospital.com',
+          userRoles: [],
+        },
+      });
+      staffRepo.create.mockImplementation((row: unknown) => row);
+      staffRepo.save.mockResolvedValue({ id: 'staff-new' });
+      userRolesRepo.findOne.mockResolvedValue(null);
+      userRolesRepo.create.mockImplementation((row: unknown) => row);
+      invitesRepo.create.mockImplementation((row: unknown) => row);
+      invitesRepo.save.mockResolvedValue({});
+      return mockCreateTransaction(null);
+    }
+
+    it('rejects hospital_admin invite from hospital_manager', async () => {
+      await expect(
+        service.create(
+          'hospital-a',
+          {
+            email: 'new-admin@hospital.com',
+            fullName: 'New Admin',
+            roleSlug: 'hospital_admin',
+          },
+          hospitalManager,
+        ),
+      ).rejects.toThrow(/cannot be assigned via staff invite/);
+
+      expect(rolesRepo.findOne).not.toHaveBeenCalled();
+    });
+
+    it('allows a sitting hospital_admin to invite a successor while remaining active', async () => {
+      mockActiveAdminCount(1);
+      const { query } = setupHospitalAdminInviteCreate();
+
+      await service.create(
+        'hospital-a',
+        {
+          email: 'new-admin@hospital.com',
+          fullName: 'New Admin',
+          roleSlug: 'hospital_admin',
+        },
+        hospitalAdmin,
+      );
+
+      expect(staffRepo.save).toHaveBeenCalled();
+      expect(invitesRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          roleSlug: 'hospital_admin',
+          email: 'new-admin@hospital.com',
+        }),
+      );
+      expect(userRolesRepo.save).not.toHaveBeenCalled();
+      expect(query).not.toHaveBeenCalled();
+    });
+
+    it('allows super_admin to invite a successor while an active hospital_admin exists', async () => {
+      mockActiveAdminCount(1);
+      setupHospitalAdminInviteCreate();
+
+      await service.create(
+        'hospital-a',
+        {
+          email: 'new-admin@hospital.com',
+          fullName: 'New Admin',
+          roleSlug: 'hospital_admin',
+        },
+        superAdmin,
+      );
+
+      expect(userRolesRepo.save).not.toHaveBeenCalled();
+      expect(staffRepo.save).toHaveBeenCalled();
+    });
+
+    it('still blocks deactivating the last admin after inviting a pending successor', async () => {
+      const lastAdminStaff = {
+        id: 'staff-admin',
+        userId: 'admin-1',
+        hospitalId: 'hospital-a',
+        isActive: true,
+        user: {
+          email: 'admin@hospital.com',
+          userRoles: [
+            { role: { slug: 'hospital_admin' }, hospitalId: 'hospital-a' },
+          ],
+        },
+      };
+      staffRepo.findOne.mockResolvedValue({ ...lastAdminStaff });
+      mockActiveAdminCount(0);
+
+      await expect(
+        service.remove('staff-admin', hospitalAdmin),
+      ).rejects.toThrow(/Invite a replacement administrator first/);
+    });
+  });
+
+  describe('acceptInvite — hospital_admin succession', () => {
+    function mockAcceptTransaction(invite: Record<string, unknown>) {
+      const query = jest.fn().mockResolvedValue(undefined);
+      const pendingStaff = {
+        id: 'staff-new',
+        userId: 'user-new',
+        hospitalId: 'hospital-a',
+        isActive: true,
+        user: { email: 'new-admin@hospital.com', isActive: true },
+      };
+      invitesRepo.manager.transaction.mockImplementation(
+        (cb: (m: Record<string, unknown>) => unknown) => {
+          const manager = {
+            query,
+            getRepository: (entity: unknown) => {
+              if (entity === StaffInvite) {
+                return {
+                  createQueryBuilder: () => ({
+                    setLock: jest.fn().mockReturnThis(),
+                    where: jest.fn().mockReturnThis(),
+                    getOne: jest.fn().mockResolvedValue(invite),
+                  }),
+                  save: invitesRepo.save,
+                };
+              }
+              if (entity === User) {
+                return {
+                  findOne: jest.fn().mockResolvedValue({
+                    id: 'user-new',
+                    isActive: true,
+                    hospitalId: 'hospital-a',
+                  }),
+                  update: usersRepo.update,
+                };
+              }
+              if (entity === StaffProfile) {
+                return {
+                  findOne: jest.fn().mockResolvedValue(pendingStaff),
+                };
+              }
+              if (entity === Role) {
+                return {
+                  findOne: jest.fn().mockResolvedValue({
+                    id: 'role-admin',
+                    slug: 'hospital_admin',
+                  }),
+                };
+              }
+              if (entity === UserRole) return userRolesRepo;
+              return {};
+            },
+          };
+          return Promise.resolve(cb(manager));
+        },
+      );
+      return { query, pendingStaff };
+    }
+
+    it('transfers the unique hospital_admin role to the invitee and removes the inviter', async () => {
+      const invite = {
+        token: 'tok',
+        email: 'new-admin@hospital.com',
+        hospitalId: 'hospital-a',
+        staffProfileId: 'staff-new',
+        roleSlug: 'hospital_admin',
+        acceptedAt: null,
+        expiresAt: new Date(Date.now() + 86400000),
+      };
+      const { query } = mockAcceptTransaction(invite);
+      userRolesRepo.findOne.mockResolvedValue(null);
+      userRolesRepo.create.mockImplementation((row: unknown) => row);
+      userRolesRepo.save.mockResolvedValue({});
+      invitesRepo.save.mockResolvedValue({});
+      staffRepo.findOne.mockResolvedValue({
+        id: 'staff-new',
+        userId: 'user-new',
+        hospitalId: 'hospital-a',
+        user: {
+          fullName: 'New Admin',
+          email: 'new-admin@hospital.com',
+          userRoles: [{ role: { slug: 'hospital_admin' } }],
+        },
+      });
+
+      await service.acceptInvite('tok', 'auth-new', 'new-admin@hospital.com');
+
+      expect(query).toHaveBeenCalledWith(
+        expect.stringContaining('pg_advisory_xact_lock'),
+        ['hospital-admin-transfer:hospital-a'],
+      );
+      expect(query).toHaveBeenCalledWith(
+        expect.stringContaining('DELETE FROM user_roles'),
+        ['hospital-a', 'user-new'],
+      );
+      expect(userRolesRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'user-new',
+          roleId: 'role-admin',
+          hospitalId: 'hospital-a',
+        }),
+      );
+      expect(invite.acceptedAt).toBeInstanceOf(Date);
+    });
+
+    it('does not transfer roles for non-admin invites', async () => {
+      const invite = {
+        token: 'tok',
+        email: 'doc@example.com',
+        hospitalId: 'hospital-a',
+        staffProfileId: 'staff-new',
+        roleSlug: 'doctor',
+        acceptedAt: null,
+        expiresAt: new Date(Date.now() + 86400000),
+      };
+      const { query } = mockAcceptTransaction(invite);
+      invitesRepo.save.mockResolvedValue({});
+      staffRepo.findOne.mockResolvedValue({
+        id: 'staff-new',
+        userId: 'user-new',
+        hospitalId: 'hospital-a',
+        user: {
+          fullName: 'Doc',
+          email: 'doc@example.com',
+          userRoles: [{ role: { slug: 'doctor' } }],
+        },
+      });
+
+      await service.acceptInvite('tok', 'auth-new', 'doc@example.com');
+
+      expect(query).not.toHaveBeenCalled();
+      expect(userRolesRepo.save).not.toHaveBeenCalled();
     });
   });
 });

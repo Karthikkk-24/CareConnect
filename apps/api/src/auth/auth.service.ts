@@ -170,7 +170,10 @@ export class AuthService {
    * Tenancy rules:
    * - Cannot switch to a different hospital once hospitalId is set (unless super_admin).
    * - Joining an existing hospital requires assignHospitalAdmin bootstrap OR invite flow.
-   * - Bootstrap admin only when that hospital has zero hospital_admin members yet.
+   * - Bootstrap admin only when that hospital has zero *active* hospital_admin
+   *   members yet (re-bootstrap after lockout). Sitting-admin succession is
+   *   StaffService.acceptInvite: the unique role transfers when the invite
+   *   is accepted, not here.
    */
   async completeOnboarding(
     actor: AuthenticatedUser,
@@ -240,15 +243,37 @@ export class AuthService {
           }
 
           if (!isSuperAdmin) {
-            const existingAdmins = await manager.count(UserRole, {
-              where: { roleId: adminRole.id, hospitalId },
-            });
+            const rows = (await manager.query(
+              `SELECT COUNT(*)::int AS count
+               FROM user_roles ur
+               INNER JOIN users u ON u.id = ur.user_id
+               INNER JOIN roles r ON r.id = ur.role_id
+               WHERE r.slug = 'hospital_admin'
+                 AND ur.hospital_id = $1
+                 AND u.is_active = true
+                 AND u.deleted_at IS NULL`,
+              [hospitalId],
+            )) as Array<{ count: number | string }>;
+            const existingAdmins = Number(rows[0]?.count ?? 0);
             if (existingAdmins > 0) {
               throw new ForbiddenException(
                 'Hospital already has an administrator; join via staff invite',
               );
             }
           }
+
+          // Unique index covers inactive hospital_admin rows too; drop leftovers
+          // so bootstrap can assign a replacement when none are active.
+          await manager.query(
+            `DELETE FROM user_roles ur
+             USING users u, roles r
+             WHERE ur.user_id = u.id
+               AND ur.role_id = r.id
+               AND r.slug = 'hospital_admin'
+               AND ur.hospital_id = $1
+               AND (u.is_active = false OR u.deleted_at IS NOT NULL)`,
+            [hospitalId],
+          );
 
           await manager.update(User, user.id, {
             fullName,

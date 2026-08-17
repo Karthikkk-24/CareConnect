@@ -30,7 +30,7 @@ Hospital-scoped data is filtered by the authenticated user's `hospitalId` unless
 |--------|---------|
 | `auth` / `users` | JWT validation, `me`, onboarding / patient onboarding |
 | `hospitals` | Hospital profile and settings |
-| `staff` | Staff CRUD, invite URLs, RBAC assignment |
+| `staff` | Staff CRUD, invite URLs, RBAC assignment. `hospital_admin` invite is a pending successor; the unique role transfers on accept. |
 | `patients` | Patient CRUD, bulk import, documents, soft delete, account linking |
 | `appointments` | Scheduling and status updates |
 | `admissions` | Admissions and bed occupancy |
