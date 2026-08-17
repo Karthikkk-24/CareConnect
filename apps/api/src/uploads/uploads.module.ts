@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import {
@@ -13,6 +14,7 @@ import { UploadsService } from './uploads.service';
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     AuthModule,
     TypeOrmModule.forFeature([
       PatientDocument,
