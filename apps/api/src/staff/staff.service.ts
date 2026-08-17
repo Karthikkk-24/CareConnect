@@ -28,6 +28,8 @@ function isUniqueViolation(error: unknown): boolean {
   );
 }
 
+const HOSPITAL_ADMIN_ROLE = 'hospital_admin';
+
 const ASSIGNABLE_STAFF_ROLES = new Set([
   'hospital_manager',
   'doctor',
@@ -36,7 +38,38 @@ const ASSIGNABLE_STAFF_ROLES = new Set([
   'lab_technician',
   'pharmacist',
   'accountant',
+  // hospital_admin is assignable only by hospital_admin / super_admin, and
+  // only when the hospital currently has zero active hospital_admins.
+  HOSPITAL_ADMIN_ROLE,
 ]);
+
+const LAST_ACTIVE_HOSPITAL_ADMIN_MESSAGE =
+  'Hospital must keep at least one active hospital_admin. Invite a replacement administrator first.';
+
+const HOSPITAL_ADMIN_SLOT_TAKEN_MESSAGE =
+  'This hospital already has an active hospital_admin. A replacement can only be invited when none are active.';
+
+/** Platform super_admin is not a hospital_admin and must not occupy this slot. */
+const COUNT_ACTIVE_HOSPITAL_ADMINS_SQL = `
+  SELECT COUNT(*)::int AS count
+  FROM user_roles ur
+  INNER JOIN users u ON u.id = ur.user_id
+  INNER JOIN roles r ON r.id = ur.role_id
+  WHERE r.slug = 'hospital_admin'
+    AND ur.hospital_id = $1
+    AND u.is_active = true
+    AND u.deleted_at IS NULL
+`;
+
+const RELEASE_INACTIVE_HOSPITAL_ADMIN_SLOTS_SQL = `
+  DELETE FROM user_roles ur
+  USING users u, roles r
+  WHERE ur.user_id = u.id
+    AND ur.role_id = r.id
+    AND r.slug = 'hospital_admin'
+    AND ur.hospital_id = $1
+    AND (u.is_active = false OR u.deleted_at IS NOT NULL)
+`;
 
 @Injectable()
 export class StaffService {
@@ -57,11 +90,73 @@ export class StaffService {
 
   private assertAssignableRole(roleSlug: string, actor: AuthenticatedUser) {
     if (actor.roles.includes('super_admin')) return;
+    if (roleSlug === HOSPITAL_ADMIN_ROLE) {
+      if (!actor.roles.includes('hospital_admin')) {
+        throw new BadRequestException(
+          `Role "${roleSlug}" cannot be assigned via staff invite`,
+        );
+      }
+      return;
+    }
     if (!ASSIGNABLE_STAFF_ROLES.has(roleSlug)) {
       throw new BadRequestException(
         `Role "${roleSlug}" cannot be assigned via staff invite`,
       );
     }
+  }
+
+  private isHospitalAdmin(staff: StaffProfile): boolean {
+    return (staff.user?.userRoles ?? []).some(
+      (ur) =>
+        ur.role?.slug === HOSPITAL_ADMIN_ROLE &&
+        (ur.hospitalId == null || ur.hospitalId === staff.hospitalId),
+    );
+  }
+
+  private async countActiveHospitalAdmins(
+    hospitalId: string,
+    excludeUserId?: string,
+  ): Promise<number> {
+    const params: string[] = [hospitalId];
+    let sql = COUNT_ACTIVE_HOSPITAL_ADMINS_SQL;
+    if (excludeUserId) {
+      sql += ` AND ur.user_id <> $2`;
+      params.push(excludeUserId);
+    }
+    const rows = (await this.userRolesRepo.manager.query(sql, params)) as Array<{
+      count: number | string;
+    }>;
+    return Number(rows[0]?.count ?? 0);
+  }
+
+  private async assertNotLastActiveHospitalAdmin(staff: StaffProfile) {
+    const others = await this.countActiveHospitalAdmins(
+      staff.hospitalId,
+      staff.userId,
+    );
+    if (others === 0) {
+      throw new BadRequestException(LAST_ACTIVE_HOSPITAL_ADMIN_MESSAGE);
+    }
+  }
+
+  private async assertHospitalAdminSlotAvailable(
+    hospitalId: string,
+    excludeUserId?: string,
+  ) {
+    const active = await this.countActiveHospitalAdmins(
+      hospitalId,
+      excludeUserId,
+    );
+    if (active > 0) {
+      throw new BadRequestException(HOSPITAL_ADMIN_SLOT_TAKEN_MESSAGE);
+    }
+  }
+
+  private async releaseInactiveHospitalAdminSlots(
+    hospitalId: string,
+    runner: { query: (sql: string, parameters?: unknown[]) => Promise<unknown> },
+  ) {
+    await runner.query(RELEASE_INACTIVE_HOSPITAL_ADMIN_SLOTS_SQL, [hospitalId]);
   }
 
   assertHospitalAccess(user: AuthenticatedUser, hospitalId: string) {
@@ -104,6 +199,9 @@ export class StaffService {
   ): Promise<StaffProfile> {
     this.assertHospitalAccess(actor, hospitalId);
     this.assertAssignableRole(input.roleSlug, actor);
+    if (input.roleSlug === HOSPITAL_ADMIN_ROLE) {
+      await this.assertHospitalAdminSlotAvailable(hospitalId);
+    }
 
     const role = await this.rolesRepo.findOne({
       where: { slug: input.roleSlug },
@@ -193,6 +291,12 @@ export class StaffService {
           );
         }
 
+        if (input.roleSlug === HOSPITAL_ADMIN_ROLE) {
+          // Unique index is on all hospital_admin rows (including inactive).
+          // Free the slot so a replacement invite can succeed when count is 0.
+          await this.releaseInactiveHospitalAdminSlots(hospitalId, manager);
+        }
+
         const existingRole = await userRolesRepo.findOne({
           where: { userId: user.id, roleId: role.id, hospitalId },
         });
@@ -243,6 +347,15 @@ export class StaffService {
       });
     } catch (error) {
       if (isUniqueViolation(error)) {
+        const constraint =
+          (error as QueryFailedError & { constraint?: string }).constraint ??
+          '';
+        if (
+          input.roleSlug === HOSPITAL_ADMIN_ROLE ||
+          constraint.includes('one_hospital_admin')
+        ) {
+          throw new ConflictException(HOSPITAL_ADMIN_SLOT_TAKEN_MESSAGE);
+        }
         throw new ConflictException(
           'Staff profile or pending invite already exists for this email',
         );
@@ -272,9 +385,7 @@ export class StaffService {
     const staff = await this.findByIdForUser(id, actor);
     if (!staff) throw new NotFoundException('Staff member not found');
 
-    const targetIsHospitalAdmin = (staff.user?.userRoles ?? []).some(
-      (ur) => ur.role?.slug === 'hospital_admin',
-    );
+    const targetIsHospitalAdmin = this.isHospitalAdmin(staff);
     const actorIsAdmin =
       actor.roles.includes('hospital_admin') ||
       actor.roles.includes('super_admin');
@@ -286,12 +397,32 @@ export class StaffService {
       );
     }
 
+    const demotingAdmin =
+      targetIsHospitalAdmin &&
+      input.roleSlug !== undefined &&
+      input.roleSlug !== HOSPITAL_ADMIN_ROLE;
+    const deactivatingAdmin =
+      targetIsHospitalAdmin && input.isActive === false;
+    if (demotingAdmin || deactivatingAdmin) {
+      await this.assertNotLastActiveHospitalAdmin(staff);
+    }
+
     if (input.fullName) {
       await this.usersRepo.update(staff.userId, { fullName: input.fullName });
     }
 
     if (input.roleSlug) {
       this.assertAssignableRole(input.roleSlug, actor);
+      if (input.roleSlug === HOSPITAL_ADMIN_ROLE) {
+        await this.assertHospitalAdminSlotAvailable(
+          staff.hospitalId,
+          staff.userId,
+        );
+        await this.releaseInactiveHospitalAdminSlots(
+          staff.hospitalId,
+          this.userRolesRepo.manager,
+        );
+      }
       const role = await this.rolesRepo.findOne({
         where: { slug: input.roleSlug },
       });
@@ -349,6 +480,10 @@ export class StaffService {
   async remove(id: string, actor: AuthenticatedUser): Promise<boolean> {
     const staff = await this.findByIdForUser(id, actor);
     if (!staff) throw new NotFoundException('Staff member not found');
+
+    if (this.isHospitalAdmin(staff)) {
+      await this.assertNotLastActiveHospitalAdmin(staff);
+    }
 
     await this.syncClerkActiveState(staff.userId, false);
 

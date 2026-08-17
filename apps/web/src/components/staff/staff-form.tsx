@@ -20,6 +20,7 @@ const roleOptions = [
   ROLES.PHARMACIST,
   ROLES.ACCOUNTANT,
   ROLES.HOSPITAL_MANAGER,
+  ROLES.HOSPITAL_ADMIN,
 ];
 
 export function StaffForm({

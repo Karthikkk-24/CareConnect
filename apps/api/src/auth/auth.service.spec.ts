@@ -47,7 +47,12 @@ describe('AuthService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    manager.query.mockResolvedValue(undefined);
+    manager.query.mockImplementation((sql: string) => {
+      if (typeof sql === 'string' && sql.includes('COUNT(*)')) {
+        return Promise.resolve([{ count: 0 }]);
+      }
+      return Promise.resolve(undefined);
+    });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -304,7 +309,7 @@ describe('AuthService', () => {
       );
     });
 
-    it('rejects bootstrap when an admin already exists under the lock', async () => {
+    it('ignores inactive leftover hospital_admins when counting the slot', async () => {
       usersRepo.findOne.mockResolvedValue({
         id: 'user-1',
         hospitalId: 'hospital-a',
@@ -314,7 +319,37 @@ describe('AuthService', () => {
         id: 'role-admin',
         slug: 'hospital_admin',
       });
-      manager.count.mockResolvedValue(1);
+      manager.find.mockResolvedValue([]);
+
+      await service.completeOnboarding(actor, 'Founder', 'hospital-a', true);
+
+      expect(manager.query).toHaveBeenCalledWith(
+        expect.stringContaining('u.is_active = true'),
+        ['hospital-a'],
+      );
+      expect(manager.query).toHaveBeenCalledWith(
+        expect.stringContaining('DELETE FROM user_roles'),
+        ['hospital-a'],
+      );
+      expect(manager.save).toHaveBeenCalled();
+    });
+
+    it('rejects bootstrap when an active admin already exists under the lock', async () => {
+      usersRepo.findOne.mockResolvedValue({
+        id: 'user-1',
+        hospitalId: 'hospital-a',
+      });
+      hospitalsRepo.findOne.mockResolvedValue({ id: 'hospital-a' });
+      manager.findOne.mockResolvedValue({
+        id: 'role-admin',
+        slug: 'hospital_admin',
+      });
+      manager.query.mockImplementation((sql: string) => {
+        if (typeof sql === 'string' && sql.includes('COUNT(*)')) {
+          return Promise.resolve([{ count: 1 }]);
+        }
+        return Promise.resolve(undefined);
+      });
 
       await expect(
         service.completeOnboarding(actor, 'Founder', 'hospital-a', true),
