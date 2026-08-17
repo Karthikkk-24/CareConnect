@@ -39,12 +39,33 @@ const CLINICAL_AUTHOR_ROLES = [
   ROLES.HOSPITAL_MANAGER,
 ] as const;
 
+/** Chart reads: clinical staff, not pharmacist or lab_technician. */
+const CHART_READ_ROLES = [
+  ROLES.DOCTOR,
+  ROLES.NURSE,
+  ROLES.RECEPTIONIST,
+  ROLES.HOSPITAL_ADMIN,
+  ROLES.HOSPITAL_MANAGER,
+  ROLES.SUPER_ADMIN,
+] as const;
+
+/** Lab worklist: lab techs plus clinical staff. Pharmacist is excluded. */
+const LAB_ORDER_READ_ROLES = [
+  ROLES.LAB_TECHNICIAN,
+  ROLES.DOCTOR,
+  ROLES.NURSE,
+  ROLES.HOSPITAL_ADMIN,
+  ROLES.HOSPITAL_MANAGER,
+  ROLES.SUPER_ADMIN,
+] as const;
+
 @Resolver()
 @UseGuards(GqlAuthGuard, RolesGuard)
 export class ClinicalResolver {
   constructor(private readonly clinicalService: ClinicalService) {}
 
   @Query(() => [LabOrderType])
+  @Roles(...LAB_ORDER_READ_ROLES)
   @Permissions(PERMISSIONS.PATIENTS_READ)
   async labOrders(
     @CurrentUser() user: AuthenticatedUser,
@@ -59,6 +80,7 @@ export class ClinicalResolver {
   }
 
   @Query(() => [VitalSignType])
+  @Roles(...CHART_READ_ROLES)
   @Permissions(PERMISSIONS.PATIENTS_READ)
   async vitalSigns(
     @CurrentUser() user: AuthenticatedUser,
@@ -73,6 +95,7 @@ export class ClinicalResolver {
   }
 
   @Query(() => [ClinicalNoteType])
+  @Roles(...CHART_READ_ROLES)
   @Permissions(PERMISSIONS.PATIENTS_READ)
   async clinicalNotes(
     @CurrentUser() user: AuthenticatedUser,
@@ -90,6 +113,7 @@ export class ClinicalResolver {
   }
 
   @Query(() => [DiagnosisType])
+  @Roles(...CHART_READ_ROLES)
   @Permissions(PERMISSIONS.PATIENTS_READ)
   async diagnoses(
     @CurrentUser() user: AuthenticatedUser,
@@ -104,6 +128,7 @@ export class ClinicalResolver {
   }
 
   @Query(() => [PrescriptionType])
+  @Roles(...CHART_READ_ROLES)
   @Permissions(PERMISSIONS.PATIENTS_READ)
   async prescriptions(
     @CurrentUser() user: AuthenticatedUser,

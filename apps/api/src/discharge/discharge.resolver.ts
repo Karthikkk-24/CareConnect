@@ -16,12 +16,23 @@ import {
   UpdateFollowUpStatusInput,
 } from './discharge.types';
 
+/** Chart reads: clinical staff, not pharmacist or lab_technician. */
+const CHART_READ_ROLES = [
+  ROLES.DOCTOR,
+  ROLES.NURSE,
+  ROLES.RECEPTIONIST,
+  ROLES.HOSPITAL_ADMIN,
+  ROLES.HOSPITAL_MANAGER,
+  ROLES.SUPER_ADMIN,
+] as const;
+
 @Resolver()
 @UseGuards(GqlAuthGuard, RolesGuard)
 export class DischargeResolver {
   constructor(private readonly dischargeService: DischargeService) {}
 
   @Query(() => [FollowUpType])
+  @Roles(...CHART_READ_ROLES)
   @Permissions(PERMISSIONS.PATIENTS_READ)
   async followUps(
     @CurrentUser() user: AuthenticatedUser,
@@ -36,6 +47,7 @@ export class DischargeResolver {
   }
 
   @Query(() => [DischargeType])
+  @Roles(...CHART_READ_ROLES)
   @Permissions(PERMISSIONS.PATIENTS_READ)
   async discharges(
     @CurrentUser() user: AuthenticatedUser,

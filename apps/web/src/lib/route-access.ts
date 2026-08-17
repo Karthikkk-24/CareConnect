@@ -13,10 +13,12 @@ type RouteRule = {
   prefix: string;
   anyPermissions?: string[];
   anyRoles?: string[];
+  /** When both are set, require permission AND role (e.g. patient directory). */
+  requireAll?: boolean;
 };
 
-/** Roles allowed to create/edit/import patient charts (excludes pharmacist). */
-const PATIENT_DEMOGRAPHIC_WRITE_ROLES = [
+/** Clinical staff who may browse/edit patient charts (excludes pharmacist, lab_technician). */
+const CLINICAL_STAFF_ROLES = [
   'doctor',
   'nurse',
   'receptionist',
@@ -32,13 +34,13 @@ const WRITE_ROUTE_RULES: (RouteRule & { requireAll?: boolean })[] = [
   {
     prefix: '/patients/import',
     anyPermissions: ['patients:write'],
-    anyRoles: PATIENT_DEMOGRAPHIC_WRITE_ROLES,
+    anyRoles: CLINICAL_STAFF_ROLES,
     requireAll: true,
   },
   {
     prefix: '/patients/new',
     anyPermissions: ['patients:write'],
-    anyRoles: PATIENT_DEMOGRAPHIC_WRITE_ROLES,
+    anyRoles: CLINICAL_STAFF_ROLES,
     requireAll: true,
   },
   { prefix: '/staff/new', anyPermissions: ['staff:write'] },
@@ -54,7 +56,7 @@ const WRITE_ROUTE_PATTERNS: {
   {
     pattern: /^\/patients\/[^/]+\/edit$/,
     anyPermissions: ['patients:write'],
-    anyRoles: PATIENT_DEMOGRAPHIC_WRITE_ROLES,
+    anyRoles: CLINICAL_STAFF_ROLES,
     requireAll: true,
   },
   {
@@ -68,7 +70,12 @@ const WRITE_ROUTE_PATTERNS: {
 
 const ROUTE_RULES: RouteRule[] = [
   { prefix: '/staff', anyPermissions: ['staff:read'] },
-  { prefix: '/patients', anyPermissions: ['patients:read'] },
+  {
+    prefix: '/patients',
+    anyPermissions: ['patients:read'],
+    anyRoles: CLINICAL_STAFF_ROLES,
+    requireAll: true,
+  },
   { prefix: '/appointments', anyPermissions: ['appointments:read'] },
   { prefix: '/admissions', anyPermissions: ['patients:read'] },
   { prefix: '/wards', anyPermissions: ['hospitals:read', 'patients:read'] },
@@ -166,11 +173,7 @@ export function canAccessRoute(pathname: string, ctx: AccessContext): boolean {
   );
   if (!rule) return false;
 
-  if (rule.anyRoles?.some((role) => ctx.roles.includes(role))) return true;
-  if (rule.anyPermissions?.some((perm) => ctx.permissions.includes(perm))) {
-    return true;
-  }
-  return false;
+  return hasWriteAccess(rule, ctx);
 }
 
 /** Whether a nav href should be shown for this user */
