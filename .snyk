@@ -1,0 +1,8 @@
+# Snyk (https://snyk.io) policy file
+#
+# `legacy/` is an abandoned Vite + React prototype (out of support). Do not
+# expand Snyk to scan it — high false-positive risk from unmaintained deps.
+# See CONTRIBUTING.md.
+exclude:
+  global:
+    - legacy/**

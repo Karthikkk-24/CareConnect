@@ -73,8 +73,14 @@ Do not commit secrets (`.env`, keys, credentials).
 Dependency scanning:
 
 ```bash
-snyk test --all-projects
+snyk test --all-projects --exclude=legacy
 ```
+
+`legacy/` is an abandoned Vite + React prototype: **out of support**, not in the
+pnpm workspace, and **excluded from Snyk**. Do not add it to the workspace or
+to Snyk monitoring (high false-positive risk from unmaintained deps). Path
+excludes for Snyk Code/Secrets live in `.snyk`; `--exclude=legacy` keeps
+`snyk test --all-projects` from treating `legacy/package.json` as a project.
 
 ### Enabling Snyk Code (SAST)
 
@@ -108,5 +114,6 @@ File any new code findings as GitHub issues with severity P0–P4.
 - `packages/types` — Shared types and Zod schemas
 - `supabase/migrations` — Neon-compatible SQL migrations
 - `docs/` — Architecture and API documentation
+- `legacy/` — Abandoned Vite prototype (out of support; excluded from Snyk)
 
 See [docs/architecture.md](docs/architecture.md) and [docs/api.md](docs/api.md) for deeper context.
