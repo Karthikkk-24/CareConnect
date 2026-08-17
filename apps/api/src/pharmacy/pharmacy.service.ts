@@ -13,10 +13,16 @@ import { AuditService } from '../audit/audit.service';
 import { roundMoney } from '../common/money';
 import {
   DispensePrescriptionInput,
+  PendingPrescriptionsPageType,
   PendingPrescriptionType,
   PharmacyStockType,
   UpsertPharmacyStockInput,
 } from './pharmacy.types';
+import {
+  paginatedList,
+  resolvePagination,
+  type PaginationInput,
+} from '../common/dto/pagination.dto';
 
 @Injectable()
 export class PharmacyService {
@@ -206,8 +212,10 @@ export class PharmacyService {
 
   async listPendingPrescriptions(
     hospitalId: string,
-  ): Promise<PendingPrescriptionType[]> {
-    const prescriptions = await this.prescriptionsRepo
+    pagination?: PaginationInput,
+  ): Promise<PendingPrescriptionsPageType> {
+    const { page, limit, skip } = resolvePagination(pagination);
+    const [prescriptions, total] = await this.prescriptionsRepo
       .createQueryBuilder('prescription')
       .innerJoinAndSelect('prescription.patient', 'patient')
       .leftJoinAndSelect('prescription.items', 'items')
@@ -215,10 +223,16 @@ export class PharmacyService {
       .andWhere('prescription.status = :status', { status: 'pending' })
       .andWhere('patient.deleted_at IS NULL')
       .orderBy('prescription.created_at', 'ASC')
-      .take(200)
-      .getMany();
-    return prescriptions.map((prescription) =>
-      this.toPendingPrescriptionType(prescription),
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
+    return paginatedList(
+      prescriptions.map((prescription) =>
+        this.toPendingPrescriptionType(prescription),
+      ),
+      total,
+      page,
+      limit,
     );
   }
 

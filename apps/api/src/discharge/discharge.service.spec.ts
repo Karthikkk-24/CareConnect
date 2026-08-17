@@ -43,6 +43,7 @@ describe('DischargeService', () => {
     create: jest.fn(),
     find: jest.fn(),
     findOne: jest.fn(),
+    createQueryBuilder: jest.fn(),
     manager: {
       transaction: jest.fn((cb: (m: typeof followManager) => unknown) =>
         Promise.resolve(cb(followManager)),
@@ -334,6 +335,31 @@ describe('DischargeService', () => {
           actor,
         ),
       ).rejects.toThrow(/Cannot reschedule a completed follow-up/);
+    });
+  });
+
+  describe('followUps pagination', () => {
+    it('applies skip/take and returns hasMore', async () => {
+      const qb = {
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 51]),
+      };
+      followUpsRepo.createQueryBuilder.mockReturnValue(qb);
+
+      const result = await service.followUps('hospital-a', undefined, {
+        page: 1,
+        limit: 50,
+      });
+
+      expect(qb.take).toHaveBeenCalledWith(50);
+      expect(result.hasMore).toBe(true);
+      expect(result.total).toBe(51);
     });
   });
 });

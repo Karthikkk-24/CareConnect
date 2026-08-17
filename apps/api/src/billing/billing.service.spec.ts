@@ -35,6 +35,7 @@ describe('BillingService', () => {
     find: jest.fn(),
     save: jest.fn(),
     create: jest.fn(),
+    createQueryBuilder: jest.fn(),
   };
   const invoiceItemsRepo = { save: jest.fn(), create: jest.fn() };
   const paymentsRepo = {
@@ -197,6 +198,33 @@ describe('BillingService', () => {
       expect(qb.innerJoin).toHaveBeenCalledWith('payment.invoice', 'invoice');
       expect(qb.innerJoin).toHaveBeenCalledWith('invoice.patient', 'patient');
       expect(qb.andWhere).toHaveBeenCalledWith('patient.deleted_at IS NULL');
+    });
+  });
+
+  describe('listInvoices pagination', () => {
+    it('returns page metadata instead of silently truncating', async () => {
+      const qb = {
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 201]),
+      };
+      invoicesRepo.createQueryBuilder.mockReturnValue(qb);
+
+      const result = await service.listInvoices('hospital-a', {
+        page: 1,
+        limit: 50,
+      });
+
+      expect(qb.take).toHaveBeenCalledWith(50);
+      expect(qb.take).not.toHaveBeenCalledWith(200);
+      expect(result.hasMore).toBe(true);
+      expect(result.total).toBe(201);
+      expect(result.limit).toBe(50);
     });
   });
 });

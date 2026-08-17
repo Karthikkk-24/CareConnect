@@ -12,9 +12,11 @@ import { HospitalContextService } from '../common/hospital-context.service';
 import {
   CreateInvoiceInput,
   InvoiceType,
+  InvoicesPageType,
   RecordPaymentInput,
   BillingPatientLookupType,
 } from './billing.types';
+import { PaginationInput } from '../common/dto/pagination.dto';
 
 /**
  * Billing resolvers: finance roles only.
@@ -37,19 +39,21 @@ export class BillingResolver {
     private readonly hospitalContext: HospitalContextService,
   ) {}
 
-  @Query(() => [InvoiceType])
+  @Query(() => InvoicesPageType)
   @Roles(...BILLING_ROLES)
   @Permissions(PERMISSIONS.BILLING_READ)
   async invoices(
     @CurrentUser() user: AuthenticatedUser,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
-  ): Promise<InvoiceType[]> {
+    @Args('pagination', { nullable: true, type: () => PaginationInput })
+    pagination?: PaginationInput,
+  ): Promise<InvoicesPageType> {
     const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
       { write: false },
     );
-    return this.billingService.listInvoices(resolvedHospitalId);
+    return this.billingService.listInvoices(resolvedHospitalId, pagination);
   }
 
   @Query(() => [BillingPatientLookupType])

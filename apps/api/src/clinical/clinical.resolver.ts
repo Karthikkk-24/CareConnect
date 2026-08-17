@@ -18,12 +18,14 @@ import {
   CreatePrescriptionInput,
   CreateVitalInput,
   DiagnosisType,
+  LabOrdersPageType,
   LabOrderType,
   LabResultType,
   PrescriptionType,
   UpdateLabOrderStatusInput,
   VitalSignType,
 } from './clinical.types';
+import { PaginationInput } from '../common/dto/pagination.dto';
 import { UseGuards } from '@nestjs/common';
 
 const CLINICIAN_ROLES = [
@@ -68,20 +70,26 @@ export class ClinicalResolver {
     private readonly hospitalContext: HospitalContextService,
   ) {}
 
-  @Query(() => [LabOrderType])
+  @Query(() => LabOrdersPageType)
   @Roles(...LAB_ORDER_READ_ROLES)
   @Permissions(PERMISSIONS.PATIENTS_READ)
   async labOrders(
     @CurrentUser() user: AuthenticatedUser,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
     @Args('status', { nullable: true }) status?: string,
-  ): Promise<LabOrderType[]> {
+    @Args('pagination', { nullable: true, type: () => PaginationInput })
+    pagination?: PaginationInput,
+  ): Promise<LabOrdersPageType> {
     const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
       { write: false },
     );
-    return this.clinicalService.listLabOrders(resolvedHospitalId, status);
+    return this.clinicalService.listLabOrders(
+      resolvedHospitalId,
+      status,
+      pagination,
+    );
   }
 
   @Query(() => [VitalSignType])

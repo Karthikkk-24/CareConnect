@@ -9,6 +9,7 @@ import { DashboardHeader } from '@/components/layout/dashboard-header';
 import {
   APPOINTMENTS_QUERY,
   CANCEL_APPOINTMENT_MUTATION,
+  LIST_PAGE_LIMIT,
   ME_QUERY,
   RESCHEDULE_APPOINTMENT_MUTATION,
   UPDATE_APPOINTMENT_STATUS_MUTATION,
@@ -61,10 +62,11 @@ export default function AppointmentsPage() {
       ['hospital_admin', 'hospital_manager', 'super_admin', 'receptionist', 'nurse'].includes(r),
     );
 
-  const { data, loading, error, refetch } = useQuery(APPOINTMENTS_QUERY, {
+  const { data, loading, error, refetch, fetchMore } = useQuery(APPOINTMENTS_QUERY, {
     variables: {
       hospitalId,
       date: selectedDate,
+      pagination: { page: 1, limit: LIST_PAGE_LIMIT },
       ...(isDoctorOnly && me?.id ? { doctorId: me.id } : {}),
     },
     skip: !hospitalId,
@@ -83,7 +85,8 @@ export default function AppointmentsPage() {
     },
   });
 
-  const appointments = data?.appointments ?? [];
+  const appointments = data?.appointments?.items ?? [];
+  const hasMore = Boolean(data?.appointments?.hasMore);
 
   const handleStatus = async (id: string, status: string) => {
     setStatusError('');
@@ -267,6 +270,39 @@ export default function AppointmentsPage() {
             )}
           </div>
         )}
+        {hasMore ? (
+          <div className="border-t border-white/30 px-6 py-4 text-center">
+            <ClayButton
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={() =>
+                void fetchMore({
+                  variables: {
+                    pagination: {
+                      page: (data?.appointments?.page ?? 1) + 1,
+                      limit: LIST_PAGE_LIMIT,
+                    },
+                  },
+                  updateQuery: (prev, { fetchMoreResult }) => {
+                    if (!fetchMoreResult) return prev;
+                    return {
+                      appointments: {
+                        ...fetchMoreResult.appointments,
+                        items: [
+                          ...(prev.appointments?.items ?? []),
+                          ...(fetchMoreResult.appointments?.items ?? []),
+                        ],
+                      },
+                    };
+                  },
+                })
+              }
+            >
+              Load more
+            </ClayButton>
+          </div>
+        ) : null}
       </ClayCard>
     </div>
   );

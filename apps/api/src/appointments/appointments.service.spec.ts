@@ -164,8 +164,9 @@ describe('AppointmentsService status machine', () => {
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
         take: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([]),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
       };
       appointmentsRepo.createQueryBuilder.mockReturnValue(qb);
       return qb;
@@ -209,6 +210,47 @@ describe('AppointmentsService status machine', () => {
         'appointment.doctor_id = :doctorId',
         expect.anything(),
       );
+    });
+
+    it('applies skip/take from pagination and returns page info', async () => {
+      const qb = listQb();
+      qb.getManyAndCount.mockResolvedValue([[], 120]);
+
+      const result = await service.findAll(
+        'hospital-a',
+        undefined,
+        undefined,
+        undefined,
+        actor,
+        { page: 2, limit: 50 },
+      );
+
+      expect(qb.skip).toHaveBeenCalledWith(50);
+      expect(qb.take).toHaveBeenCalledWith(50);
+      expect(result).toEqual(
+        expect.objectContaining({
+          items: [],
+          total: 120,
+          page: 2,
+          limit: 50,
+          hasMore: true,
+        }),
+      );
+    });
+
+    it('caps the page size at 100', async () => {
+      const qb = listQb();
+
+      await service.findAll(
+        'hospital-a',
+        undefined,
+        undefined,
+        undefined,
+        actor,
+        { page: 1, limit: 500 },
+      );
+
+      expect(qb.take).toHaveBeenCalledWith(100);
     });
   });
 

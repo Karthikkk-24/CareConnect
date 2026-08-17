@@ -11,6 +11,7 @@ import {
   COMPLETE_LAB_RESULT_MUTATION,
   CREATE_LAB_ORDER_MUTATION,
   LAB_ORDERS_QUERY,
+  LIST_PAGE_LIMIT,
   ME_QUERY,
   PATIENTS_QUERY,
   UPDATE_LAB_ORDER_STATUS_MUTATION,
@@ -79,8 +80,12 @@ export default function LabPage() {
 
   const apiBase = getApiOrigin();
 
-  const { data, loading, error: listError, refetch } = useQuery(LAB_ORDERS_QUERY, {
-    variables: { hospitalId, status: undefined },
+  const { data, loading, error: listError, refetch, fetchMore } = useQuery(LAB_ORDERS_QUERY, {
+    variables: {
+      hospitalId,
+      status: undefined,
+      pagination: { page: 1, limit: LIST_PAGE_LIMIT },
+    },
     skip: !hospitalId,
   });
 
@@ -124,7 +129,7 @@ export default function LabPage() {
     { onCompleted: () => refetch() },
   );
 
-  const orders: LabOrderRow[] = data?.labOrders ?? [];
+  const orders: LabOrderRow[] = data?.labOrders?.items ?? [];
   const pendingOrders = orders.filter(
     (o) => o.status !== 'completed' && o.status !== 'cancelled',
   );
@@ -444,6 +449,40 @@ export default function LabPage() {
               ))}
             </div>
           )}
+          {data?.labOrders?.hasMore ? (
+            <div className="border-t border-white/30 px-6 py-4 text-center">
+              <ClayButton
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={() =>
+                  void fetchMore({
+                    variables: {
+                      hospitalId,
+                      pagination: {
+                        page: (data?.labOrders?.page ?? 1) + 1,
+                        limit: LIST_PAGE_LIMIT,
+                      },
+                    },
+                    updateQuery: (prev, { fetchMoreResult }) => {
+                      if (!fetchMoreResult) return prev;
+                      return {
+                        labOrders: {
+                          ...fetchMoreResult.labOrders,
+                          items: [
+                            ...(prev.labOrders?.items ?? []),
+                            ...(fetchMoreResult.labOrders?.items ?? []),
+                          ],
+                        },
+                      };
+                    },
+                  })
+                }
+              >
+                Load more
+              </ClayButton>
+            </div>
+          ) : null}
         </ClayCard>
 
         {canWriteLab ? (

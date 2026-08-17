@@ -35,6 +35,7 @@ describe('PharmacyService', () => {
     find: jest.fn(),
     findOne: jest.fn(),
     save: jest.fn(),
+    createQueryBuilder: jest.fn(),
     manager: {
       transaction: jest.fn((cb: (m: typeof manager) => unknown) =>
         Promise.resolve(cb(manager)),
@@ -436,6 +437,36 @@ describe('PharmacyService', () => {
 
       expect(existing.quantity).toBe('1.00');
       expect(result.quantity).toBe(1);
+    });
+  });
+
+  describe('listPendingPrescriptions pagination', () => {
+    it('pages pending prescriptions instead of a silent 200 cap', async () => {
+      const qb = {
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 12]),
+      };
+      prescriptionsRepo.createQueryBuilder.mockReturnValue(qb);
+
+      const result = await service.listPendingPrescriptions('hospital-a');
+
+      expect(qb.take).toHaveBeenCalledWith(50);
+      expect(qb.take).not.toHaveBeenCalledWith(200);
+      expect(result).toEqual(
+        expect.objectContaining({
+          items: [],
+          total: 12,
+          page: 1,
+          limit: 50,
+          hasMore: false,
+        }),
+      );
     });
   });
 });

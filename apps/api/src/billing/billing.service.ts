@@ -18,11 +18,17 @@ import { AuditService } from '../audit/audit.service';
 import {
   CreateInvoiceInput,
   InvoiceItemType,
+  InvoicesPageType,
   InvoiceType,
   PaymentType,
   RecordPaymentInput,
   BillingPatientLookupType,
 } from './billing.types';
+import {
+  paginatedList,
+  resolvePagination,
+  type PaginationInput,
+} from '../common/dto/pagination.dto';
 
 @Injectable()
 export class BillingService {
@@ -222,18 +228,30 @@ export class BillingService {
     return this.toInvoiceType(invoice);
   }
 
-  async listInvoices(hospitalId: string): Promise<InvoiceType[]> {
-    const invoices = await this.invoicesRepo
+  async listInvoices(
+    hospitalId: string,
+    pagination?: PaginationInput,
+  ): Promise<InvoicesPageType> {
+    const { page, limit, skip } = resolvePagination(pagination);
+    const qb = this.invoicesRepo
       .createQueryBuilder('invoice')
       .innerJoinAndSelect('invoice.patient', 'patient')
       .leftJoinAndSelect('invoice.items', 'items')
       .leftJoinAndSelect('invoice.payments', 'payments')
       .where('invoice.hospital_id = :hospitalId', { hospitalId })
       .andWhere('patient.deleted_at IS NULL')
-      .orderBy('invoice.created_at', 'DESC')
-      .take(200)
-      .getMany();
-    return invoices.map((invoice) => this.toInvoiceType(invoice));
+      .orderBy('invoice.created_at', 'DESC');
+
+    const [invoices, total] = await qb
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
+    return paginatedList(
+      invoices.map((invoice) => this.toInvoiceType(invoice)),
+      total,
+      page,
+      limit,
+    );
   }
 
   /**

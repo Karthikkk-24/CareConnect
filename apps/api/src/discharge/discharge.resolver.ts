@@ -13,10 +13,12 @@ import {
   CreateDischargeInput,
   CreateFollowUpInput,
   DischargeType,
+  FollowUpsPageType,
   FollowUpType,
   RescheduleFollowUpInput,
   UpdateFollowUpStatusInput,
 } from './discharge.types';
+import { PaginationInput } from '../common/dto/pagination.dto';
 
 /** Chart reads: clinical staff, not pharmacist or lab_technician. */
 const CHART_READ_ROLES = [
@@ -36,20 +38,26 @@ export class DischargeResolver {
     private readonly hospitalContext: HospitalContextService,
   ) {}
 
-  @Query(() => [FollowUpType])
+  @Query(() => FollowUpsPageType)
   @Roles(...CHART_READ_ROLES)
   @Permissions(PERMISSIONS.PATIENTS_READ)
   async followUps(
     @CurrentUser() user: AuthenticatedUser,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
     @Args('status', { nullable: true }) status?: string,
-  ): Promise<FollowUpType[]> {
+    @Args('pagination', { nullable: true, type: () => PaginationInput })
+    pagination?: PaginationInput,
+  ): Promise<FollowUpsPageType> {
     const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
       { write: false },
     );
-    return this.dischargeService.followUps(resolvedHospitalId, status);
+    return this.dischargeService.followUps(
+      resolvedHospitalId,
+      status,
+      pagination,
+    );
   }
 
   @Query(() => [DischargeType])

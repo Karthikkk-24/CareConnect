@@ -33,12 +33,18 @@ import {
   CreatePrescriptionInput,
   CreateVitalInput,
   DiagnosisType,
+  LabOrdersPageType,
   LabOrderType,
   LabResultType,
   PrescriptionType,
   UpdateLabOrderStatusInput,
   VitalSignType,
 } from './clinical.types';
+import {
+  paginatedList,
+  resolvePagination,
+  type PaginationInput,
+} from '../common/dto/pagination.dto';
 
 /**
  * Lab order status machine:
@@ -653,11 +659,13 @@ export class ClinicalService {
   async listLabOrders(
     hospitalId: string,
     status?: string,
-  ): Promise<LabOrderType[]> {
+    pagination?: PaginationInput,
+  ): Promise<LabOrdersPageType> {
     if (status && !(status in LAB_ALLOWED_TRANSITIONS)) {
       throw new BadRequestException(`Invalid lab order status "${status}"`);
     }
 
+    const { page, limit, skip } = resolvePagination(pagination);
     const qb = this.labOrdersRepo
       .createQueryBuilder('order')
       .innerJoinAndSelect('order.patient', 'patient')
@@ -667,10 +675,11 @@ export class ClinicalService {
     if (status) {
       qb.andWhere('order.status = :status', { status });
     }
-    const orders = await qb
+    const [orders, total] = await qb
       .orderBy('order.created_at', 'DESC')
-      .take(200)
-      .getMany();
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
 
     const completedOrderIds = orders
       .filter((o) => o.status === 'completed')
@@ -688,12 +697,17 @@ export class ClinicalService {
       }
     }
 
-    return orders.map((o) => ({
-      ...this.toLabOrderType(o),
-      result: resultsByOrderId.has(o.id)
-        ? this.toLabResultType(resultsByOrderId.get(o.id)!)
-        : undefined,
-    }));
+    return paginatedList(
+      orders.map((o) => ({
+        ...this.toLabOrderType(o),
+        result: resultsByOrderId.has(o.id)
+          ? this.toLabResultType(resultsByOrderId.get(o.id)!)
+          : undefined,
+      })),
+      total,
+      page,
+      limit,
+    );
   }
 
   async listVitalSigns(

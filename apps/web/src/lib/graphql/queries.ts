@@ -451,25 +451,45 @@ export const DASHBOARD_STATS_QUERY = gql`
   }
 `;
 
+export const LIST_PAGE_LIMIT = 50;
+
 export const APPOINTMENTS_QUERY = gql`
-  query Appointments($hospitalId: String, $date: String, $status: String, $doctorId: String) {
-    appointments(hospitalId: $hospitalId, date: $date, status: $status, doctorId: $doctorId) {
-      id
-      patientId
-      patient {
+  query Appointments(
+    $hospitalId: String
+    $date: String
+    $status: String
+    $doctorId: String
+    $pagination: PaginationInput
+  ) {
+    appointments(
+      hospitalId: $hospitalId
+      date: $date
+      status: $status
+      doctorId: $doctorId
+      pagination: $pagination
+    ) {
+      items {
         id
-        fullName
+        patientId
+        patient {
+          id
+          fullName
+        }
+        doctorId
+        doctor {
+          id
+          fullName
+        }
+        scheduledAt
+        reason
+        status
+        notes
+        createdAt
       }
-      doctorId
-      doctor {
-        id
-        fullName
-      }
-      scheduledAt
-      reason
-      status
-      notes
-      createdAt
+      total
+      page
+      limit
+      hasMore
     }
   }
 `;
@@ -707,26 +727,32 @@ export const CREATE_PRESCRIPTION_MUTATION = gql`
 `;
 
 export const LAB_ORDERS_QUERY = gql`
-  query LabOrders($hospitalId: String, $status: String) {
-    labOrders(hospitalId: $hospitalId, status: $status) {
-      id
-      patientId
-      patient {
+  query LabOrders($hospitalId: String, $status: String, $pagination: PaginationInput) {
+    labOrders(hospitalId: $hospitalId, status: $status, pagination: $pagination) {
+      items {
         id
-        fullName
+        patientId
+        patient {
+          id
+          fullName
+        }
+        testName
+        status
+        notes
+        createdAt
+        result {
+          id
+          resultValue
+          referenceRange
+          unit
+          resultFileUrl
+          completedAt
+        }
       }
-      testName
-      status
-      notes
-      createdAt
-      result {
-        id
-        resultValue
-        referenceRange
-        unit
-        resultFileUrl
-        completedAt
-      }
+      total
+      page
+      limit
+      hasMore
     }
   }
 `;
@@ -802,19 +828,25 @@ export const CREATE_DISCHARGE_MUTATION = gql`
 `;
 
 export const FOLLOW_UPS_QUERY = gql`
-  query FollowUps($hospitalId: String, $status: String) {
-    followUps(hospitalId: $hospitalId, status: $status) {
-      id
-      patientId
-      patientName
-      doctorId
-      doctorName
-      dischargeId
-      scheduledAt
-      type
-      status
-      notes
-      createdAt
+  query FollowUps($hospitalId: String, $status: String, $pagination: PaginationInput) {
+    followUps(hospitalId: $hospitalId, status: $status, pagination: $pagination) {
+      items {
+        id
+        patientId
+        patientName
+        doctorId
+        doctorName
+        dischargeId
+        scheduledAt
+        type
+        status
+        notes
+        createdAt
+      }
+      total
+      page
+      limit
+      hasMore
     }
   }
 `;
@@ -911,32 +943,38 @@ export const PORTAL_PATIENT_RECORDS_QUERY = gql`
 `;
 
 export const INVOICES_QUERY = gql`
-  query Invoices($hospitalId: String) {
-    invoices(hospitalId: $hospitalId) {
-      id
-      patientId
-      patient {
-        id
-        fullName
-      }
-      admissionId
-      status
-      totalAmount
-      issuedAt
-      createdAt
+  query Invoices($hospitalId: String, $pagination: PaginationInput) {
+    invoices(hospitalId: $hospitalId, pagination: $pagination) {
       items {
         id
-        description
-        quantity
-        unitPrice
-        amount
+        patientId
+        patient {
+          id
+          fullName
+        }
+        admissionId
+        status
+        totalAmount
+        issuedAt
+        createdAt
+        items {
+          id
+          description
+          quantity
+          unitPrice
+          amount
+        }
+        payments {
+          id
+          amount
+          method
+          paidAt
+        }
       }
-      payments {
-        id
-        amount
-        method
-        paidAt
-      }
+      total
+      page
+      limit
+      hasMore
     }
   }
 `;
@@ -1057,26 +1095,32 @@ export const PHARMACY_STOCK_QUERY = gql`
 `;
 
 export const PENDING_PRESCRIPTIONS_QUERY = gql`
-  query PendingPrescriptions($hospitalId: String) {
-    pendingPrescriptions(hospitalId: $hospitalId) {
-      id
-      patientId
-      patient {
-        id
-        fullName
-      }
-      status
-      notes
-      createdAt
+  query PendingPrescriptions($hospitalId: String, $pagination: PaginationInput) {
+    pendingPrescriptions(hospitalId: $hospitalId, pagination: $pagination) {
       items {
         id
-        drugName
-        quantity
-        dosage
-        frequency
-        duration
-        instructions
+        patientId
+        patient {
+          id
+          fullName
+        }
+        status
+        notes
+        createdAt
+        items {
+          id
+          drugName
+          quantity
+          dosage
+          frequency
+          duration
+          instructions
+        }
       }
+      total
+      page
+      limit
+      hasMore
     }
   }
 `;
