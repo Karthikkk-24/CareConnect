@@ -126,12 +126,14 @@ export class RescheduleAppointmentInput {
   @IsDateString()
   scheduledAt: string;
 
+  @MaxLength(2000)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   @MinLength(1)
   reason?: string;
 
+  @MaxLength(2000)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()

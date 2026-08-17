@@ -190,6 +190,7 @@ export class RescheduleFollowUpInput {
   @IsDateString()
   scheduledAt: string;
 
+  @MaxLength(2000)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
