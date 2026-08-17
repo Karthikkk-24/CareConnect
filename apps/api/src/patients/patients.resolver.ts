@@ -20,12 +20,23 @@ import {
   UpdatePatientInput,
 } from './patients.types';
 
+/** Chart/directory reads: clinical staff, not pharmacist or lab_technician. */
+const CHART_READ_ROLES = [
+  ROLES.DOCTOR,
+  ROLES.NURSE,
+  ROLES.RECEPTIONIST,
+  ROLES.HOSPITAL_ADMIN,
+  ROLES.HOSPITAL_MANAGER,
+  ROLES.SUPER_ADMIN,
+] as const;
+
 @Resolver()
 @UseGuards(GqlAuthGuard, RolesGuard)
 export class PatientsResolver {
   constructor(private readonly patientsService: PatientsService) {}
 
   @Query(() => PatientsPageType)
+  @Roles(...CHART_READ_ROLES)
   @Permissions(PERMISSIONS.PATIENTS_READ)
   async patients(
     @CurrentUser() user: AuthenticatedUser,
@@ -47,6 +58,7 @@ export class PatientsResolver {
   }
 
   @Query(() => PatientDetailType)
+  @Roles(...CHART_READ_ROLES)
   @Permissions(PERMISSIONS.PATIENTS_READ)
   async patient(
     @CurrentUser() user: AuthenticatedUser,

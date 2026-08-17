@@ -1,13 +1,12 @@
 import { UseGuards } from '@nestjs/common';
 import { Args, Int, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { PERMISSIONS } from '@careconnect/types';
+import { PERMISSIONS, ROLES } from '@careconnect/types';
 import { GqlAuthGuard } from '../auth/gql-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { Permissions } from '../rbac/permissions.decorator';
 import { Roles } from '../rbac/roles.decorator';
 import { RolesGuard } from '../rbac/roles.guard';
-import { STAFF_ROLES } from '../rbac/staff-roles';
 import { BillingService } from './billing.service';
 import {
   CreateInvoiceInput,
@@ -16,13 +15,26 @@ import {
   BillingPatientLookupType,
 } from './billing.types';
 
+/**
+ * Billing resolvers: finance roles only.
+ * Seed 002 grants billing:read to accountant/hospital_admin/super_admin.
+ * Receptionist does not have billing:read. Pharmacist is excluded (#282).
+ * hospital_manager is listed for defense in depth even without the slug.
+ */
+const BILLING_ROLES = [
+  ROLES.ACCOUNTANT,
+  ROLES.HOSPITAL_ADMIN,
+  ROLES.HOSPITAL_MANAGER,
+  ROLES.SUPER_ADMIN,
+] as const;
+
 @Resolver()
 @UseGuards(GqlAuthGuard, RolesGuard)
 export class BillingResolver {
   constructor(private readonly billingService: BillingService) {}
 
   @Query(() => [InvoiceType])
-  @Roles(...STAFF_ROLES)
+  @Roles(...BILLING_ROLES)
   @Permissions(PERMISSIONS.BILLING_READ)
   async invoices(
     @CurrentUser() user: AuthenticatedUser,
@@ -36,7 +48,7 @@ export class BillingResolver {
   }
 
   @Query(() => [BillingPatientLookupType])
-  @Roles(...STAFF_ROLES)
+  @Roles(...BILLING_ROLES)
   @Permissions(PERMISSIONS.BILLING_READ)
   async billingPatientSearch(
     @CurrentUser() user: AuthenticatedUser,
@@ -56,7 +68,7 @@ export class BillingResolver {
   }
 
   @Query(() => InvoiceType)
-  @Roles(...STAFF_ROLES)
+  @Roles(...BILLING_ROLES)
   @Permissions(PERMISSIONS.BILLING_READ)
   async invoice(
     @CurrentUser() user: AuthenticatedUser,
@@ -71,7 +83,7 @@ export class BillingResolver {
   }
 
   @Mutation(() => InvoiceType)
-  @Roles(...STAFF_ROLES)
+  @Roles(...BILLING_ROLES)
   @Permissions(PERMISSIONS.BILLING_WRITE)
   async createInvoice(
     @CurrentUser() user: AuthenticatedUser,
@@ -86,7 +98,7 @@ export class BillingResolver {
   }
 
   @Mutation(() => InvoiceType)
-  @Roles(...STAFF_ROLES)
+  @Roles(...BILLING_ROLES)
   @Permissions(PERMISSIONS.BILLING_WRITE)
   async recordPayment(
     @CurrentUser() user: AuthenticatedUser,
@@ -101,7 +113,7 @@ export class BillingResolver {
   }
 
   @Mutation(() => InvoiceType)
-  @Roles(...STAFF_ROLES)
+  @Roles(...BILLING_ROLES)
   @Permissions(PERMISSIONS.BILLING_WRITE)
   async voidInvoice(
     @CurrentUser() user: AuthenticatedUser,
