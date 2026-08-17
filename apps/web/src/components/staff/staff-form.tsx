@@ -32,6 +32,7 @@ export function StaffForm({
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm<StaffInput>({
     resolver: zodResolver(staffSchema),
@@ -40,6 +41,8 @@ export function StaffForm({
       ...defaultValues,
     },
   });
+
+  const selectedRole = watch('roleSlug');
 
   return (
     <ClayCard className="max-w-2xl">
@@ -64,6 +67,11 @@ export function StaffForm({
                 </option>
               ))}
             </select>
+            {selectedRole === ROLES.HOSPITAL_ADMIN ? (
+              <p className="text-sm text-clay-text-muted">
+                Invite a successor. The hospital_admin role transfers when they accept.
+              </p>
+            ) : null}
           </div>
           <ClayInput label="Department" error={errors.department?.message} {...register('department')} />
           <ClayInput

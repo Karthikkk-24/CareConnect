@@ -170,7 +170,10 @@ export class AuthService {
    * Tenancy rules:
    * - Cannot switch to a different hospital once hospitalId is set (unless super_admin).
    * - Joining an existing hospital requires assignHospitalAdmin bootstrap OR invite flow.
-   * - Bootstrap admin only when that hospital has zero hospital_admin members yet.
+   * - Bootstrap admin only when that hospital has zero *active* hospital_admin
+   *   members yet (re-bootstrap after lockout). Sitting-admin succession is
+   *   StaffService.acceptInvite: the unique role transfers when the invite
+   *   is accepted, not here.
    */
   async completeOnboarding(
     actor: AuthenticatedUser,
