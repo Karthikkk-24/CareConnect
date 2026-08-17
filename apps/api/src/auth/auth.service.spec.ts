@@ -23,11 +23,39 @@ describe('AuthService', () => {
     create: jest.fn(),
     save: jest.fn(),
     update: jest.fn(),
+    createQueryBuilder: jest.fn(),
     manager: {
       transaction: jest.fn((cb: (m: typeof manager) => unknown) =>
         Promise.resolve(cb(manager)),
       ),
     },
+  };
+
+  function stubEmailLookup(user: Record<string, unknown> | null) {
+    usersRepo.createQueryBuilder.mockReturnValue({
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      getOne: jest.fn().mockResolvedValue(user),
+    });
+  }
+
+  const pendingStaff = {
+    id: 'pending-user-1',
+    authId: 'pending_abc123',
+    email: 'invited@hospital.com',
+    fullName: 'Invited Staff',
+    hospitalId: 'hospital-a',
+    isActive: true,
+    onboardingCompleted: false,
+    userRoles: [
+      {
+        hospitalId: 'hospital-a',
+        role: {
+          slug: 'nurse',
+          permissions: [{ slug: 'patients:read' }],
+        },
+      },
+    ],
   };
 
   const userRolesRepo = {
@@ -136,6 +164,60 @@ describe('AuthService', () => {
         permissions: ['patients:read'],
         onboardingCompleted: true,
       });
+    });
+
+    it('does not bind pending_* staff when email is unverified', async () => {
+      usersRepo.findOne.mockResolvedValue(null);
+      stubEmailLookup(pendingStaff);
+
+      await expect(
+        service.syncAndGetUser('user_attacker', 'invited@hospital.com', false),
+      ).rejects.toThrow(UnauthorizedException);
+      await expect(
+        service.syncAndGetUser('user_attacker', 'invited@hospital.com', false),
+      ).rejects.toThrow('Email address is not verified');
+      expect(usersRepo.update).not.toHaveBeenCalled();
+      expect(usersRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('does not bind pending_* staff when email_verified claim is missing', async () => {
+      usersRepo.findOne.mockResolvedValue(null);
+      stubEmailLookup(pendingStaff);
+
+      await expect(
+        service.syncAndGetUser('user_attacker', 'invited@hospital.com'),
+      ).rejects.toThrow('Email address is not verified');
+      expect(usersRepo.update).not.toHaveBeenCalled();
+      expect(usersRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('binds pending_* staff when email is verified', async () => {
+      usersRepo.findOne.mockResolvedValue(null);
+      stubEmailLookup({ ...pendingStaff });
+      hospitalsRepo.findOne.mockResolvedValue({
+        id: 'hospital-a',
+        isActive: true,
+      });
+
+      const result = await service.syncAndGetUser(
+        'user_clerk_invited',
+        'invited@hospital.com',
+        true,
+      );
+
+      expect(usersRepo.update).toHaveBeenCalledWith('pending-user-1', {
+        authId: 'user_clerk_invited',
+      });
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: 'pending-user-1',
+          authId: 'user_clerk_invited',
+          email: 'invited@hospital.com',
+          hospitalId: 'hospital-a',
+          roles: ['nurse'],
+        }),
+      );
+      expect(usersRepo.save).not.toHaveBeenCalled();
     });
   });
 

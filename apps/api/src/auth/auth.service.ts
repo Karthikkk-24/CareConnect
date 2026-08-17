@@ -45,13 +45,15 @@ export class AuthService {
   async syncAndGetUser(
     authId: string,
     email?: string,
+    emailVerified = false,
   ): Promise<AuthenticatedUser | null> {
     let user = await this.usersRepo.findOne({
       where: { authId },
       relations: ['userRoles', 'userRoles.role', 'userRoles.role.permissions'],
     });
 
-    // Link invited staff who were created with a different auth_id placeholder
+    // Link invited staff who were created with a different auth_id placeholder.
+    // Email uniqueness is global, so this never binds a row from another hospital.
     if (!user && email) {
       user = await this.usersRepo
         .createQueryBuilder('user')
@@ -63,9 +65,15 @@ export class AuthService {
       if (user) {
         // Only reclaim pending invite placeholders — never steal an active Clerk-linked account
         const isPending = user.authId.startsWith('pending_');
-        if (isPending || user.authId === authId) {
+        if (isPending) {
+          if (!emailVerified) {
+            // Fail closed: missing or false email_verified must not claim an invite slot
+            throw new UnauthorizedException('Email address is not verified');
+          }
           await this.usersRepo.update(user.id, { authId });
           user.authId = authId;
+        } else if (user.authId === authId) {
+          await this.usersRepo.update(user.id, { authId });
         } else {
           // Fail closed: do not create a duplicate users row for the same email
           throw new UnauthorizedException(
