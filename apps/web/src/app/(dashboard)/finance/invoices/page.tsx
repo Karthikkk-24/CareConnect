@@ -5,7 +5,7 @@ import { useQuery } from '@apollo/client';
 import { FileText, Plus } from 'lucide-react';
 import { ClayBadge, ClayButton, ClayCard } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
-import { INVOICES_QUERY, ME_QUERY } from '@/lib/graphql/queries';
+import { INVOICES_QUERY, LIST_PAGE_LIMIT, ME_QUERY } from '@/lib/graphql/queries';
 
 const statusVariant = (status: string) => {
   switch (status) {
@@ -24,13 +24,14 @@ export default function InvoicesPage() {
   const { data: meData } = useQuery(ME_QUERY);
   const hospitalId = meData?.me?.hospitalId;
 
-  const { data, loading, error, refetch } = useQuery(INVOICES_QUERY, {
-    variables: { hospitalId },
+  const { data, loading, error, refetch, fetchMore } = useQuery(INVOICES_QUERY, {
+    variables: { hospitalId, pagination: { page: 1, limit: LIST_PAGE_LIMIT } },
     skip: !hospitalId,
   });
 
-  const invoices = data?.invoices ?? [];
+  const invoices = data?.invoices?.items ?? [];
   const canWriteBilling = (meData?.me?.permissions ?? []).includes('billing:write');
+  const hasMore = Boolean(data?.invoices?.hasMore);
 
   return (
     <div>
@@ -103,6 +104,40 @@ export default function InvoicesPage() {
             )}
           </div>
         )}
+        {hasMore ? (
+          <div className="border-t border-white/30 px-6 py-4 text-center">
+            <ClayButton
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={() =>
+                void fetchMore({
+                  variables: {
+                    hospitalId,
+                    pagination: {
+                      page: (data?.invoices?.page ?? 1) + 1,
+                      limit: LIST_PAGE_LIMIT,
+                    },
+                  },
+                  updateQuery: (prev, { fetchMoreResult }) => {
+                    if (!fetchMoreResult) return prev;
+                    return {
+                      invoices: {
+                        ...fetchMoreResult.invoices,
+                        items: [
+                          ...(prev.invoices?.items ?? []),
+                          ...(fetchMoreResult.invoices?.items ?? []),
+                        ],
+                      },
+                    };
+                  },
+                })
+              }
+            >
+              Load more
+            </ClayButton>
+          </div>
+        ) : null}
       </ClayCard>
     </div>
   );

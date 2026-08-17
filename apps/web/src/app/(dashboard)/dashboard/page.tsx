@@ -9,6 +9,7 @@ import {
   ACTIVE_ADMISSIONS_QUERY,
   APPOINTMENTS_QUERY,
   DASHBOARD_STATS_QUERY,
+  LIST_PAGE_LIMIT,
   ME_QUERY,
   PATIENTS_QUERY,
   STAFF_MEMBERS_QUERY,
@@ -78,6 +79,7 @@ export default function DashboardPage() {
     variables: {
       hospitalId,
       date: today,
+      pagination: { page: 1, limit: LIST_PAGE_LIMIT },
       ...(isDoctorOnly && me?.id ? { doctorId: me.id } : {}),
     },
     skip: !hospitalId || !!statsData?.dashboardStats,
@@ -105,7 +107,7 @@ export default function DashboardPage() {
     statsError && !appointmentsData
       ? '—'
       : (statsData?.dashboardStats?.appointmentsToday ??
-        appointmentsData?.appointments?.length ??
+        appointmentsData?.appointments?.total ??
         '—');
 
   const activeAdmissions =

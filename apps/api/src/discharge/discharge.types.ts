@@ -1,4 +1,4 @@
-import { Field, ID, InputType, ObjectType } from '@nestjs/graphql';
+import { Field, ID, InputType, Int, ObjectType } from '@nestjs/graphql';
 import {
   IsDateString,
   IsIn,
@@ -86,6 +86,24 @@ export class FollowUpType {
 
   @Field()
   updatedAt: Date;
+}
+
+@ObjectType()
+export class FollowUpsPageType {
+  @Field(() => [FollowUpType])
+  items: FollowUpType[];
+
+  @Field(() => Int)
+  total: number;
+
+  @Field(() => Int)
+  page: number;
+
+  @Field(() => Int)
+  limit: number;
+
+  @Field()
+  hasMore: boolean;
 }
 
 @InputType()

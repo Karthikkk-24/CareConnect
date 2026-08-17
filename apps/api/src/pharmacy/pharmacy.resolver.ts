@@ -11,10 +11,12 @@ import { PharmacyService } from './pharmacy.service';
 import { HospitalContextService } from '../common/hospital-context.service';
 import {
   DispensePrescriptionInput,
+  PendingPrescriptionsPageType,
   PendingPrescriptionType,
   PharmacyStockType,
   UpsertPharmacyStockInput,
 } from './pharmacy.types';
+import { PaginationInput } from '../common/dto/pagination.dto';
 
 const PHARMACY_ROLES = [
   ROLES.PHARMACIST,
@@ -45,19 +47,24 @@ export class PharmacyResolver {
     return this.pharmacyService.listPharmacyStock(resolvedHospitalId);
   }
 
-  @Query(() => [PendingPrescriptionType])
+  @Query(() => PendingPrescriptionsPageType)
   @Roles(...PHARMACY_ROLES)
   @Permissions(PERMISSIONS.PATIENTS_READ)
   async pendingPrescriptions(
     @CurrentUser() user: AuthenticatedUser,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
-  ): Promise<PendingPrescriptionType[]> {
+    @Args('pagination', { nullable: true, type: () => PaginationInput })
+    pagination?: PaginationInput,
+  ): Promise<PendingPrescriptionsPageType> {
     const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
       { write: false },
     );
-    return this.pharmacyService.listPendingPrescriptions(resolvedHospitalId);
+    return this.pharmacyService.listPendingPrescriptions(
+      resolvedHospitalId,
+      pagination,
+    );
   }
 
   @Mutation(() => PharmacyStockType)

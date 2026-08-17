@@ -1,4 +1,4 @@
-import { Field, ID, InputType, ObjectType } from '@nestjs/graphql';
+import { Field, ID, InputType, Int, ObjectType } from '@nestjs/graphql';
 import {
   IsDateString,
   IsIn,
@@ -139,6 +139,24 @@ export class RescheduleAppointmentInput {
   @IsString()
   @MinLength(1)
   notes?: string;
+}
+
+@ObjectType()
+export class AppointmentsPageType {
+  @Field(() => [AppointmentType])
+  items: AppointmentType[];
+
+  @Field(() => Int)
+  total: number;
+
+  @Field(() => Int)
+  page: number;
+
+  @Field(() => Int)
+  limit: number;
+
+  @Field()
+  hasMore: boolean;
 }
 
 export { APPOINTMENT_STATUSES };

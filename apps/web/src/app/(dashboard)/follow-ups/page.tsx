@@ -8,6 +8,7 @@ import { DashboardHeader } from '@/components/layout/dashboard-header';
 import {
   CREATE_FOLLOW_UP_MUTATION,
   FOLLOW_UPS_QUERY,
+  LIST_PAGE_LIMIT,
   ME_QUERY,
   PATIENTS_QUERY,
   RESCHEDULE_FOLLOW_UP_MUTATION,
@@ -67,13 +68,8 @@ export default function FollowUpsPage() {
   const [reschedulingId, setReschedulingId] = useState<string | null>(null);
   const [rescheduleAt, setRescheduleAt] = useState('');
 
-  const {
-    data,
-    loading,
-    error: listError,
-    refetch,
-  } = useQuery(FOLLOW_UPS_QUERY, {
-    variables: { hospitalId },
+  const { data, loading, error: listError, refetch, fetchMore } = useQuery(FOLLOW_UPS_QUERY, {
+    variables: { hospitalId, pagination: { page: 1, limit: LIST_PAGE_LIMIT } },
     skip: !hospitalId,
   });
 
@@ -124,7 +120,7 @@ export default function FollowUpsPage() {
     onError: (err) => setError(err.message),
   });
 
-  const followUps = data?.followUps ?? [];
+  const followUps = data?.followUps?.items ?? [];
 
   const handleStatus = async (id: string, status: string) => {
     setError('');
@@ -390,6 +386,40 @@ export default function FollowUpsPage() {
             )}
           </div>
         )}
+        {data?.followUps?.hasMore ? (
+          <div className="border-t border-white/30 px-6 py-4 text-center">
+            <ClayButton
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={() =>
+                void fetchMore({
+                  variables: {
+                    hospitalId,
+                    pagination: {
+                      page: (data?.followUps?.page ?? 1) + 1,
+                      limit: LIST_PAGE_LIMIT,
+                    },
+                  },
+                  updateQuery: (prev, { fetchMoreResult }) => {
+                    if (!fetchMoreResult) return prev;
+                    return {
+                      followUps: {
+                        ...fetchMoreResult.followUps,
+                        items: [
+                          ...(prev.followUps?.items ?? []),
+                          ...(fetchMoreResult.followUps?.items ?? []),
+                        ],
+                      },
+                    };
+                  },
+                })
+              }
+            >
+              Load more
+            </ClayButton>
+          </div>
+        ) : null}
       </ClayCard>
     </div>
   );

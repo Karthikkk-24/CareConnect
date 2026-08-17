@@ -5,7 +5,7 @@ import { useQuery } from '@apollo/client';
 import { DollarSign, FileText, Plus } from 'lucide-react';
 import { ClayButton, ClayCard, ClayStatCard } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
-import { HOSPITAL_REPORTS_QUERY, INVOICES_QUERY, ME_QUERY } from '@/lib/graphql/queries';
+import { HOSPITAL_REPORTS_QUERY, INVOICES_QUERY, LIST_PAGE_LIMIT, ME_QUERY } from '@/lib/graphql/queries';
 import { canAccessRoute } from '@/lib/route-access';
 
 export default function FinancePage() {
@@ -13,7 +13,7 @@ export default function FinancePage() {
   const hospitalId = meData?.me?.hospitalId;
 
   const { data: invoicesData, error: invoicesError } = useQuery(INVOICES_QUERY, {
-    variables: { hospitalId },
+    variables: { hospitalId, pagination: { page: 1, limit: LIST_PAGE_LIMIT } },
     skip: !hospitalId,
   });
 
@@ -22,7 +22,7 @@ export default function FinancePage() {
     skip: !hospitalId,
   });
 
-  const invoices = invoicesData?.invoices ?? [];
+  const invoices = invoicesData?.invoices?.items ?? [];
   const outstanding = invoicesError
     ? null
     : invoices.filter(

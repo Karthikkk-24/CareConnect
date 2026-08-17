@@ -12,11 +12,17 @@ import { AuditService } from '../audit/audit.service';
 import { HospitalDoctorValidator } from '../common/hospital-doctor.validator';
 import {
   APPOINTMENT_STATUSES,
+  AppointmentsPageType,
   AppointmentType,
   CancelAppointmentInput,
   CreateAppointmentInput,
   RescheduleAppointmentInput,
 } from './appointments.types';
+import {
+  paginatedList,
+  resolvePagination,
+  type PaginationInput,
+} from '../common/dto/pagination.dto';
 
 /**
  * Appointment status machine:
@@ -192,7 +198,8 @@ export class AppointmentsService {
     doctorId?: string,
     status?: string,
     actor?: AuthenticatedUser,
-  ): Promise<AppointmentType[]> {
+    pagination?: PaginationInput,
+  ): Promise<AppointmentsPageType> {
     const effectiveDoctorId = this.resolveDoctorScope(actor, doctorId);
 
     if (status) {
@@ -231,12 +238,19 @@ export class AppointmentsService {
       );
     }
 
-    const rows = await appointments
+    const { page, limit, skip } = resolvePagination(pagination);
+    const rowsAndCount = await appointments
       .orderBy('appointment.scheduled_at', 'ASC')
-      .take(200)
-      .getMany();
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
 
-    return rows.map((a) => this.toAppointmentType(a));
+    return paginatedList(
+      rowsAndCount[0].map((a) => this.toAppointmentType(a)),
+      rowsAndCount[1],
+      page,
+      limit,
+    );
   }
 
   /**

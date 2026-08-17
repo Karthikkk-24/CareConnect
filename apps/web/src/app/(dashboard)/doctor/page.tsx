@@ -6,7 +6,7 @@ import { Calendar, Clock, FileText, FlaskConical, Users } from 'lucide-react';
 import { ClayBadge, ClayButton, ClayCard } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
 import { QueryError } from '@/components/query-error';
-import { APPOINTMENTS_QUERY, ME_QUERY } from '@/lib/graphql/queries';
+import { APPOINTMENTS_QUERY, LIST_PAGE_LIMIT, ME_QUERY } from '@/lib/graphql/queries';
 import { localDateISO } from '@/lib/local-date';
 
 function formatTime(iso: string) {
@@ -21,11 +21,16 @@ export default function DoctorDashboardPage() {
   const canWriteAppointments = (meData?.me?.permissions ?? []).includes('appointments:write');
 
   const { data, loading, error, refetch } = useQuery(APPOINTMENTS_QUERY, {
-    variables: { hospitalId, date: today, doctorId },
+    variables: {
+      hospitalId,
+      date: today,
+      doctorId,
+      pagination: { page: 1, limit: LIST_PAGE_LIMIT },
+    },
     skip: !hospitalId || !doctorId,
   });
 
-  const appointments = data?.appointments ?? [];
+  const appointments = data?.appointments?.items ?? [];
   const pending = appointments.filter(
     (a: { status: string }) => a.status === 'scheduled' || a.status === 'checked_in',
   );

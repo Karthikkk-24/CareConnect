@@ -1,4 +1,4 @@
-import { Field, Float, ID, InputType, ObjectType } from '@nestjs/graphql';
+import { Field, Float, ID, InputType, Int, ObjectType } from '@nestjs/graphql';
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -94,6 +94,24 @@ export class InvoiceType {
 
   @Field()
   updatedAt: Date;
+}
+
+@ObjectType()
+export class InvoicesPageType {
+  @Field(() => [InvoiceType])
+  items: InvoiceType[];
+
+  @Field(() => Int)
+  total: number;
+
+  @Field(() => Int)
+  page: number;
+
+  @Field(() => Int)
+  limit: number;
+
+  @Field()
+  hasMore: boolean;
 }
 
 @InputType()

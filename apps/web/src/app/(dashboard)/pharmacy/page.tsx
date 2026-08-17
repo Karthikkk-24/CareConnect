@@ -7,6 +7,7 @@ import { ClayBadge, ClayButton, ClayCard, ClayInput } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
 import {
   DISPENSE_PRESCRIPTION_MUTATION,
+  LIST_PAGE_LIMIT,
   ME_QUERY,
   PENDING_PRESCRIPTIONS_QUERY,
   PHARMACY_STOCK_QUERY,
@@ -24,9 +25,12 @@ export default function PharmacyPage() {
   const hospitalId = meData?.me?.hospitalId;
   const canWrite = (meData?.me?.permissions ?? []).includes('pharmacy:write');
 
-  const { data: rxData, loading: rxLoading, error: rxError, refetch: refetchRx } = useQuery(
+  const { data: rxData, loading: rxLoading, error: rxError, refetch: refetchRx, fetchMore: fetchMoreRx } = useQuery(
     PENDING_PRESCRIPTIONS_QUERY,
-    { variables: { hospitalId }, skip: !hospitalId },
+    {
+      variables: { hospitalId, pagination: { page: 1, limit: LIST_PAGE_LIMIT } },
+      skip: !hospitalId,
+    },
   );
 
   const { data: stockData, loading: stockLoading, error: stockError, refetch: refetchStock } = useQuery(
@@ -47,7 +51,7 @@ export default function PharmacyPage() {
     },
   });
 
-  const prescriptions = rxData?.pendingPrescriptions ?? [];
+  const prescriptions = rxData?.pendingPrescriptions?.items ?? [];
   const stock = stockData?.pharmacyStock ?? [];
 
   const handleDispense = async (prescriptionId: string) => {
@@ -104,7 +108,7 @@ export default function PharmacyPage() {
           <div className="border-b border-white/40 bg-clay-primary-light/30 px-6 py-4">
             <h2 className="text-lg font-semibold text-clay-text">Pending Prescriptions</h2>
             <p className="text-sm text-clay-text-muted">
-              {rxError ? '—' : `${prescriptions.length} awaiting dispense`}
+              {rxError ? '—' : `${rxData?.pendingPrescriptions?.total ?? prescriptions.length} awaiting dispense`}
             </p>
           </div>
           {rxLoading ? (
@@ -162,6 +166,40 @@ export default function PharmacyPage() {
               )}
             </div>
           )}
+          {rxData?.pendingPrescriptions?.hasMore ? (
+            <div className="border-t border-white/30 px-6 py-4 text-center">
+              <ClayButton
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={() =>
+                  void fetchMoreRx({
+                    variables: {
+                      hospitalId,
+                      pagination: {
+                        page: (rxData?.pendingPrescriptions?.page ?? 1) + 1,
+                        limit: LIST_PAGE_LIMIT,
+                      },
+                    },
+                    updateQuery: (prev, { fetchMoreResult }) => {
+                      if (!fetchMoreResult) return prev;
+                      return {
+                        pendingPrescriptions: {
+                          ...fetchMoreResult.pendingPrescriptions,
+                          items: [
+                            ...(prev.pendingPrescriptions?.items ?? []),
+                            ...(fetchMoreResult.pendingPrescriptions?.items ?? []),
+                          ],
+                        },
+                      };
+                    },
+                  })
+                }
+              >
+                Load more
+              </ClayButton>
+            </div>
+          ) : null}
         </ClayCard>
 
         <div className="space-y-6">

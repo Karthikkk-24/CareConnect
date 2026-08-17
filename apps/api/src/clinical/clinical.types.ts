@@ -264,6 +264,24 @@ export class LabOrderType {
   result?: LabResultType;
 }
 
+@ObjectType()
+export class LabOrdersPageType {
+  @Field(() => [LabOrderType])
+  items: LabOrderType[];
+
+  @Field(() => Int)
+  total: number;
+
+  @Field(() => Int)
+  page: number;
+
+  @Field(() => Int)
+  limit: number;
+
+  @Field()
+  hasMore: boolean;
+}
+
 @InputType()
 export class CreateVitalInput {
   @Field()

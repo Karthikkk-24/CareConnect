@@ -1,4 +1,4 @@
-import { Field, Float, ID, InputType, ObjectType } from '@nestjs/graphql';
+import { Field, Float, ID, InputType, Int, ObjectType } from '@nestjs/graphql';
 import {
   IsNumber,
   IsOptional,
@@ -69,6 +69,24 @@ export class PendingPrescriptionType {
 
   @Field()
   updatedAt: Date;
+}
+
+@ObjectType()
+export class PendingPrescriptionsPageType {
+  @Field(() => [PendingPrescriptionType])
+  items: PendingPrescriptionType[];
+
+  @Field(() => Int)
+  total: number;
+
+  @Field(() => Int)
+  page: number;
+
+  @Field(() => Int)
+  limit: number;
+
+  @Field()
+  hasMore: boolean;
 }
 
 @InputType()

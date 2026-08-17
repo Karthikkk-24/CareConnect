@@ -20,10 +20,16 @@ import {
   CreateDischargeInput,
   CreateFollowUpInput,
   DischargeType,
+  FollowUpsPageType,
   FollowUpType,
   RescheduleFollowUpInput,
   UpdateFollowUpStatusInput,
 } from './discharge.types';
+import {
+  paginatedList,
+  resolvePagination,
+  type PaginationInput,
+} from '../common/dto/pagination.dto';
 
 function isUniqueViolation(error: unknown): boolean {
   return (
@@ -431,11 +437,13 @@ export class DischargeService {
   async followUps(
     hospitalId: string,
     status?: string,
-  ): Promise<FollowUpType[]> {
+    pagination?: PaginationInput,
+  ): Promise<FollowUpsPageType> {
     if (status && !(status in FOLLOW_UP_TRANSITIONS)) {
       throw new BadRequestException(`Invalid follow-up status "${status}"`);
     }
 
+    const { page, limit, skip } = resolvePagination(pagination);
     const items = this.followUpsRepo
       .createQueryBuilder('followUp')
       .innerJoinAndSelect('followUp.patient', 'patient')
@@ -445,12 +453,18 @@ export class DischargeService {
     if (status) {
       items.andWhere('followUp.status = :status', { status });
     }
-    const rows = await items
+    const [rows, total] = await items
       .orderBy('followUp.scheduled_at', 'ASC')
-      .take(200)
-      .getMany();
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
 
-    return rows.map((item) => this.toFollowUpType(item));
+    return paginatedList(
+      rows.map((item) => this.toFollowUpType(item)),
+      total,
+      page,
+      limit,
+    );
   }
 
   async dischargesForPatient(

@@ -11,11 +11,13 @@ import { STAFF_ROLES } from '../rbac/staff-roles';
 import { AppointmentsService } from './appointments.service';
 import { HospitalContextService } from '../common/hospital-context.service';
 import {
+  AppointmentsPageType,
   AppointmentType,
   CancelAppointmentInput,
   CreateAppointmentInput,
   RescheduleAppointmentInput,
 } from './appointments.types';
+import { PaginationInput } from '../common/dto/pagination.dto';
 
 @Resolver()
 @UseGuards(GqlAuthGuard, RolesGuard)
@@ -25,7 +27,7 @@ export class AppointmentsResolver {
     private readonly hospitalContext: HospitalContextService,
   ) {}
 
-  @Query(() => [AppointmentType])
+  @Query(() => AppointmentsPageType)
   @Roles(...STAFF_ROLES)
   @Permissions(PERMISSIONS.APPOINTMENTS_READ)
   async appointments(
@@ -34,7 +36,9 @@ export class AppointmentsResolver {
     @Args('doctorId', { nullable: true }) doctorId?: string,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
     @Args('status', { nullable: true }) status?: string,
-  ): Promise<AppointmentType[]> {
+    @Args('pagination', { nullable: true, type: () => PaginationInput })
+    pagination?: PaginationInput,
+  ): Promise<AppointmentsPageType> {
     const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
@@ -46,6 +50,7 @@ export class AppointmentsResolver {
       doctorId,
       status,
       user,
+      pagination,
     );
   }
 
@@ -95,9 +100,10 @@ export class AppointmentsResolver {
     @Args('input') input: RescheduleAppointmentInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<AppointmentType> {
-    const resolvedHospitalId = this.appointmentsService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.appointmentsService.reschedule(resolvedHospitalId, input, user);
   }
