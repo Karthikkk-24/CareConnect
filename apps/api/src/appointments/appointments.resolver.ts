@@ -95,9 +95,10 @@ export class AppointmentsResolver {
     @Args('input') input: RescheduleAppointmentInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<AppointmentType> {
-    const resolvedHospitalId = this.appointmentsService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.appointmentsService.reschedule(resolvedHospitalId, input, user);
   }

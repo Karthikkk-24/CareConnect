@@ -166,9 +166,10 @@ export class DischargeResolver {
     @Args('input') input: RescheduleFollowUpInput,
     @Args('hospitalId', { nullable: true }) hospitalId?: string,
   ): Promise<FollowUpType> {
-    const resolvedHospitalId = this.dischargeService.resolveHospitalId(
+    const resolvedHospitalId = await this.hospitalContext.resolveHospitalId(
       user,
       hospitalId,
+      { write: true },
     );
     return this.dischargeService.rescheduleFollowUp(
       resolvedHospitalId,
