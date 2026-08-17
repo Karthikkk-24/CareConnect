@@ -8,6 +8,7 @@ import { ClayButton, ClayCard } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
 import { PortalQueryError } from '@/components/portal/portal-query-error';
 import { PORTAL_PATIENT_RECORDS_QUERY } from '@/lib/graphql/queries';
+import { getApiOrigin } from '@/lib/api-url';
 
 export default function PortalDocumentsPage() {
   const { getToken } = useAuth();
@@ -16,9 +17,7 @@ export default function PortalDocumentsPage() {
   const patient = data?.portalPatientRecords?.patient;
   const documents = data?.portalPatientRecords?.documents ?? [];
 
-  const apiBase = (
-    process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/graphql'
-  ).replace(/\/graphql\/?$/, '');
+  const apiBase = getApiOrigin();
 
   const handleOpenDocument = async (fileUrl: string) => {
     setFileError('');

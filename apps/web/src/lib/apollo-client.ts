@@ -4,8 +4,9 @@ import { useMemo } from 'react';
 import { ApolloClient, HttpLink, InMemoryCache, from } from '@apollo/client';
 import { setContext } from '@apollo/client/link/context';
 import { useAuth } from '@clerk/nextjs';
+import { getPublicApiUrl } from '@/lib/api-url';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/graphql';
+const API_URL = getPublicApiUrl();
 
 /**
  * Returns a memoized Apollo client wired to the current Clerk session.
