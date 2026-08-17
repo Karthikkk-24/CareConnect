@@ -225,5 +225,115 @@ describe('DischargeService', () => {
         ),
       ).rejects.toThrow(/Cannot transition follow-up/);
     });
+
+    it('rejects marking rescheduled without a new date', async () => {
+      const row = {
+        id: 'fu-1',
+        hospitalId: 'hospital-a',
+        patientId: 'patient-1',
+        status: 'scheduled',
+      };
+      const qb = {
+        setLock: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(row),
+      };
+      followManager.createQueryBuilder.mockReturnValue(qb);
+
+      await expect(
+        service.updateFollowUpStatus(
+          'hospital-a',
+          { id: 'fu-1', status: 'rescheduled' },
+          actor,
+        ),
+      ).rejects.toThrow(/Use rescheduleFollowUp/);
+    });
+  });
+
+  describe('rescheduleFollowUp', () => {
+    const mockLockedFollowUp = (row: Record<string, unknown>) => {
+      const state = { ...row };
+      const qb = {
+        setLock: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(state),
+      };
+      followManager.createQueryBuilder.mockReturnValue(qb);
+      followManager.save.mockImplementation((r: typeof state) => {
+        Object.assign(state, r);
+        return Promise.resolve(state);
+      });
+      followManager.findOne.mockResolvedValue({
+        id: state.patientId ?? 'patient-1',
+        hospitalId: 'hospital-a',
+      });
+      followUpsRepo.findOne.mockImplementation(() =>
+        Promise.resolve({ ...state, patient: null, doctor: null }),
+      );
+      return state;
+    };
+
+    it('updates due date and keeps status scheduled', async () => {
+      mockLockedFollowUp({
+        id: 'fu-1',
+        hospitalId: 'hospital-a',
+        patientId: 'patient-1',
+        status: 'scheduled',
+        scheduledAt: new Date('2026-08-18T10:00:00.000Z'),
+      });
+
+      const result = await service.rescheduleFollowUp(
+        'hospital-a',
+        { id: 'fu-1', scheduledAt: '2026-08-25T09:30:00.000Z' },
+        actor,
+      );
+
+      expect(result.status).toBe('scheduled');
+      expect(new Date(result.scheduledAt).toISOString()).toBe(
+        '2026-08-25T09:30:00.000Z',
+      );
+    });
+
+    it('revives a dead rescheduled row with a new live date', async () => {
+      mockLockedFollowUp({
+        id: 'fu-1',
+        hospitalId: 'hospital-a',
+        patientId: 'patient-1',
+        status: 'rescheduled',
+        scheduledAt: new Date('2026-08-18T10:00:00.000Z'),
+      });
+
+      const result = await service.rescheduleFollowUp(
+        'hospital-a',
+        {
+          id: 'fu-1',
+          scheduledAt: '2026-08-26T15:00:00.000Z',
+          notes: 'Moved at patient request',
+        },
+        actor,
+      );
+
+      expect(result.status).toBe('scheduled');
+      expect(result.notes).toBe('Moved at patient request');
+    });
+
+    it('rejects completed follow-ups', async () => {
+      mockLockedFollowUp({
+        id: 'fu-1',
+        hospitalId: 'hospital-a',
+        patientId: 'patient-1',
+        status: 'completed',
+      });
+
+      await expect(
+        service.rescheduleFollowUp(
+          'hospital-a',
+          { id: 'fu-1', scheduledAt: '2026-08-25T09:30:00.000Z' },
+          actor,
+        ),
+      ).rejects.toThrow(/Cannot reschedule a completed follow-up/);
+    });
   });
 });

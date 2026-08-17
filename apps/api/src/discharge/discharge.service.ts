@@ -21,6 +21,7 @@ import {
   CreateFollowUpInput,
   DischargeType,
   FollowUpType,
+  RescheduleFollowUpInput,
   UpdateFollowUpStatusInput,
 } from './discharge.types';
 
@@ -33,12 +34,14 @@ function isUniqueViolation(error: unknown): boolean {
 
 /**
  * Follow-up status machine:
- *   scheduled → completed | missed | rescheduled
- *   rescheduled → scheduled | completed | missed
- * Terminal: completed, missed (immutable)
+ *   scheduled → completed | missed
+ *   rescheduled → scheduled | completed | missed (legacy rows only)
+ * Terminal: completed (immutable)
+ * missed can be revived to scheduled via rescheduleFollowUp (new due date).
+ * Do not mark status "rescheduled" without a new date — use rescheduleFollowUp.
  */
 const FOLLOW_UP_TRANSITIONS: Record<string, readonly string[]> = {
-  scheduled: ['completed', 'missed', 'rescheduled'],
+  scheduled: ['completed', 'missed'],
   rescheduled: ['scheduled', 'completed', 'missed'],
   completed: [],
   missed: [],
@@ -46,12 +49,25 @@ const FOLLOW_UP_TRANSITIONS: Record<string, readonly string[]> = {
 
 function assertFollowUpTransition(from: string, to: string) {
   if (from === to) return;
+  if (to === 'rescheduled') {
+    throw new BadRequestException(
+      'Cannot mark a follow-up as rescheduled without a new date. Use rescheduleFollowUp.',
+    );
+  }
   const allowed = FOLLOW_UP_TRANSITIONS[from] ?? [];
   if (!allowed.includes(to)) {
     throw new BadRequestException(
       `Cannot transition follow-up from "${from}" to "${to}"`,
     );
   }
+}
+
+function parseIsoDate(value: string, field: string): Date {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new BadRequestException(`Invalid ${field}`);
+  }
+  return parsed;
 }
 
 @Injectable()
@@ -350,6 +366,63 @@ export class DischargeService {
       resource: 'follow_up',
       resourceId: saved.id,
       metadata: { status: saved.status },
+    });
+
+    return this.toFollowUpType(saved);
+  }
+
+  async rescheduleFollowUp(
+    hospitalId: string,
+    input: RescheduleFollowUpInput,
+    actor: AuthenticatedUser,
+  ): Promise<FollowUpType> {
+    const nextScheduledAt = parseIsoDate(input.scheduledAt, 'scheduledAt');
+
+    const followUpId = await this.followUpsRepo.manager.transaction(
+      async (manager) => {
+        const followUp = await manager
+          .createQueryBuilder(FollowUp, 'followUp')
+          .setLock('pessimistic_write')
+          .where('followUp.id = :id', { id: input.id })
+          .andWhere('followUp.hospital_id = :hospitalId', { hospitalId })
+          .getOne();
+        if (!followUp) throw new NotFoundException('Follow-up not found');
+
+        const patient = await manager.findOne(Patient, {
+          where: { id: followUp.patientId, hospitalId },
+        });
+        if (!patient) throw new NotFoundException('Follow-up not found');
+
+        if (followUp.status === 'completed') {
+          throw new BadRequestException(
+            'Cannot reschedule a completed follow-up',
+          );
+        }
+
+        followUp.scheduledAt = nextScheduledAt;
+        // Keep a live status with the new due date — never park on "rescheduled".
+        followUp.status = 'scheduled';
+        if (input.notes !== undefined) {
+          followUp.notes = input.notes;
+        }
+        await manager.save(followUp);
+        return followUp.id;
+      },
+    );
+
+    const saved = await this.followUpsRepo.findOne({
+      where: { id: followUpId, hospitalId },
+      relations: ['patient', 'doctor'],
+    });
+    if (!saved) throw new NotFoundException('Follow-up not found');
+
+    await this.audit.log({
+      actorId: actor.id,
+      hospitalId,
+      action: 'reschedule',
+      resource: 'follow_up',
+      resourceId: saved.id,
+      metadata: { scheduledAt: saved.scheduledAt.toISOString() },
     });
 
     return this.toFollowUpType(saved);

@@ -10,6 +10,7 @@ import {
   APPOINTMENTS_QUERY,
   CANCEL_APPOINTMENT_MUTATION,
   ME_QUERY,
+  RESCHEDULE_APPOINTMENT_MUTATION,
   UPDATE_APPOINTMENT_STATUS_MUTATION,
 } from '@/lib/graphql/queries';
 import { QueryError } from '@/components/query-error';
@@ -17,6 +18,17 @@ import { localDateISO } from '@/lib/local-date';
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function toDateTimeLocalValue(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function canRescheduleAppointment(status: string) {
+  return status === 'scheduled' || status === 'checked_in' || status === 'no_show';
 }
 
 const statusVariant = (status: string) => {
@@ -36,6 +48,8 @@ const statusVariant = (status: string) => {
 export default function AppointmentsPage() {
   const [selectedDate, setSelectedDate] = useState(localDateISO());
   const [statusError, setStatusError] = useState('');
+  const [reschedulingId, setReschedulingId] = useState<string | null>(null);
+  const [rescheduleAt, setRescheduleAt] = useState('');
   const { data: meData } = useQuery(ME_QUERY);
   const me = meData?.me;
   const hospitalId = me?.hospitalId;
@@ -62,6 +76,12 @@ export default function AppointmentsPage() {
   const [cancelAppointment] = useMutation(CANCEL_APPOINTMENT_MUTATION, {
     onCompleted: () => refetch(),
   });
+  const [rescheduleAppointment] = useMutation(RESCHEDULE_APPOINTMENT_MUTATION, {
+    onCompleted: () => {
+      setReschedulingId(null);
+      refetch();
+    },
+  });
 
   const appointments = data?.appointments ?? [];
 
@@ -77,6 +97,24 @@ export default function AppointmentsPage() {
       await updateStatus({ variables: { id, status, hospitalId } });
     } catch (err) {
       setStatusError(err instanceof Error ? err.message : 'Failed to update appointment status');
+    }
+  };
+
+  const handleReschedule = async (id: string) => {
+    setStatusError('');
+    if (!rescheduleAt) {
+      setStatusError('Choose a new date and time to reschedule');
+      return;
+    }
+    try {
+      await rescheduleAppointment({
+        variables: {
+          hospitalId,
+          input: { id, scheduledAt: new Date(rescheduleAt).toISOString() },
+        },
+      });
+    } catch (err) {
+      setStatusError(err instanceof Error ? err.message : 'Failed to reschedule appointment');
     }
   };
 
@@ -112,7 +150,9 @@ export default function AppointmentsPage() {
       </div>
 
       {statusError ? (
-        <p className="mb-4 rounded-2xl bg-red-50 px-4 py-2 text-sm text-clay-error">{statusError}</p>
+        <p className="mb-4 rounded-2xl bg-red-50 px-4 py-2 text-sm text-clay-error">
+          {statusError}
+        </p>
       ) : null}
 
       <ClayCard padding="none" className="overflow-hidden">
@@ -130,7 +170,10 @@ export default function AppointmentsPage() {
             <Calendar className="mx-auto mb-3 h-10 w-10 text-clay-text-muted/50" />
             <p className="text-clay-text-muted">No appointments scheduled for today.</p>
             {canWriteAppointments ? (
-              <Link href="/appointments/new" className="mt-3 inline-block text-sm text-clay-primary hover:underline">
+              <Link
+                href="/appointments/new"
+                className="mt-3 inline-block text-sm text-clay-primary hover:underline"
+              >
                 Schedule one now
               </Link>
             ) : null}
@@ -165,29 +208,60 @@ export default function AppointmentsPage() {
                   <ClayBadge variant={statusVariant(appt.status)}>
                     {appt.status.replace(/_/g, ' ')}
                   </ClayBadge>
-                  {canWriteAppointments && appt.status === 'scheduled' ? (
-                    <div className="flex gap-2">
-                      <ClayButton
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => handleStatus(appt.id, 'checked_in')}
-                      >
-                        Check In
+                  {canWriteAppointments && reschedulingId === appt.id ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        type="datetime-local"
+                        value={rescheduleAt}
+                        onChange={(e) => setRescheduleAt(e.target.value)}
+                        className="rounded-2xl border border-white/60 bg-clay-surface px-3 py-2 text-sm shadow-clay-inset"
+                      />
+                      <ClayButton size="sm" onClick={() => void handleReschedule(appt.id)}>
+                        Save
                       </ClayButton>
-                      <ClayButton
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleStatus(appt.id, 'cancelled')}
-                      >
-                        Cancel
+                      <ClayButton size="sm" variant="ghost" onClick={() => setReschedulingId(null)}>
+                        Close
                       </ClayButton>
                     </div>
-                  ) : null}
-                  {canWriteAppointments && appt.status === 'checked_in' ? (
-                    <ClayButton size="sm" onClick={() => handleStatus(appt.id, 'completed')}>
-                      Complete
-                    </ClayButton>
-                  ) : null}
+                  ) : (
+                    <>
+                      {canWriteAppointments && appt.status === 'scheduled' ? (
+                        <div className="flex gap-2">
+                          <ClayButton
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => handleStatus(appt.id, 'checked_in')}
+                          >
+                            Check In
+                          </ClayButton>
+                          <ClayButton
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleStatus(appt.id, 'cancelled')}
+                          >
+                            Cancel
+                          </ClayButton>
+                        </div>
+                      ) : null}
+                      {canWriteAppointments && appt.status === 'checked_in' ? (
+                        <ClayButton size="sm" onClick={() => handleStatus(appt.id, 'completed')}>
+                          Complete
+                        </ClayButton>
+                      ) : null}
+                      {canWriteAppointments && canRescheduleAppointment(appt.status) ? (
+                        <ClayButton
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => {
+                            setReschedulingId(appt.id);
+                            setRescheduleAt(toDateTimeLocalValue(appt.scheduledAt));
+                          }}
+                        >
+                          Reschedule
+                        </ClayButton>
+                      ) : null}
+                    </>
+                  )}
                 </div>
               ),
             )}

@@ -180,4 +180,22 @@ export class UpdateFollowUpStatusInput {
   notes?: string;
 }
 
+@InputType()
+export class RescheduleFollowUpInput {
+  @Field()
+  @IsUUID()
+  id: string;
+
+  @Field()
+  @IsDateString()
+  scheduledAt: string;
+
+  @MaxLength(2000)
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  notes?: string;
+}
+
 export { FOLLOW_UP_STATUSES };

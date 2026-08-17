@@ -15,6 +15,7 @@ import {
   AppointmentType,
   CancelAppointmentInput,
   CreateAppointmentInput,
+  RescheduleAppointmentInput,
 } from './appointments.types';
 
 /**
@@ -22,7 +23,8 @@ import {
  *   scheduled → checked_in → completed
  *            ↘ cancelled / no_show
  *   checked_in → completed / cancelled / no_show
- * Terminal: completed, cancelled, no_show (immutable)
+ * Terminal: completed, cancelled (immutable)
+ * no_show can be revived to scheduled via reschedule (new slot).
  */
 const ALLOWED_TRANSITIONS: Record<string, readonly string[]> = {
   scheduled: ['checked_in', 'cancelled', 'no_show', 'completed'],
@@ -40,6 +42,14 @@ function assertTransition(from: string, to: string) {
       `Cannot transition appointment from "${from}" to "${to}"`,
     );
   }
+}
+
+function parseIsoDate(value: string, field: string): Date {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new BadRequestException(`Invalid ${field}`);
+  }
+  return parsed;
 }
 
 @Injectable()
@@ -355,6 +365,68 @@ export class AppointmentsService {
       resource: 'appointment',
       resourceId: saved.id,
       metadata: { reason: input.reason },
+    });
+
+    return this.toAppointmentType(saved);
+  }
+
+  async reschedule(
+    hospitalId: string,
+    input: RescheduleAppointmentInput,
+    actor: AuthenticatedUser,
+  ): Promise<AppointmentType> {
+    const nextScheduledAt = parseIsoDate(input.scheduledAt, 'scheduledAt');
+
+    const appointmentId = await this.appointmentsRepo.manager.transaction(
+      async (manager) => {
+        const appointment = await manager
+          .createQueryBuilder(Appointment, 'appointment')
+          .setLock('pessimistic_write')
+          .where('appointment.id = :id', { id: input.id })
+          .andWhere('appointment.hospital_id = :hospitalId', { hospitalId })
+          .getOne();
+        if (!appointment) throw new NotFoundException('Appointment not found');
+
+        const patientAlive = await manager.findOne(Patient, {
+          where: { id: appointment.patientId, hospitalId },
+        });
+        if (!patientAlive) throw new NotFoundException('Appointment not found');
+
+        if (
+          appointment.status === 'cancelled' ||
+          appointment.status === 'completed'
+        ) {
+          throw new BadRequestException(
+            `Cannot reschedule a ${appointment.status} appointment`,
+          );
+        }
+
+        appointment.scheduledAt = nextScheduledAt;
+        // A new slot is live again — revive no_show rather than leaving a dead status.
+        if (appointment.status === 'no_show') {
+          appointment.status = 'scheduled';
+        }
+        if (input.reason !== undefined) {
+          appointment.reason = input.reason;
+        }
+        if (input.notes !== undefined) {
+          appointment.notes = input.notes;
+        }
+
+        await manager.save(appointment);
+        return appointment.id;
+      },
+    );
+
+    const saved = await this.findAppointmentOrThrow(appointmentId, hospitalId);
+
+    await this.audit.log({
+      actorId: actor.id,
+      hospitalId,
+      action: 'reschedule',
+      resource: 'appointment',
+      resourceId: saved.id,
+      metadata: { scheduledAt: saved.scheduledAt.toISOString() },
     });
 
     return this.toAppointmentType(saved);

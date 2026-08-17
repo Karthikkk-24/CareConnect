@@ -14,6 +14,7 @@ import {
   CreateFollowUpInput,
   DischargeType,
   FollowUpType,
+  RescheduleFollowUpInput,
   UpdateFollowUpStatusInput,
 } from './discharge.types';
 
@@ -144,6 +145,32 @@ export class DischargeResolver {
       { write: true },
     );
     return this.dischargeService.updateFollowUpStatus(
+      resolvedHospitalId,
+      input,
+      user,
+    );
+  }
+
+  @Mutation(() => FollowUpType)
+  @Roles(
+    ROLES.DOCTOR,
+    ROLES.NURSE,
+    ROLES.RECEPTIONIST,
+    ROLES.HOSPITAL_ADMIN,
+    ROLES.HOSPITAL_MANAGER,
+    ROLES.SUPER_ADMIN,
+  )
+  @Permissions(PERMISSIONS.PATIENTS_WRITE)
+  async rescheduleFollowUp(
+    @CurrentUser() user: AuthenticatedUser,
+    @Args('input') input: RescheduleFollowUpInput,
+    @Args('hospitalId', { nullable: true }) hospitalId?: string,
+  ): Promise<FollowUpType> {
+    const resolvedHospitalId = this.dischargeService.resolveHospitalId(
+      user,
+      hospitalId,
+    );
+    return this.dischargeService.rescheduleFollowUp(
       resolvedHospitalId,
       input,
       user,
