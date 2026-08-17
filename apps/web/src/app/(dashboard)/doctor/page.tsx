@@ -7,17 +7,14 @@ import { ClayBadge, ClayButton, ClayCard } from '@careconnect/ui';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
 import { QueryError } from '@/components/query-error';
 import { APPOINTMENTS_QUERY, ME_QUERY } from '@/lib/graphql/queries';
-
-function todayDateString() {
-  return new Date().toISOString().slice(0, 10);
-}
+import { localDateISO } from '@/lib/local-date';
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 export default function DoctorDashboardPage() {
-  const today = todayDateString();
+  const today = localDateISO();
   const { data: meData } = useQuery(ME_QUERY);
   const hospitalId = meData?.me?.hospitalId;
   const doctorId = meData?.me?.id;
