@@ -309,17 +309,4 @@ export class AuthService {
       }
     }
   }
-
-  async assignRole(userId: string, roleSlug: string, hospitalId?: string) {
-    const role = await this.rolesRepo.findOne({ where: { slug: roleSlug } });
-    if (!role) return;
-    const existing = await this.userRolesRepo.findOne({
-      where: { userId, roleId: role.id, hospitalId: hospitalId ?? undefined },
-    });
-    if (!existing) {
-      await this.userRolesRepo.save(
-        this.userRolesRepo.create({ userId, roleId: role.id, hospitalId }),
-      );
-    }
-  }
 }
