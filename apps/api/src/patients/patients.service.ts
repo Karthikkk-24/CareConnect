@@ -1050,6 +1050,9 @@ export class PatientsService {
     const actor = { id: userId } as AuthenticatedUser;
     const errors: { row: number; message: string }[] = [];
     let successCount = 0;
+    const seenEmails = new Set<string>();
+    const seenPhones = new Set<string>();
+    const seenIdentificationNumbers = new Set<string>();
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
@@ -1065,13 +1068,57 @@ export class PatientsService {
         continue;
       }
 
+      let gender: string | undefined;
+      try {
+        gender = this.normalizeGender(row.gender);
+      } catch (err) {
+        errors.push({
+          row: rowNum,
+          message: err instanceof Error ? err.message : 'Invalid gender',
+        });
+        continue;
+      }
+
+      try {
+        await this.assertNoDuplicates(hospitalId, {
+          email: row.email,
+          phone: row.phone,
+          identificationNumber: row.identificationNumber,
+        });
+      } catch (err) {
+        errors.push({
+          row: rowNum,
+          message:
+            err instanceof Error ? err.message : 'Failed duplicate check',
+        });
+        continue;
+      }
+
+      const batchConflicts = this.batchDuplicateConflicts(
+        {
+          email: row.email,
+          phone: row.phone,
+          identificationNumber: row.identificationNumber,
+        },
+        seenEmails,
+        seenPhones,
+        seenIdentificationNumbers,
+      );
+      if (batchConflicts.length) {
+        errors.push({
+          row: rowNum,
+          message: `A patient with the same ${batchConflicts.join(', ')} already exists in this hospital`,
+        });
+        continue;
+      }
+
       if (!dryRun) {
         const input: CreatePatientInput = {
           fullName: row.fullName.trim(),
           email: row.email,
           phone: row.phone,
           dateOfBirth: row.dateOfBirth,
-          gender: this.normalizeGender(row.gender),
+          gender,
           bloodGroup: row.bloodGroup,
           address: row.address,
           city: row.city,
@@ -1098,6 +1145,16 @@ export class PatientsService {
 
         try {
           await this.create(hospitalId, input, actor);
+          this.rememberBatchIdentity(
+            {
+              email: row.email,
+              phone: row.phone,
+              identificationNumber: row.identificationNumber,
+            },
+            seenEmails,
+            seenPhones,
+            seenIdentificationNumbers,
+          );
           successCount++;
         } catch (err) {
           errors.push({
@@ -1107,6 +1164,16 @@ export class PatientsService {
           });
         }
       } else {
+        this.rememberBatchIdentity(
+          {
+            email: row.email,
+            phone: row.phone,
+            identificationNumber: row.identificationNumber,
+          },
+          seenEmails,
+          seenPhones,
+          seenIdentificationNumbers,
+        );
         successCount++;
       }
     }
@@ -1135,13 +1202,56 @@ export class PatientsService {
     };
   }
 
+  /** Empty / whitespace stays empty. Aliases m/f map to male/female. Anything else is an error. */
   private normalizeGender(gender?: string): string | undefined {
-    if (!gender) return undefined;
-    const g = gender.toLowerCase().trim();
-    if (['male', 'm'].includes(g)) return 'male';
-    if (['female', 'f'].includes(g)) return 'female';
+    if (gender == null) return undefined;
+    const trimmed = gender.trim();
+    if (!trimmed) return undefined;
+    const g = trimmed.toLowerCase();
+    if (g === 'male' || g === 'm') return 'male';
+    if (g === 'female' || g === 'f') return 'female';
     if (g === 'other') return 'other';
-    return 'prefer_not_to_say';
+    if (g === 'prefer_not_to_say') return 'prefer_not_to_say';
+    throw new BadRequestException(
+      `Invalid gender "${trimmed}". Use male, female, other, or prefer_not_to_say`,
+    );
+  }
+
+  private batchDuplicateConflicts(
+    fields: { email?: string; phone?: string; identificationNumber?: string },
+    seenEmails: Set<string>,
+    seenPhones: Set<string>,
+    seenIdentificationNumbers: Set<string>,
+  ): string[] {
+    const conflicts: string[] = [];
+    const email = fields.email?.trim().toLowerCase();
+    if (email && seenEmails.has(email)) conflicts.push('email');
+    const phoneDigits = fields.phone?.replace(/\D/g, '');
+    if (phoneDigits && seenPhones.has(phoneDigits)) conflicts.push('phone');
+    const identificationNumber = fields.identificationNumber?.trim();
+    if (
+      identificationNumber &&
+      seenIdentificationNumbers.has(identificationNumber)
+    ) {
+      conflicts.push('identification number');
+    }
+    return conflicts;
+  }
+
+  private rememberBatchIdentity(
+    fields: { email?: string; phone?: string; identificationNumber?: string },
+    seenEmails: Set<string>,
+    seenPhones: Set<string>,
+    seenIdentificationNumbers: Set<string>,
+  ): void {
+    const email = fields.email?.trim().toLowerCase();
+    if (email) seenEmails.add(email);
+    const phoneDigits = fields.phone?.replace(/\D/g, '');
+    if (phoneDigits) seenPhones.add(phoneDigits);
+    const identificationNumber = fields.identificationNumber?.trim();
+    if (identificationNumber) {
+      seenIdentificationNumbers.add(identificationNumber);
+    }
   }
 
   async addDocument(

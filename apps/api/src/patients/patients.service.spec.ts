@@ -702,4 +702,114 @@ describe('PatientsService', () => {
       expect(patientsRepo.save).not.toHaveBeenCalled();
     });
   });
+
+  describe('bulkImport dry-run and gender', () => {
+    it('reports existing email/phone duplicates as row errors on dry-run', async () => {
+      mockQueryBuilder(true);
+
+      const result = await service.bulkImport(
+        'hospital-1',
+        [
+          {
+            fullName: 'Jane Doe',
+            email: 'jane@example.com',
+            phone: '555-0100',
+          },
+        ],
+        actor.id,
+        true,
+      );
+
+      expect(result.dryRun).toBe(true);
+      expect(result.successCount).toBe(0);
+      expect(result.errorCount).toBe(1);
+      expect(result.errors[0]).toEqual(
+        expect.objectContaining({
+          row: 1,
+          message: expect.stringMatching(/email.*phone|phone.*email/i),
+        }),
+      );
+      expect(patientsRepo.manager.transaction).not.toHaveBeenCalled();
+    });
+
+    it('reports in-file duplicate email as a row error on dry-run', async () => {
+      mockQueryBuilder(false);
+
+      const result = await service.bulkImport(
+        'hospital-1',
+        [
+          { fullName: 'Jane Doe', email: 'jane@example.com' },
+          { fullName: 'Janet Doe', email: 'jane@example.com' },
+        ],
+        actor.id,
+        true,
+      );
+
+      expect(result.successCount).toBe(1);
+      expect(result.errorCount).toBe(1);
+      expect(result.errors[0]).toEqual(
+        expect.objectContaining({
+          row: 2,
+          message: expect.stringMatching(/email/i),
+        }),
+      );
+    });
+
+    it('accepts valid unique rows on dry-run without creating patients', async () => {
+      mockQueryBuilder(false);
+
+      const result = await service.bulkImport(
+        'hospital-1',
+        [
+          {
+            fullName: 'Jane Doe',
+            email: 'jane@example.com',
+            gender: 'female',
+          },
+        ],
+        actor.id,
+        true,
+      );
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          dryRun: true,
+          totalRows: 1,
+          successCount: 1,
+          errorCount: 0,
+          errors: [],
+        }),
+      );
+      expect(patientsRepo.manager.transaction).not.toHaveBeenCalled();
+    });
+
+    it('rejects invalid gender instead of coercing it', async () => {
+      mockQueryBuilder(false);
+
+      const result = await service.bulkImport(
+        'hospital-1',
+        [{ fullName: 'Jane Doe', gender: 'unknown' }],
+        actor.id,
+        true,
+      );
+
+      expect(result.successCount).toBe(0);
+      expect(result.errorCount).toBe(1);
+      expect(result.errors[0]?.message).toMatch(/Invalid gender "unknown"/i);
+    });
+
+    it('treats empty gender as empty and still counts the row as valid', async () => {
+      mockQueryBuilder(false);
+
+      const result = await service.bulkImport(
+        'hospital-1',
+        [{ fullName: 'Jane Doe', gender: '   ' }],
+        actor.id,
+        true,
+      );
+
+      expect(result.successCount).toBe(1);
+      expect(result.errorCount).toBe(0);
+    });
+  });
 });
