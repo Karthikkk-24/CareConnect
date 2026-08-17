@@ -14,6 +14,7 @@ import {
   STAFF_MEMBERS_QUERY,
 } from '@/lib/graphql/queries';
 import { canAccessRoute } from '@/lib/route-access';
+import { localDateISO } from '@/lib/local-date';
 
 const QUICK_ACTIONS = [
   { label: 'Register Patient', href: '/patients/new', anyPermissions: ['patients:write'] },
@@ -44,7 +45,7 @@ function canSeeQuickAction(
 }
 
 function todayDateString() {
-  return new Date().toISOString().slice(0, 10);
+  return localDateISO();
 }
 
 export default function DashboardPage() {

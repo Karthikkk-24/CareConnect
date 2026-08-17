@@ -13,10 +13,7 @@ import {
   UPDATE_APPOINTMENT_STATUS_MUTATION,
 } from '@/lib/graphql/queries';
 import { QueryError } from '@/components/query-error';
-
-function todayDateString() {
-  return new Date().toISOString().slice(0, 10);
-}
+import { localDateISO } from '@/lib/local-date';
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -37,7 +34,7 @@ const statusVariant = (status: string) => {
 };
 
 export default function AppointmentsPage() {
-  const [selectedDate, setSelectedDate] = useState(todayDateString());
+  const [selectedDate, setSelectedDate] = useState(localDateISO());
   const [statusError, setStatusError] = useState('');
   const { data: meData } = useQuery(ME_QUERY);
   const me = meData?.me;
