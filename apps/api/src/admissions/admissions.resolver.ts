@@ -17,12 +17,22 @@ import {
   WardOccupancyType,
 } from './admissions.types';
 
+const CHART_READ_ROLES = [
+  ROLES.DOCTOR,
+  ROLES.NURSE,
+  ROLES.RECEPTIONIST,
+  ROLES.HOSPITAL_ADMIN,
+  ROLES.HOSPITAL_MANAGER,
+  ROLES.SUPER_ADMIN,
+] as const;
+
 @Resolver()
 @UseGuards(GqlAuthGuard, RolesGuard)
 export class AdmissionsResolver {
   constructor(private readonly admissionsService: AdmissionsService) {}
 
   @Query(() => [AdmissionType])
+  @Roles(...CHART_READ_ROLES)
   @Permissions(PERMISSIONS.PATIENTS_READ)
   async activeAdmissions(
     @CurrentUser() user: AuthenticatedUser,
@@ -36,6 +46,7 @@ export class AdmissionsResolver {
   }
 
   @Query(() => [WardOccupancyType])
+  @Roles(...CHART_READ_ROLES)
   @Permissions(PERMISSIONS.PATIENTS_READ)
   async wardOccupancy(
     @CurrentUser() user: AuthenticatedUser,

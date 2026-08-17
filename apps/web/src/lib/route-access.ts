@@ -77,9 +77,19 @@ const ROUTE_RULES: RouteRule[] = [
     requireAll: true,
   },
   { prefix: '/appointments', anyPermissions: ['appointments:read'] },
-  { prefix: '/admissions', anyPermissions: ['patients:read'] },
+  {
+    prefix: '/admissions',
+    anyPermissions: ['patients:read'],
+    anyRoles: CLINICAL_STAFF_ROLES,
+    requireAll: true,
+  },
   { prefix: '/wards', anyPermissions: ['hospitals:read', 'patients:read'] },
-  { prefix: '/follow-ups', anyPermissions: ['patients:read'] },
+  {
+    prefix: '/follow-ups',
+    anyPermissions: ['patients:read'],
+    anyRoles: CLINICAL_STAFF_ROLES,
+    requireAll: true,
+  },
   { prefix: '/finance', anyPermissions: ['billing:read'] },
   {
     prefix: '/pharmacy',
