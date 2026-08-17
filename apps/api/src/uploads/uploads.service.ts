@@ -5,6 +5,7 @@ import {
   NotFoundException,
   OnApplicationBootstrap,
 } from '@nestjs/common';
+import { Interval } from '@nestjs/schedule';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { promises as fs } from 'fs';
 import { basename, extname, join } from 'path';
@@ -19,12 +20,17 @@ import {
   PatientDocument,
 } from '../database/entities';
 
+/** Re-run the boot sweep every 6 hours (same TTL/lock logic; not aggressive). */
+const ORPHAN_SWEEP_INTERVAL_MS = 6 * 60 * 60 * 1000;
+
 @Injectable()
 export class UploadsService implements OnApplicationBootstrap {
   private readonly logger = new Logger(UploadsService.name);
 
   /** Time an uploaded file may sit unlinked before the sweep removes it. */
   static readonly ORPHAN_TTL_HOURS = 24;
+
+  static readonly ORPHAN_SWEEP_INTERVAL_MS = ORPHAN_SWEEP_INTERVAL_MS;
 
   /** Arbitrary Postgres advisory lock id for the orphan sweep. */
   private static readonly ORPHAN_SWEEP_LOCK_KEY = 727003;
@@ -47,8 +53,8 @@ export class UploadsService implements OnApplicationBootstrap {
   /**
    * Delete uploads/ files that are older than the TTL and have never been
    * linked to a patient_documents or lab_results row. Runs on application
-   * bootstrap; a Postgres advisory lock prevents concurrent sweeps when
-   * multiple instances boot together.
+   * bootstrap and on a 6-hour interval; a Postgres advisory lock prevents
+   * concurrent sweeps when multiple instances overlap.
    *
    * Uses a dedicated QueryRunner so lock + unlock share one pooled connection
    * (session advisory locks are connection-scoped).
@@ -142,13 +148,23 @@ export class UploadsService implements OnApplicationBootstrap {
   /** Run the orphan sweep after the app is listening (never blocks boot). */
   onApplicationBootstrap(): void {
     setImmediate(() => {
-      this.removeOrphanUploads().catch((err: unknown) => {
-        this.logger.warn(
-          `Orphan upload sweep failed: ${
-            err instanceof Error ? err.message : String(err)
-          }`,
-        );
-      });
+      this.sweepOrphanUploadsSafely();
+    });
+  }
+
+  /** Same sweep as boot, so long-lived instances still drop unlinked PHI. */
+  @Interval(ORPHAN_SWEEP_INTERVAL_MS)
+  sweepOrphanUploadsOnInterval(): void {
+    this.sweepOrphanUploadsSafely();
+  }
+
+  private sweepOrphanUploadsSafely(): void {
+    this.removeOrphanUploads().catch((err: unknown) => {
+      this.logger.warn(
+        `Orphan upload sweep failed: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
     });
   }
 

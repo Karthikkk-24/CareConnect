@@ -533,4 +533,17 @@ describe('UploadsService', () => {
       expect(queryRunner.release).toHaveBeenCalled();
     });
   });
+
+  describe('scheduled orphan sweep', () => {
+    it('uses a 6-hour interval and the same removeOrphanUploads path', () => {
+      expect(UploadsService.ORPHAN_SWEEP_INTERVAL_MS).toBe(6 * 60 * 60 * 1000);
+      const spy = jest
+        .spyOn(service, 'removeOrphanUploads')
+        .mockResolvedValue(undefined);
+
+      service.sweepOrphanUploadsOnInterval();
+
+      expect(spy).toHaveBeenCalledTimes(1);
+    });
+  });
 });
