@@ -4,7 +4,12 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import jwksRsa from 'jwks-rsa';
 import { AuthService } from './auth.service';
-import type { AuthenticatedUser, JwtPayload } from './auth.types';
+import type { AuthenticatedUser } from './auth.types';
+import {
+  extractEmail,
+  isEmailVerified,
+  type ClerkJwtPayload,
+} from './clerk-jwt.payload';
 
 /**
  * Clerk session tokens are RS256-signed JWTs. Public keys are published at
@@ -70,7 +75,11 @@ export class ClerkJwtStrategy extends PassportStrategy(Strategy, 'clerk-jwt') {
     }
 
     const email = extractEmail(payload);
-    const user = await this.authService.syncAndGetUser(payload.sub, email);
+    const user = await this.authService.syncAndGetUser(
+      payload.sub,
+      email,
+      isEmailVerified(payload),
+    );
 
     if (!user) {
       throw new UnauthorizedException('User not found');
@@ -78,36 +87,4 @@ export class ClerkJwtStrategy extends PassportStrategy(Strategy, 'clerk-jwt') {
 
     return user;
   }
-}
-
-export interface ClerkJwtPayload extends JwtPayload {
-  email?: string;
-  email_address?: string;
-  primary_email_address?: string;
-  primary_email_address_id?: string;
-  email_addresses?: Array<{ id?: string; email_address?: string }>;
-  first_name?: string;
-  last_name?: string;
-  full_name?: string;
-  username?: string;
-  org_id?: string;
-  org_slug?: string;
-  org_role?: string;
-}
-
-function extractEmail(payload: ClerkJwtPayload): string | undefined {
-  if (payload.email) return payload.email;
-  if (payload.email_address) return payload.email_address;
-  if (payload.primary_email_address) return payload.primary_email_address;
-
-  const list = payload.email_addresses;
-  if (Array.isArray(list) && list.length > 0) {
-    const primaryId = payload.primary_email_address_id;
-    const primary =
-      (primaryId ? list.find((entry) => entry?.id === primaryId) : undefined) ??
-      list[0];
-    if (primary?.email_address) return primary.email_address;
-  }
-
-  return undefined;
 }
