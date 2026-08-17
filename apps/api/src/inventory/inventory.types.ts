@@ -4,6 +4,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
   Min,
   MinLength,
 } from 'class-validator';
@@ -40,11 +41,13 @@ export class InventoryItemType {
 
 @InputType()
 export class CreateInventoryItemInput {
+  @MaxLength(255)
   @Field()
   @IsString()
   @MinLength(1)
   name: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
@@ -56,6 +59,7 @@ export class CreateInventoryItemInput {
   @Min(0)
   quantity?: number;
 
+  @MaxLength(50)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()

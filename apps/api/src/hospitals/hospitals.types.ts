@@ -1,5 +1,11 @@
 import { Field, ID, InputType, ObjectType } from '@nestjs/graphql';
-import { IsBoolean, IsOptional, IsString, MinLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 @ObjectType()
 export class HospitalType {
@@ -39,31 +45,37 @@ export class HospitalType {
 
 @InputType()
 export class CreateHospitalInput {
+  @MaxLength(255)
   @Field()
   @IsString()
   @MinLength(2)
   name: string;
 
+  @MaxLength(255)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   email?: string;
 
+  @MaxLength(50)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   phone?: string;
 
+  @MaxLength(2000)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   address?: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   city?: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
@@ -72,36 +84,43 @@ export class CreateHospitalInput {
 
 @InputType()
 export class UpdateHospitalInput {
+  @MaxLength(255)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   name?: string;
 
+  @MaxLength(255)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   email?: string;
 
+  @MaxLength(50)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   phone?: string;
 
+  @MaxLength(2000)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   address?: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   city?: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   country?: string;
 
+  @MaxLength(500)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()

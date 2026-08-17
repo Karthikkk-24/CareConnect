@@ -1,5 +1,11 @@
 import { Field, ID, InputType, Int, ObjectType } from '@nestjs/graphql';
-import { IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 import { PatientType } from '../patients/patients.types';
 import { BedType, WardType } from '../facility/facility.types';
 import { UserSummaryType } from '../users/users.types';
@@ -92,6 +98,7 @@ export class AdmitPatientInput {
   @IsUUID()
   bedId: string;
 
+  @MaxLength(2000)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
@@ -104,6 +111,7 @@ export class DischargeAdmissionInput {
   @IsUUID()
   id: string;
 
+  @MaxLength(2000)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
@@ -132,6 +140,7 @@ export class TransferOutAdmissionInput {
   @IsUUID()
   admissionId: string;
 
+  @MaxLength(2000)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()

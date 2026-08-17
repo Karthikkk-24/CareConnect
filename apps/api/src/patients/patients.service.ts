@@ -830,7 +830,9 @@ export class PatientsService {
     const patient = await this.findPatientOrThrow(patientId, hospitalId);
 
     if (!patient.userId) {
-      throw new BadRequestException('Patient chart is not linked to a portal account');
+      throw new BadRequestException(
+        'Patient chart is not linked to a portal account',
+      );
     }
 
     const previousUserId = patient.userId;

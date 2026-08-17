@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
   MinLength,
 } from 'class-validator';
 import { APPOINTMENT_STATUSES } from '../database/entities/appointment.entity';
@@ -76,11 +77,13 @@ export class CreateAppointmentInput {
   @IsDateString()
   scheduledAt: string;
 
+  @MaxLength(2000)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   reason?: string;
 
+  @MaxLength(2000)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
@@ -105,6 +108,7 @@ export class CancelAppointmentInput {
   @IsUUID()
   id: string;
 
+  @MaxLength(2000)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()

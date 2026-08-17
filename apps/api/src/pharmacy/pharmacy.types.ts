@@ -4,6 +4,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
   Min,
   MinLength,
 } from 'class-validator';
@@ -72,6 +73,7 @@ export class PendingPrescriptionType {
 
 @InputType()
 export class UpsertPharmacyStockInput {
+  @MaxLength(255)
   @Field()
   @IsString()
   @MinLength(1)
@@ -89,6 +91,7 @@ export class UpsertPharmacyStockInput {
   @Min(0)
   expectedQuantity?: number;
 
+  @MaxLength(50)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()

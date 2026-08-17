@@ -324,9 +324,7 @@ describe('AdmissionsService', () => {
       expect(admissionsRepo.createQueryBuilder).toHaveBeenCalledWith(
         'admission',
       );
-      expect(qb.andWhere).toHaveBeenCalledWith(
-        'patient.deleted_at IS NULL',
-      );
+      expect(qb.andWhere).toHaveBeenCalledWith('patient.deleted_at IS NULL');
     });
   });
 });

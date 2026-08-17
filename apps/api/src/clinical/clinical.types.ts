@@ -1,8 +1,8 @@
 import { Field, Float, ID, InputType, Int, ObjectType } from '@nestjs/graphql';
 import {
-  IsArray,
   ArrayMaxSize,
   ArrayMinSize,
+  IsArray,
   IsBoolean,
   IsIn,
   IsInt,
@@ -11,6 +11,7 @@ import {
   IsString,
   IsUUID,
   Max,
+  MaxLength,
   Min,
   MinLength,
   ValidateNested,
@@ -274,6 +275,7 @@ export class CreateVitalInput {
   @IsUUID()
   admissionId?: string;
 
+  @MaxLength(20)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
@@ -301,6 +303,7 @@ export class CreateVitalInput {
   @IsOptional()
   height?: number;
 
+  @MaxLength(2000)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
@@ -318,11 +321,13 @@ export class CreateDiagnosisInput {
   @IsUUID()
   admissionId?: string;
 
+  @MaxLength(20)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   icdCode?: string;
 
+  @MaxLength(2000)
   @Field()
   @IsString()
   @MinLength(1)
@@ -345,21 +350,25 @@ export class CreateClinicalNoteInput {
   @IsUUID()
   admissionId?: string;
 
+  @MaxLength(2000)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   subjective?: string;
 
+  @MaxLength(2000)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   objective?: string;
 
+  @MaxLength(2000)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   assessment?: string;
 
+  @MaxLength(2000)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
@@ -368,6 +377,7 @@ export class CreateClinicalNoteInput {
 
 @InputType()
 export class PrescriptionItemInput {
+  @MaxLength(255)
   @Field()
   @IsString()
   @MinLength(1)
@@ -380,21 +390,25 @@ export class PrescriptionItemInput {
   @Max(NUMERIC_10_2_MAX)
   quantity?: number;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   dosage?: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   frequency?: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   duration?: string;
 
+  @MaxLength(2000)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
@@ -412,6 +426,7 @@ export class CreatePrescriptionInput {
   @IsUUID()
   admissionId?: string;
 
+  @MaxLength(2000)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
@@ -437,11 +452,13 @@ export class CreateLabOrderInput {
   @IsUUID()
   admissionId?: string;
 
+  @MaxLength(255)
   @Field()
   @IsString()
   @MinLength(1)
   testName: string;
 
+  @MaxLength(2000)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
@@ -454,21 +471,25 @@ export class CompleteLabResultInput {
   @IsUUID()
   labOrderId: string;
 
+  @MaxLength(2000)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   resultValue?: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   referenceRange?: string;
 
+  @MaxLength(50)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   unit?: string;
 
+  @MaxLength(500)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
