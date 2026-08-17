@@ -6,6 +6,7 @@ import {
   IsIn,
   IsOptional,
   IsString,
+  MaxLength,
   MinLength,
   ValidateNested,
 } from 'class-validator';
@@ -237,16 +238,19 @@ export class BulkImportResultType {
 
 @InputType()
 export class EmergencyContactInput {
+  @MaxLength(255)
   @Field()
   @IsString()
   @MinLength(1)
   name: string;
 
+  @MaxLength(50)
   @Field()
   @IsString()
   @MinLength(1)
   phone: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
@@ -255,16 +259,19 @@ export class EmergencyContactInput {
 
 @InputType()
 export class PatientInsuranceInput {
+  @MaxLength(255)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   provider?: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   policyNumber?: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
@@ -273,21 +280,25 @@ export class PatientInsuranceInput {
 
 @InputType()
 export class PatientAllergyInput {
+  @MaxLength(255)
   @Field()
   @IsString()
   @MinLength(1)
   allergen: string;
 
+  @MaxLength(50)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   severity?: string;
 
+  @MaxLength(2000)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   reaction?: string;
 
+  @MaxLength(2000)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
@@ -296,21 +307,25 @@ export class PatientAllergyInput {
 
 @InputType()
 export class PatientMedicationInput {
+  @MaxLength(255)
   @Field()
   @IsString()
   @MinLength(1)
   name: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   dosage?: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   frequency?: string;
 
+  @MaxLength(255)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
@@ -324,21 +339,25 @@ export class MedicalHistoryInput {
   @IsIn(['past', 'family', 'surgical'])
   type: string;
 
+  @MaxLength(255)
   @Field()
   @IsString()
   @MinLength(1)
   condition: string;
 
+  @MaxLength(20)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   diagnosisDate?: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   relation?: string;
 
+  @MaxLength(2000)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
@@ -359,76 +378,91 @@ export class PatientConsentInput {
 
 @InputType()
 export class CreatePatientInput {
+  @MaxLength(255)
   @Field()
   @IsString()
   @MinLength(2)
   fullName: string;
 
+  @MaxLength(255)
   @Field({ nullable: true })
   @IsOptional()
   @IsEmail()
   email?: string;
 
+  @MaxLength(50)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   phone?: string;
 
+  @MaxLength(20)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   dateOfBirth?: string;
 
+  @MaxLength(20)
   @Field({ nullable: true })
   @IsOptional()
   @IsIn([...PATIENT_GENDERS])
   gender?: string;
 
+  @MaxLength(10)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   bloodGroup?: string;
 
+  @MaxLength(2000)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   address?: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   city?: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   state?: string;
 
+  @MaxLength(20)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   zipCode?: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   country?: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   occupation?: string;
 
+  @MaxLength(50)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   identificationType?: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   identificationNumber?: string;
 
+  @MaxLength(255)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
@@ -478,77 +512,92 @@ export class CreatePatientInput {
 
 @InputType()
 export class UpdatePatientInput {
+  @MaxLength(255)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   @MinLength(2)
   fullName?: string;
 
+  @MaxLength(255)
   @Field({ nullable: true })
   @IsOptional()
   @IsEmail()
   email?: string;
 
+  @MaxLength(50)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   phone?: string;
 
+  @MaxLength(20)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   dateOfBirth?: string;
 
+  @MaxLength(20)
   @Field({ nullable: true })
   @IsOptional()
   @IsIn([...PATIENT_GENDERS])
   gender?: string;
 
+  @MaxLength(10)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   bloodGroup?: string;
 
+  @MaxLength(2000)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   address?: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   city?: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   state?: string;
 
+  @MaxLength(20)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   zipCode?: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   country?: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   occupation?: string;
 
+  @MaxLength(50)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   identificationType?: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   identificationNumber?: string;
 
+  @MaxLength(255)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
@@ -598,69 +647,88 @@ export class UpdatePatientInput {
 
 @InputType()
 export class BulkPatientRowInput {
+  @MaxLength(255)
   @Field()
   fullName: string;
 
+  @MaxLength(255)
   @Field({ nullable: true })
   email?: string;
 
+  @MaxLength(50)
   @Field({ nullable: true })
   phone?: string;
 
+  @MaxLength(20)
   @Field({ nullable: true })
   dateOfBirth?: string;
 
+  @MaxLength(20)
   @Field({ nullable: true })
   gender?: string;
 
+  @MaxLength(10)
   @Field({ nullable: true })
   bloodGroup?: string;
 
+  @MaxLength(2000)
   @Field({ nullable: true })
   address?: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   city?: string;
 
+  @MaxLength(255)
   @Field({ nullable: true })
   emergencyContactName?: string;
 
+  @MaxLength(50)
   @Field({ nullable: true })
   emergencyContactPhone?: string;
 
+  @MaxLength(255)
   @Field({ nullable: true })
   insuranceProvider?: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   insurancePolicyNumber?: string;
 
+  @MaxLength(255)
   @Field({ nullable: true })
   allergies?: string;
 
+  @MaxLength(50)
   @Field({ nullable: true })
   identificationType?: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   identificationNumber?: string;
 }
 
 @InputType()
 export class PatientDocumentInput {
+  @MaxLength(255)
   @Field()
   @IsString()
   @MinLength(1)
   name: string;
 
+  @MaxLength(500)
   @Field()
   @IsString()
   @MinLength(1)
   fileUrl: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   fileType?: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()

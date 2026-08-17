@@ -4,6 +4,7 @@ import {
   IsEmail,
   IsOptional,
   IsString,
+  MaxLength,
   MinLength,
 } from 'class-validator';
 
@@ -54,6 +55,7 @@ export class StaffType {
 
 @InputType()
 export class CreateStaffInput {
+  @MaxLength(255)
   @Field()
   @IsString()
   @MinLength(2)
@@ -63,6 +65,7 @@ export class CreateStaffInput {
   @IsEmail()
   email: string;
 
+  @MaxLength(50)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
@@ -72,16 +75,19 @@ export class CreateStaffInput {
   @IsString()
   roleSlug: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   department?: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   specialization?: string;
 
+  @MaxLength(50)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
@@ -90,11 +96,13 @@ export class CreateStaffInput {
 
 @InputType()
 export class UpdateStaffInput {
+  @MaxLength(255)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   fullName?: string;
 
+  @MaxLength(50)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
@@ -105,16 +113,19 @@ export class UpdateStaffInput {
   @IsString()
   roleSlug?: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   department?: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   specialization?: string;
 
+  @MaxLength(50)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()

@@ -254,7 +254,11 @@ export class BillingService {
 
     const patients = await this.patientsRepo
       .createQueryBuilder('patient')
-      .select(['patient.id', 'patient.fullName', 'patient.identificationNumber'])
+      .select([
+        'patient.id',
+        'patient.fullName',
+        'patient.identificationNumber',
+      ])
       .where('patient.hospital_id = :hospitalId', { hospitalId })
       .andWhere('patient.deleted_at IS NULL')
       .andWhere(

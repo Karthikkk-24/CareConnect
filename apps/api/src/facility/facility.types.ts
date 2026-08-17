@@ -1,5 +1,12 @@
 import { Field, ID, InputType, ObjectType } from '@nestjs/graphql';
-import { IsIn, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+import {
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 /** Manual bed updates only allow available ↔ maintenance (occupied is admit/discharge). */
 export const MANUAL_BED_STATUSES = ['available', 'maintenance'] as const;
@@ -69,11 +76,13 @@ export class BedType {
 
 @InputType()
 export class CreateDepartmentInput {
+  @MaxLength(255)
   @Field()
   @IsString()
   @MinLength(1)
   name: string;
 
+  @MaxLength(2000)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
@@ -82,6 +91,7 @@ export class CreateDepartmentInput {
 
 @InputType()
 export class CreateWardInput {
+  @MaxLength(255)
   @Field()
   @IsString()
   @MinLength(1)
@@ -92,6 +102,7 @@ export class CreateWardInput {
   @IsUUID()
   departmentId?: string;
 
+  @MaxLength(50)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
@@ -104,6 +115,7 @@ export class CreateBedInput {
   @IsUUID()
   wardId: string;
 
+  @MaxLength(50)
   @Field()
   @IsString()
   @MinLength(1)

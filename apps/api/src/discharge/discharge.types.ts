@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
   MinLength,
 } from 'class-validator';
 import { FOLLOW_UP_STATUSES } from '../database/entities/follow-up.entity';
@@ -93,16 +94,19 @@ export class CreateDischargeInput {
   @IsUUID()
   admissionId: string;
 
+  @MaxLength(2000)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   summary?: string;
 
+  @MaxLength(2000)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   medicationsAtDischarge?: string;
 
+  @MaxLength(2000)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
@@ -113,6 +117,7 @@ export class CreateDischargeInput {
   @IsDateString()
   followUpScheduledAt?: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
@@ -143,11 +148,13 @@ export class CreateFollowUpInput {
   @IsDateString()
   scheduledAt: string;
 
+  @MaxLength(100)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   type?: string;
 
+  @MaxLength(2000)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
@@ -165,6 +172,7 @@ export class UpdateFollowUpStatusInput {
   @IsIn([...FOLLOW_UP_STATUSES])
   status: string;
 
+  @MaxLength(2000)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()

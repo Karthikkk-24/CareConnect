@@ -1,13 +1,14 @@
 import { Field, Float, ID, InputType, ObjectType } from '@nestjs/graphql';
 import {
-  IsArray,
   ArrayMaxSize,
   ArrayMinSize,
+  IsArray,
   IsIn,
   IsNumber,
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
   Min,
   MinLength,
   ValidateNested,
@@ -97,6 +98,7 @@ export class InvoiceType {
 
 @InputType()
 export class CreateInvoiceItemInput {
+  @MaxLength(2000)
   @Field()
   @IsString()
   @MinLength(1)

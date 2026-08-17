@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -14,6 +15,18 @@ function isUniqueViolation(error: unknown): boolean {
     error instanceof QueryFailedError &&
     (error as QueryFailedError & { code?: string }).code === '23505'
   );
+}
+
+/** users.full_name is VARCHAR(255); reject oversized names before the DB does. */
+function assertFullName(fullName: string): string {
+  const trimmed = fullName?.trim() ?? '';
+  if (!trimmed) {
+    throw new BadRequestException('Full name is required');
+  }
+  if (trimmed.length > 255) {
+    throw new BadRequestException('Full name must be at most 255 characters');
+  }
+  return trimmed;
 }
 
 @Injectable()
@@ -165,6 +178,7 @@ export class AuthService {
     hospitalId?: string,
     assignHospitalAdmin = false,
   ) {
+    fullName = assertFullName(fullName);
     const user = await this.usersRepo.findOne({ where: { id: actor.id } });
     if (!user) throw new NotFoundException('User not found');
 
@@ -275,6 +289,7 @@ export class AuthService {
 
   /** Patient portal path: assign patient role and mark onboarding complete. */
   async completePatientOnboarding(user: AuthenticatedUser, fullName: string) {
+    fullName = assertFullName(fullName);
     const staffRoles = (user.roles ?? []).filter((role) => role !== 'patient');
     if (user.hospitalId || staffRoles.length > 0) {
       throw new ForbiddenException(
