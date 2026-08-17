@@ -1,4 +1,4 @@
-import { UseGuards } from '@nestjs/common';
+import { NotFoundException, UseGuards } from '@nestjs/common';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { PERMISSIONS, ROLES } from '@careconnect/types';
 import { GqlAuthGuard } from '../auth/gql-auth.guard';
@@ -76,6 +76,11 @@ export class StaffResolver {
     @Args('id') id: string,
     @Args('input') input: UpdateStaffInput,
   ): Promise<StaffType> {
+    const existing = await this.staffService.findByIdForUser(id, user);
+    if (!existing) throw new NotFoundException('Staff member not found');
+    await this.hospitalContext.resolveHospitalId(user, existing.hospitalId, {
+      write: true,
+    });
     const member = await this.staffService.update(id, input, user);
     const full = await this.staffService.findById(member.id);
     return this.staffService.toStaffType(full!);
@@ -88,6 +93,11 @@ export class StaffResolver {
     @CurrentUser() user: AuthenticatedUser,
     @Args('id') id: string,
   ): Promise<StaffType> {
+    const existing = await this.staffService.findByIdForUser(id, user);
+    if (!existing) throw new NotFoundException('Staff member not found');
+    await this.hospitalContext.resolveHospitalId(user, existing.hospitalId, {
+      write: true,
+    });
     const member = await this.staffService.resendStaffInvite(id, user);
     const inviteToken = member.inviteToken;
     const full = await this.staffService.findById(member.id);
@@ -101,6 +111,11 @@ export class StaffResolver {
     @CurrentUser() user: AuthenticatedUser,
     @Args('id') id: string,
   ): Promise<boolean> {
+    const existing = await this.staffService.findByIdForUser(id, user);
+    if (!existing) throw new NotFoundException('Staff member not found');
+    await this.hospitalContext.resolveHospitalId(user, existing.hospitalId, {
+      write: true,
+    });
     return this.staffService.remove(id, user);
   }
 
