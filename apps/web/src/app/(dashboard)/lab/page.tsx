@@ -17,6 +17,7 @@ import {
 } from '@/lib/graphql/queries';
 import { QueryError } from '@/components/query-error';
 import { canAuthorClinical } from '@/lib/clinical-access';
+import { getApiOrigin } from '@/lib/api-url';
 
 const statusVariant = (status: string) => {
   switch (status) {
@@ -76,9 +77,7 @@ export default function LabPage() {
     permissions.includes('patients:write') && canAuthorClinical(roles);
   const canWriteLab = permissions.includes('lab:write');
 
-  const apiBase = (
-    process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/graphql'
-  ).replace(/\/graphql\/?$/, '');
+  const apiBase = getApiOrigin();
 
   const { data, loading, error: listError, refetch } = useQuery(LAB_ORDERS_QUERY, {
     variables: { hospitalId, status: undefined },

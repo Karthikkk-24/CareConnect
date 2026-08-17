@@ -17,6 +17,7 @@ import {
   canWritePatientDemographics,
 } from '@/lib/clinical-access';
 import { useAuth } from '@clerk/nextjs';
+import { getApiOrigin } from '@/lib/api-url';
 
 /** Free-form status values — admission/discharge flows own admitted/discharged. */
 const EDITABLE_PATIENT_STATUSES = ['registered', 'checked_in', 'inactive'] as const;
@@ -176,9 +177,7 @@ export default function PatientDetailPage() {
     }
   };
 
-  const apiBase = (
-    process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/graphql'
-  ).replace(/\/graphql\/?$/, '');
+  const apiBase = getApiOrigin();
 
   const handleOpenDocument = async (fileUrl: string) => {
     const token = await getToken();

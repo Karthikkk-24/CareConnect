@@ -1,9 +1,10 @@
 import type { NextConfig } from 'next';
 import createNextIntlPlugin from 'next-intl/plugin';
+import { getPublicApiUrl } from './src/lib/api-url';
 
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/graphql';
+const API_URL = getPublicApiUrl();
 
 // Clerk hydrates via inline scripts (SSR state + cache signals) and loads
 // clerk-js from its Frontend API, so script-src must keep 'unsafe-inline'
