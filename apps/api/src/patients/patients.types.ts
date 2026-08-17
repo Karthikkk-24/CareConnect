@@ -414,7 +414,7 @@ export class CreatePatientInput {
   @IsString()
   bloodGroup?: string;
 
-  @MaxLength(100)
+  @MaxLength(2000)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
@@ -549,7 +549,7 @@ export class UpdatePatientInput {
   @IsString()
   bloodGroup?: string;
 
-  @MaxLength(100)
+  @MaxLength(2000)
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
@@ -671,7 +671,7 @@ export class BulkPatientRowInput {
   @Field({ nullable: true })
   bloodGroup?: string;
 
-  @MaxLength(100)
+  @MaxLength(2000)
   @Field({ nullable: true })
   address?: string;
 
@@ -695,7 +695,7 @@ export class BulkPatientRowInput {
   @Field({ nullable: true })
   insurancePolicyNumber?: string;
 
-  @MaxLength(2000)
+  @MaxLength(255)
   @Field({ nullable: true })
   allergies?: string;
 
