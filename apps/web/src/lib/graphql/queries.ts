@@ -397,7 +397,11 @@ export const IMPORT_PATIENTS_MUTATION = gql`
 `;
 
 export const ADD_PATIENT_DOCUMENT_MUTATION = gql`
-  mutation AddPatientDocument($patientId: String!, $input: PatientDocumentInput!, $hospitalId: String) {
+  mutation AddPatientDocument(
+    $patientId: String!
+    $input: PatientDocumentInput!
+    $hospitalId: String
+  ) {
     addPatientDocument(patientId: $patientId, input: $input, hospitalId: $hospitalId) {
       id
       name
@@ -448,18 +452,8 @@ export const DASHBOARD_STATS_QUERY = gql`
 `;
 
 export const APPOINTMENTS_QUERY = gql`
-  query Appointments(
-    $hospitalId: String
-    $date: String
-    $status: String
-    $doctorId: String
-  ) {
-    appointments(
-      hospitalId: $hospitalId
-      date: $date
-      status: $status
-      doctorId: $doctorId
-    ) {
+  query Appointments($hospitalId: String, $date: String, $status: String, $doctorId: String) {
+    appointments(hospitalId: $hospitalId, date: $date, status: $status, doctorId: $doctorId) {
       id
       patientId
       patient {
@@ -497,6 +491,18 @@ export const UPDATE_APPOINTMENT_STATUS_MUTATION = gql`
     updateAppointmentStatus(id: $id, status: $status, hospitalId: $hospitalId) {
       id
       status
+    }
+  }
+`;
+
+export const RESCHEDULE_APPOINTMENT_MUTATION = gql`
+  mutation RescheduleAppointment($input: RescheduleAppointmentInput!, $hospitalId: String) {
+    rescheduleAppointment(input: $input, hospitalId: $hospitalId) {
+      id
+      scheduledAt
+      status
+      reason
+      notes
     }
   }
 `;
@@ -830,6 +836,17 @@ export const UPDATE_FOLLOW_UP_STATUS_MUTATION = gql`
   mutation UpdateFollowUpStatus($input: UpdateFollowUpStatusInput!, $hospitalId: String) {
     updateFollowUpStatus(input: $input, hospitalId: $hospitalId) {
       id
+      status
+      notes
+    }
+  }
+`;
+
+export const RESCHEDULE_FOLLOW_UP_MUTATION = gql`
+  mutation RescheduleFollowUp($input: RescheduleFollowUpInput!, $hospitalId: String) {
+    rescheduleFollowUp(input: $input, hospitalId: $hospitalId) {
+      id
+      scheduledAt
       status
       notes
     }

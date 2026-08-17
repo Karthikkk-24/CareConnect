@@ -10,6 +10,7 @@ import {
   FOLLOW_UPS_QUERY,
   ME_QUERY,
   PATIENTS_QUERY,
+  RESCHEDULE_FOLLOW_UP_MUTATION,
   STAFF_MEMBERS_QUERY,
   UPDATE_FOLLOW_UP_STATUS_MUTATION,
 } from '@/lib/graphql/queries';
@@ -24,6 +25,17 @@ function formatDateTime(iso: string) {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+function toDateTimeLocalValue(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function canRescheduleFollowUp(status: string) {
+  return status === 'scheduled' || status === 'rescheduled' || status === 'missed';
 }
 
 const statusVariant = (status: string) => {
@@ -52,19 +64,27 @@ export default function FollowUpsPage() {
   const [scheduledAt, setScheduledAt] = useState('');
   const [type, setType] = useState('outpatient');
   const [error, setError] = useState('');
+  const [reschedulingId, setReschedulingId] = useState<string | null>(null);
+  const [rescheduleAt, setRescheduleAt] = useState('');
 
-  const { data, loading, error: listError, refetch } = useQuery(FOLLOW_UPS_QUERY, {
+  const {
+    data,
+    loading,
+    error: listError,
+    refetch,
+  } = useQuery(FOLLOW_UPS_QUERY, {
     variables: { hospitalId },
     skip: !hospitalId,
   });
 
-  const { data: patientsData, error: patientsError, refetch: refetchPatients } = useQuery(
-    PATIENTS_QUERY,
-    {
-      variables: { search: patientSearch, limit: 8, hospitalId },
-      skip: !hospitalId || patientSearch.length < 2,
-    },
-  );
+  const {
+    data: patientsData,
+    error: patientsError,
+    refetch: refetchPatients,
+  } = useQuery(PATIENTS_QUERY, {
+    variables: { search: patientSearch, limit: 8, hospitalId },
+    skip: !hospitalId || patientSearch.length < 2,
+  });
 
   const {
     data: staffData,
@@ -86,6 +106,12 @@ export default function FollowUpsPage() {
   const [updateStatus] = useMutation(UPDATE_FOLLOW_UP_STATUS_MUTATION, {
     onCompleted: () => refetch(),
   });
+  const [rescheduleFollowUp] = useMutation(RESCHEDULE_FOLLOW_UP_MUTATION, {
+    onCompleted: () => {
+      setReschedulingId(null);
+      refetch();
+    },
+  });
   const [createFollowUp, { loading: creating }] = useMutation(CREATE_FOLLOW_UP_MUTATION, {
     onCompleted: () => {
       refetch();
@@ -106,6 +132,24 @@ export default function FollowUpsPage() {
       await updateStatus({ variables: { hospitalId, input: { id, status } } });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update follow-up status');
+    }
+  };
+
+  const handleReschedule = async (id: string) => {
+    setError('');
+    if (!rescheduleAt) {
+      setError('Choose a new date and time to reschedule');
+      return;
+    }
+    try {
+      await rescheduleFollowUp({
+        variables: {
+          hospitalId,
+          input: { id, scheduledAt: new Date(rescheduleAt).toISOString() },
+        },
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to reschedule follow-up');
     }
   };
 
@@ -146,16 +190,14 @@ export default function FollowUpsPage() {
 
       <div className="mb-6 flex justify-end">
         {canWriteFollowUp ? (
-        <ClayButton onClick={() => setShowForm((v) => !v)}>
-          <Plus className="mr-2 h-4 w-4" />
-          {showForm ? 'Hide form' : 'Schedule follow-up'}
-        </ClayButton>
+          <ClayButton onClick={() => setShowForm((v) => !v)}>
+            <Plus className="mr-2 h-4 w-4" />
+            {showForm ? 'Hide form' : 'Schedule follow-up'}
+          </ClayButton>
         ) : null}
       </div>
 
-      {error && !showForm ? (
-        <p className="mb-4 text-sm text-clay-error">{error}</p>
-      ) : null}
+      {error && !showForm ? <p className="mb-4 text-sm text-clay-error">{error}</p> : null}
 
       {showForm ? (
         <ClayCard className="mb-6 max-w-xl space-y-4">
@@ -263,9 +305,9 @@ export default function FollowUpsPage() {
             <CalendarClock className="mx-auto mb-3 h-10 w-10 text-clay-text-muted/50" />
             <p className="text-clay-text-muted">No follow-ups scheduled.</p>
             {canWriteFollowUp ? (
-            <ClayButton className="mt-4" size="sm" onClick={() => setShowForm(true)}>
-              Schedule one
-            </ClayButton>
+              <ClayButton className="mt-4" size="sm" onClick={() => setShowForm(true)}>
+                Schedule one
+              </ClayButton>
             ) : null}
           </div>
         ) : (
@@ -298,20 +340,51 @@ export default function FollowUpsPage() {
                   <ClayBadge variant={statusVariant(item.status)}>
                     {item.status.replace(/_/g, ' ')}
                   </ClayBadge>
-                  {item.status === 'scheduled' && canWriteFollowUp ? (
-                    <div className="flex gap-2">
-                      <ClayButton size="sm" onClick={() => handleStatus(item.id, 'completed')}>
-                        Complete
+                  {canWriteFollowUp && reschedulingId === item.id ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        type="datetime-local"
+                        value={rescheduleAt}
+                        onChange={(e) => setRescheduleAt(e.target.value)}
+                        className="rounded-2xl border border-white/60 bg-clay-surface px-3 py-2 text-sm shadow-clay-inset"
+                      />
+                      <ClayButton size="sm" onClick={() => void handleReschedule(item.id)}>
+                        Save
                       </ClayButton>
-                      <ClayButton
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => handleStatus(item.id, 'missed')}
-                      >
-                        Missed
+                      <ClayButton size="sm" variant="ghost" onClick={() => setReschedulingId(null)}>
+                        Close
                       </ClayButton>
                     </div>
-                  ) : null}
+                  ) : (
+                    <>
+                      {item.status === 'scheduled' && canWriteFollowUp ? (
+                        <div className="flex gap-2">
+                          <ClayButton size="sm" onClick={() => handleStatus(item.id, 'completed')}>
+                            Complete
+                          </ClayButton>
+                          <ClayButton
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => handleStatus(item.id, 'missed')}
+                          >
+                            Missed
+                          </ClayButton>
+                        </div>
+                      ) : null}
+                      {canWriteFollowUp && canRescheduleFollowUp(item.status) ? (
+                        <ClayButton
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => {
+                            setReschedulingId(item.id);
+                            setRescheduleAt(toDateTimeLocalValue(item.scheduledAt));
+                          }}
+                        >
+                          Reschedule
+                        </ClayButton>
+                      ) : null}
+                    </>
+                  )}
                 </div>
               ),
             )}

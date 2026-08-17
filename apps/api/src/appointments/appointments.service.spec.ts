@@ -233,4 +233,108 @@ describe('AppointmentsService status machine', () => {
       );
     });
   });
+
+  describe('reschedule', () => {
+    it('updates scheduledAt and keeps scheduled status', async () => {
+      mockLockedAppointment({
+        id: 'appt-1',
+        hospitalId: 'hospital-a',
+        patientId: 'patient-1',
+        status: 'scheduled',
+        scheduledAt: new Date('2026-08-18T09:00:00.000Z'),
+      });
+
+      const result = await service.reschedule(
+        'hospital-a',
+        { id: 'appt-1', scheduledAt: '2026-08-21T14:00:00.000Z' },
+        actor,
+      );
+
+      expect(result.status).toBe('scheduled');
+      expect(new Date(result.scheduledAt).toISOString()).toBe(
+        '2026-08-21T14:00:00.000Z',
+      );
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'reschedule',
+          resource: 'appointment',
+        }),
+      );
+    });
+
+    it('revives no_show to scheduled at the new time', async () => {
+      mockLockedAppointment({
+        id: 'appt-1',
+        hospitalId: 'hospital-a',
+        patientId: 'patient-1',
+        status: 'no_show',
+        scheduledAt: new Date('2026-08-17T09:00:00.000Z'),
+      });
+
+      const result = await service.reschedule(
+        'hospital-a',
+        {
+          id: 'appt-1',
+          scheduledAt: '2026-08-22T11:00:00.000Z',
+          notes: 'Patient called back',
+        },
+        actor,
+      );
+
+      expect(result.status).toBe('scheduled');
+      expect(result.notes).toBe('Patient called back');
+    });
+
+    it('rejects cancelled appointments', async () => {
+      mockLockedAppointment({
+        id: 'appt-1',
+        hospitalId: 'hospital-a',
+        patientId: 'patient-1',
+        status: 'cancelled',
+      });
+
+      await expect(
+        service.reschedule(
+          'hospital-a',
+          { id: 'appt-1', scheduledAt: '2026-08-21T14:00:00.000Z' },
+          actor,
+        ),
+      ).rejects.toThrow(/Cannot reschedule a cancelled appointment/);
+    });
+
+    it('rejects completed appointments', async () => {
+      mockLockedAppointment({
+        id: 'appt-1',
+        hospitalId: 'hospital-a',
+        patientId: 'patient-1',
+        status: 'completed',
+      });
+
+      await expect(
+        service.reschedule(
+          'hospital-a',
+          { id: 'appt-1', scheduledAt: '2026-08-21T14:00:00.000Z' },
+          actor,
+        ),
+      ).rejects.toThrow(/Cannot reschedule a completed appointment/);
+    });
+
+    it('throws NotFound when appointment is missing', async () => {
+      const qb = {
+        setLock: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(null),
+      };
+      apptManager.createQueryBuilder.mockReturnValue(qb);
+
+      await expect(
+        service.reschedule(
+          'hospital-a',
+          { id: 'missing', scheduledAt: '2026-08-21T14:00:00.000Z' },
+          actor,
+        ),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
 });
